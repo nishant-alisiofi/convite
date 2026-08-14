@@ -27,6 +27,10 @@ allowlist, RLS policies for all five roles, and the Tablero reading real data th
 river-route editor, first-mile pickup clustering, and the season as an audited admin setting
 instead of an environment variable. See [El mapa](#el-mapa) and [Las recogidas](#las-recogidas).
 
+**M7 — Verificación y bandeja de audio.** The daily work screen: the queue ordered by urgency
+then age, voice notes played inline, transcript correction, duplicate marking, and promotion
+to `pedido`. See [La verificación](#la-verificación).
+
 **Infra.** Live Supabase project `convite` (us-east-1, ref `kjwkvulmsjffzhuchwpy`). All 18
 migrations applied, basin seeded, 116 tests green against the real database.
 
@@ -75,6 +79,33 @@ that gets logged in `decisiones_asignacion` (2.9), not something the engine reso
 
 `motivo` is the product surface — «Hay 180 mercados en Bodega Central Quibdó, pero nadie va para
 Bellavista en los próximos 14 días» — and it names the stock's age whenever the count is old.
+
+## La verificación
+
+`/verificacion` is where the day is spent. What arrives is a message somebody sent from a
+phone; what leaves is a request somebody vouched for, a duplicate somebody recognised, or a
+referral.
+
+**Nothing reaches `pedidos` without a human action**, and that is a trigger rather than a
+policy (migration 0023). RLS decides who may insert and the UI decides which button exists,
+but neither stops the webhook, a job handler or a well-meaning script — and intake runs as
+`service_role`, which bypasses RLS entirely. A trigger is bypassed by nobody: a `pedido` may
+only point at a report that a person verified, and that person is named on the report.
+
+**The machine's transcript is never overwritten.** `adjuntos.transcripcion` stays exactly
+what speech-to-text produced; a correction goes in `transcripcion_corregida` beside it with
+the corrector's name. Overwriting it would destroy the only evidence of how the transcriber
+handles Chocoano — which is the evidence that decides whether to change provider (2.12).
+
+**Marking a duplicate carries a name too.** It is the same judgement as verifying and the
+more consequential direction, because it makes a need disappear rather than appear. The old
+constraint required a verifier only for `VERIFICADO`; `reportes_disposicion_check` now covers
+both.
+
+Playback is a plain `<audio controls>` element — the browser's own player, no JavaScript.
+Audio is served from our own storage behind a session, and the query reads the key *through*
+`reportes` so it inherits that table's community scoping: a verifier for the Atrato medio
+cannot pull a Río Quito recording by guessing an id.
 
 ## El mapa
 

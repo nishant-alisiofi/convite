@@ -104,11 +104,18 @@ export const reportes = pgTable(
       sql`(verificado_por is null and verificado_en is null)
           or (verificado_por is not null and verificado_en is not null)`,
     ),
+    // Verifying and marking a duplicate are the same kind of judgement — a person read this
+    // and decided — so both carry a name. Marking a duplicate is the more consequential
+    // direction: it makes a need disappear rather than appear.
     check(
-      'reportes_verificado_completo_check',
-      sql`estado <> 'VERIFICADO' or verificado_por is not null`,
+      'reportes_disposicion_check',
+      sql`estado in ('RECIBIDO', 'CANCELADO') or verificado_por is not null`,
     ),
     check('reportes_duplicado_check', sql`estado <> 'DUPLICADO' or reporte_padre_id is not null`),
+    // The daily queue: what is waiting, worst first (Section 4.5).
+    index('reportes_bandeja_idx')
+      .on(sql`urgencia desc nulls last`, t.creadoEn)
+      .where(sql`estado = 'RECIBIDO'`),
   ],
 )
 
@@ -129,8 +136,17 @@ export const adjuntos = pgTable(
     bytes: bigint('bytes', { mode: 'number' }),
     duracionSeg: integer('duracion_seg'),
     hashSha256: text('hash_sha256'),
+    /**
+     * What speech-to-text heard. Never edited (2.12) — a correction lands in
+     * `transcripcionCorregida`, so the machine's output stays available to judge the
+     * provider by. Overwriting it destroys the only evidence of what the model produced.
+     */
     transcripcion: text('transcripcion'),
     transcripcionConfianza: numeric('transcripcion_confianza', { precision: 4, scale: 3 }),
+    /** What a person says was actually said. Read this when present, else `transcripcion`. */
+    transcripcionCorregida: text('transcripcion_corregida'),
+    corregidaPor: uuid('corregida_por').references(() => usuarios.id),
+    corregidaEn: timestamp('corregida_en', { withTimezone: true, mode: 'date' }),
     /** Non-negotiable 2.5: no image is stored until its EXIF has been stripped. */
     exifRemovido: boolean('exif_removido').notNull().default(false),
     creadoEn: creadoEn(),
@@ -144,6 +160,12 @@ export const adjuntos = pgTable(
     check(
       'adjuntos_no_url_proveedor_check',
       sql`storage_key !~* '^https?://'`,
+    ),
+    // 2.1: a correction is somebody's claim about what was said, so it carries their name.
+    check(
+      'adjuntos_correccion_check',
+      sql`(transcripcion_corregida is null and corregida_por is null and corregida_en is null)
+          or (transcripcion_corregida is not null and corregida_por is not null and corregida_en is not null)`,
     ),
   ],
 )

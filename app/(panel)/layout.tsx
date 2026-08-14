@@ -10,7 +10,7 @@ import { clienteServidor } from '@/lib/supabase/servidor'
 
 const SECCIONES = [
   { href: '/tablero', etiqueta: 'Tablero', listo: true },
-  { href: '/verificacion', etiqueta: 'Verificación' },
+  { href: '/verificacion', etiqueta: 'Verificación', listo: true },
   { href: '/mapa', etiqueta: 'Mapa', listo: true },
   { href: '/inventario', etiqueta: 'Inventario' },
   { href: '/rutas', etiqueta: 'Rutas', listo: true },
