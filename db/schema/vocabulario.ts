@@ -167,6 +167,24 @@ export const ESTADOS_MENSAJE = [
 
 export const TIPOS_ADJUNTO = ['audio', 'foto', 'firma'] as const
 
+/**
+ * Section 4.3. `perdida` is a call we hung up on without answering, so it cost the caller
+ * nothing; `devolucion` is us ringing back, and we pay for it.
+ */
+export const TIPOS_LLAMADA = ['perdida', 'devolucion'] as const
+
+/** `bloqueada` is a callback a spend cap refused — recorded, never silently skipped. */
+export const ESTADOS_LLAMADA = [
+  'registrada',
+  'rechazada',
+  'bloqueada',
+  'marcando',
+  'contestada',
+  'grabada',
+  'a_persona',
+  'fallida',
+] as const
+
 export const ESTADOS_JOB = ['pendiente', 'corriendo', 'hecho', 'fallido'] as const
 
 export type RolContacto = (typeof ROLES_CONTACTO)[number]
@@ -186,5 +204,7 @@ export type EstadoCapacidad = (typeof ESTADOS_CAPACIDAD)[number]
 export type EstadoOferta = (typeof ESTADOS_OFERTA)[number]
 export type EstadoMensaje = (typeof ESTADOS_MENSAJE)[number]
 export type TipoAdjunto = (typeof TIPOS_ADJUNTO)[number]
+export type TipoLlamada = (typeof TIPOS_LLAMADA)[number]
+export type EstadoLlamada = (typeof ESTADOS_LLAMADA)[number]
 export type TipoLabor = (typeof TIPOS_LABOR)[number]
 export type EstadoEnvio = (typeof ESTADOS_ENVIO)[number]

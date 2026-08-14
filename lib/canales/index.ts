@@ -30,8 +30,32 @@ export type {
   PropuestaNormalizador,
 } from './normalizador'
 export { COPIA } from './salidas'
-export { cargarPerfil, despachar, entregarPendientes } from './despachador'
-export type { Digesto, ResultadoDespacho, SalidaSolicitada } from './despachador'
+export { cargarPerfil, despachar, entregarPendientes, llamarDeVuelta } from './despachador'
+export type {
+  Digesto,
+  ResultadoDespacho,
+  ResultadoLlamada,
+  SalidaSolicitada,
+} from './despachador'
+export {
+  CLAVE_PRESUPUESTO,
+  presupuestoVoz,
+  revisarTopes,
+  TOPE_POR_NUMERO_30MIN,
+  TOPE_POR_NUMERO_DIA,
+  UMBRAL_ALERTA,
+} from './topes'
+export type { EstadoPresupuesto, VeredictoTope } from './topes'
+export {
+  aE164,
+  PROVEEDOR_VOZ_SIMULADOR,
+  proveedorVozSimulador,
+} from './voz/driver'
+export type { LlamadaEntrante, ProveedorVoz } from './voz/driver'
+export { devolverLlamada, recibirLlamadaPerdida } from './voz/flujo'
+export type { Interaccion, ResultadoDevolucion, ResultadoPerdida } from './voz/flujo'
+export { dictarFolio, MENU, opcionDe, PROMPTS, tipoDeIntencion } from './voz/menu'
+export type { OpcionMenu } from './voz/menu'
 export {
   anotarActividad,
   anotarMedia,

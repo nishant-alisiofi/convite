@@ -2,6 +2,8 @@ import type { Pool, PoolClient } from 'pg'
 import type { Canal } from '@/db/schema/vocabulario'
 import { comoConfirmar, type PerfilContacto } from './politica'
 import { recortarAUnSegmento, segmentar } from './sms/segmentos'
+import { type EstadoPresupuesto, revisarTopes } from './topes'
+import { PROVEEDOR_VOZ_SIMULADOR, type ProveedorVoz } from './voz/driver'
 import { type ContextoVentana, decidirSalida, type DecisionVentana, type Plantilla } from './ventana'
 
 /**
@@ -206,5 +208,76 @@ export async function entregarPendientes(
     canal: plan.canal,
     incluidas: incluidas.length,
     pendientes: pendientes.length - incluidas.length,
+  }
+}
+
+export type ResultadoLlamada =
+  | { estado: 'marcando'; llamadaId: string; idExterno: string; presupuesto: EstadoPresupuesto }
+  | { estado: 'bloqueada'; llamadaId: string; motivo: string; presupuesto: EstadoPresupuesto }
+
+/**
+ * Rings somebody back — the only place in the codebase that dials.
+ *
+ * Same rule as the message queue, for a sharper reason: this is the one channel where a bug
+ * spends money by itself. The caps are checked here, before the provider is touched, so
+ * there is no path from a webhook to a phone call that skips them.
+ *
+ * A refusal writes a `llamadas` row with the reason. A cap that silently declines to call
+ * someone back is indistinguishable from an outage, and the person waiting by the phone
+ * cannot tell the difference either.
+ */
+export async function llamarDeVuelta(
+  ejecutor: Pool | PoolClient,
+  destino: { telefono: string; organizacionId: string; contactoId?: string | null },
+  deps: { proveedor: ProveedorVoz },
+  ahora: Date = new Date(),
+): Promise<ResultadoLlamada> {
+  const veredicto = await revisarTopes(ejecutor, destino.telefono, ahora)
+
+  if (!veredicto.permitido) {
+    const { rows } = await ejecutor.query<{ id: string }>(
+      `insert into llamadas
+         (organizacion_id, proveedor, contacto_id, telefono, tipo, estado, motivo_bloqueo, iniciada_en)
+       values ($1, $2, $3, $4, 'devolucion', 'bloqueada', $5, $6)
+       returning id`,
+      [
+        destino.organizacionId,
+        PROVEEDOR_VOZ_SIMULADOR,
+        destino.contactoId ?? null,
+        destino.telefono,
+        veredicto.motivo,
+        ahora,
+      ],
+    )
+    return {
+      estado: 'bloqueada',
+      llamadaId: rows[0]!.id,
+      motivo: veredicto.motivo,
+      presupuesto: veredicto.presupuesto,
+    }
+  }
+
+  const salida = await deps.proveedor.llamar(destino.telefono)
+
+  const { rows } = await ejecutor.query<{ id: string }>(
+    `insert into llamadas
+       (organizacion_id, proveedor, proveedor_llamada_id, contacto_id, telefono, tipo, estado, iniciada_en)
+     values ($1, $2, $3, $4, $5, 'devolucion', 'marcando', $6)
+     returning id`,
+    [
+      destino.organizacionId,
+      PROVEEDOR_VOZ_SIMULADOR,
+      salida.idExterno,
+      destino.contactoId ?? null,
+      destino.telefono,
+      ahora,
+    ],
+  )
+
+  return {
+    estado: 'marcando',
+    llamadaId: rows[0]!.id,
+    idExterno: salida.idExterno,
+    presupuesto: veredicto.presupuesto,
   }
 }

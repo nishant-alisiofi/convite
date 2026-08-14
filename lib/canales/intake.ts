@@ -247,7 +247,13 @@ export async function recibirSobre(
   // the reporte and the row stays honestly unclassified.
   const propuesta = await normalizador.proponer({ texto: sobre.contenido.texto, ahora })
   const confiable = esConfiable(propuesta)
-  const tipo = confiable ? (propuesta.tipo ?? 'necesidad') : 'sin_clasificar'
+
+  // Some channels state the type structurally rather than in words: an IVR caller who
+  // pressed «1 pedir ayuda» has declared it, exactly as the printed card's code does. That
+  // is not a guess and it is not the normalizer's to override — but a confident reading of
+  // actual words is more specific, because it comes with the catalogue item, so it wins.
+  const tipoDelCanal = sobre.tipo === 'necesidad' || sobre.tipo === 'dano' ? sobre.tipo : null
+  const tipo = confiable ? (propuesta.tipo ?? 'necesidad') : (tipoDelCanal ?? 'sin_clasificar')
 
   const { rows: filasReporte } = await client.query<{ id: string; folio: number }>(
     `insert into reportes
@@ -304,7 +310,29 @@ export async function recibirSobre(
     // rather than around it, so the one code path is the one production uses.
     const contextoVentana = { ultimoEntranteEn: sobre.recibidoEn, ahora }
 
-    if (confiable && propuesta.requiereDetalle.length === 0) {
+    // Audio with no words yet is not an unclear message — it is a message nobody has
+    // listened to. Asking «¿me cuenta qué necesita?» of someone who just recorded two
+    // minutes explaining exactly that is the channel insulting them, and it is what the
+    // clarification branch would otherwise do to every voice note and every IVR call. The
+    // report waits for a transcript (D8) or for the audio inbox (M7), and meanwhile they
+    // get their folio like anyone else.
+    const esperaTranscripcion =
+      !sobre.contenido.texto && sobre.contenido.media.some((m) => m.tipo === 'audio')
+
+    if (esperaTranscripcion) {
+      await despachar(
+        client,
+        {
+          contactoId: contacto.id,
+          cuerpo: COPIA.folio(reporte.folio),
+          cuerpoCorto: COPIA.folioSms(reporte.folio),
+          plantilla: 'reporte_recibido',
+          canalEntrada: sobre.canal,
+        },
+        contextoVentana,
+      )
+      confirmoFolio = true
+    } else if (confiable && propuesta.requiereDetalle.length === 0) {
       await cerrarAclaracion(client, contacto.id)
       await despachar(
         client,

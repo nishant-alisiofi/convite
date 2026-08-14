@@ -238,4 +238,26 @@ describe('ningún camino manda sin pasar por el despachador', () => {
       'lib/matching/vencimientos.ts',
     ])
   })
+
+  it('solo despachador.ts marca un número', () => {
+    // The same claim for voice, where it matters more: a message queue that loses the rules
+    // writes rows, a call path that loses them spends money. `llamarDeVuelta` checks the
+    // caps before touching the provider, so nothing may reach `.llamar()` around it.
+    const archivos: string[] = []
+    const recorrer = (dir: string) => {
+      for (const entrada of readdirSync(dir)) {
+        const ruta = join(dir, entrada)
+        if (statSync(ruta).isDirectory()) recorrer(ruta)
+        else if (ruta.endsWith('.ts') || ruta.endsWith('.tsx')) archivos.push(ruta)
+      }
+    }
+    recorrer('lib')
+    recorrer('app')
+
+    const marcadores = archivos.filter((ruta) =>
+      /\.llamar\(/.test(readFileSync(ruta, 'utf8')),
+    )
+
+    expect(marcadores).toEqual(['lib/canales/despachador.ts'])
+  })
 })
