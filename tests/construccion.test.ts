@@ -26,6 +26,8 @@ const PERMITIDAS_ESTATICAS = new Set([
   // The landing page: static marketing content, no database read. Prerendering is free and
   // correct, and it must NOT become dynamic — that would open a DB connection at build.
   '/acerca',
+  // robots.txt: generated from a static rule set, no database. Free and correct to prerender.
+  '/robots.txt',
 ])
 
 describe('la construcción sobrevive sin base de datos', () => {
