@@ -1,12 +1,43 @@
 @import 'tailwindcss';
 
-/* Section 10: light, calm, readable at 14px+, no dashboard that needs a big screen. */
+/*
+ * Convite's palette, drawn from the Chocó itself: the deep green of the rainforest, the
+ * ochre of the Atrato carrying sediment, and a warm off-white instead of clinical grey.
+ *
+ * Section 10 sets the constraint — light, calm, readable at 14px+, works on a laptop over a
+ * weak connection. So colour carries meaning and nothing else: the five board states each
+ * own a hue, and everything outside them stays quiet. A humanitarian dashboard that shouts
+ * in ten colours is one where nobody notices the urgent row.
+ */
+@theme {
+  /* Rainforest — the primary. */
+  --color-selva-50: #eef6f2;
+  --color-selva-100: #d4e9df;
+  --color-selva-600: #2c7a5f;
+  --color-selva-700: #1f5c4a;
+  --color-selva-900: #12362c;
+
+  /* The river: ochre, sediment-heavy. Used for waiting, not for danger. */
+  --color-atrato-50: #faf4e8;
+  --color-atrato-100: #f3e6c9;
+  --color-atrato-600: #b07d20;
+  --color-atrato-700: #8a6229;
+
+  /* Warm neutrals — paper, not screen grey. */
+  --color-barro-50: #faf9f7;
+  --color-barro-200: #e7e3dd;
+  --color-barro-600: #6f675e;
+  --color-barro-900: #2a2622;
+}
+
 :root {
   color-scheme: light;
 }
 
 body {
-  @apply bg-stone-50 text-stone-900 antialiased;
+  background-color: var(--color-barro-50);
+  color: var(--color-barro-900);
   font-size: 15px;
   line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
 }

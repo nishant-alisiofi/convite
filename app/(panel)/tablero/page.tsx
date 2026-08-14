@@ -33,31 +33,31 @@ const BUCKETS = [
     estado: 'LISTO',
     titulo: 'Listos para despachar',
     ayuda: 'Hay ruta, hay con qué y hay quién lo lleve. Falta que alguien confirme.',
-    tono: 'border-emerald-300 bg-emerald-50',
+    tono: 'border-selva-600 bg-selva-50',
   },
   {
     estado: 'SIN_CAPACIDAD',
     titulo: 'Esperan transporte',
     ayuda: 'Hay con qué y se puede llegar, pero nadie va para allá.',
-    tono: 'border-amber-300 bg-amber-50',
+    tono: 'border-atrato-700 bg-atrato-50',
   },
   {
     estado: 'SIN_EXISTENCIA',
     titulo: 'Esperan donación',
     ayuda: 'No hay en bodega ni nadie lo está ofreciendo.',
-    tono: 'border-sky-300 bg-sky-50',
+    tono: 'border-sky-400 bg-sky-50',
   },
   {
     estado: 'SIN_RUTA',
     titulo: 'Incomunicadas',
     ayuda: 'No hay cómo llegar en esta temporada.',
-    tono: 'border-rose-300 bg-rose-50',
+    tono: 'border-rose-400 bg-rose-50',
   },
   {
     estado: 'EN_CAMINO',
     titulo: 'En camino',
     ayuda: 'Ya salieron.',
-    tono: 'border-stone-300 bg-stone-100',
+    tono: 'border-barro-200 bg-barro-50',
   },
 ] as const
 
@@ -114,7 +114,7 @@ export default async function Tablero() {
                 <p className="text-sm text-stone-700">{bucket.ayuda}</p>
               </div>
 
-              <ul className="divide-y divide-stone-200 rounded-b-lg border border-stone-200 bg-white">
+              <ul className="divide-y divide-stone-200 rounded-b-lg border border-barro-200 bg-white">
                 {delBucket.map((fila) => (
                   <li key={fila.id} className="px-4 py-3">
                     <div className="flex flex-wrap items-baseline gap-x-2 text-sm text-stone-600">

@@ -32,7 +32,7 @@ export default async function PanelLayout({ children }: { children: React.ReactN
 
   return (
     <div className="min-h-dvh">
-      <header className="border-b border-stone-200 bg-white">
+      <header className="border-b border-barro-200 bg-white">
         <div className="mx-auto flex max-w-6xl items-center gap-6 px-6 py-3">
           <Link href="/tablero" className="font-semibold text-stone-900">
             Convite

@@ -22,6 +22,9 @@ remaining milestone has to prove before it counts as done.
 **Built:** the schema and its constraints; the matching engine and job queue; magic-link auth
 with an admin-managed staff allowlist; RLS for all five roles; the Tablero.
 
+**Verified working end to end:** magic-link sign-in → allowlist check → Tablero rendering
+live data through RLS.
+
 **Not built:** every inbound channel. Nothing has ever received a real message. The entire
 I/O layer — normalizer, WhatsApp, IVR, the adaptive link policy — is ahead of us, and so is
 everything downstream of dispatch.
@@ -44,6 +47,11 @@ Four things we learned by building that the spec did not anticipate:
 4. **The public boundary has to be tested against the database.** Three of the four issues
    above were invisible until the migrations ran somewhere real. Any milestone whose
    acceptance is a security property gets a database test, not a UI check.
+5. **Magic links do not arrive as `?code=`.** Supabase delivers the token in the URL
+   *fragment*, which a browser never sends to the server, so a callback that reads only
+   `?code=` bounces every real sign-in back to the login page. Fixed by handling
+   `token_hash` + `verifyOtp` — the server-side flow, and the only one that works without
+   JavaScript. Found by actually clicking the link rather than by reading the code.
 
 ---
 
@@ -62,6 +70,7 @@ These need answers from the team. Each one gates a milestone.
 | D7 | **What can `lectura` see?** Currently `mapa_publico` and nothing else, which is the literal reading of §11. | M12 | Confirm. If a donor or partner login needs more, specify what and we add an internal aggregate view. |
 | D8 | **Transcription provider**, and is it acceptable that voice notes containing names, locations and health details leave our infrastructure? | M4, M5 | Needs a decision before the first real voice note. Self-hosted Whisper is viable if not. |
 | D9 | **Data retention.** Nothing currently expires. | Cross-cutting | For household data in a conflict zone, deletion is a protection measure. Set a policy before launch. |
+| D10 | **WhatsApp or a mobile web app for community intake?** Under active debate. | M5 vs a web driver | Both, but not equally. WhatsApp for rural demand-side intake — it is zero-rated on Colombian prepaid plans, store-and-forwards on bad signal, and needs no install. A mobile web form is a good *donor* channel in Quibdó city and costs little, since the normalizer and pipeline are shared behind the channel port. See §9. |
 
 ### Spec conflicts to resolve
 
@@ -235,7 +244,24 @@ surface, not just the page.
 
 ---
 
-## 5. Cross-cutting work, in no milestone
+## 5. Design system
+
+Established while building the sign-in screen, so later screens do not each invent their own.
+
+- **Icons: Lucide** (`lucide-react`). One family, stroke icons, always paired with a text
+  label — an icon-only control is unusable for someone meeting the system once a month.
+- **Palette: Chocó.** `selva` (rainforest green) as the primary, `atrato` (the river's
+  sediment ochre) for waiting states, `barro` warm neutrals instead of clinical grey.
+  Defined as Tailwind theme tokens in `app/globals.css`.
+- **Colour carries meaning and nothing else.** Each board state owns one hue; everything
+  outside them stays quiet. A dashboard shouting in ten colours is one where nobody notices
+  the urgent row.
+- **No client JavaScript unless a screen genuinely needs it.** Sign-in and Tablero ship none.
+  Section 10: it has to work on a laptop over a weak connection.
+
+---
+
+## 6. Cross-cutting work, in no milestone
 
 Easy to lose because the build prompt does not list it.
 
@@ -256,6 +282,13 @@ Easy to lose because the build prompt does not list it.
   an audit row — natural fit for M8 alongside the route editor.
 - **Observability.** No error tracking, no alerting on a stuck job queue. A silently failing
   matcher looks exactly like a quiet week.
+- **Node 22.** `@supabase/supabase-js` 2.112 needs a native WebSocket that Node 20 lacks.
+  Next.js polyfills it so the app runs, but plain scripts using the SDK crash. Move the
+  engine to 22 rather than leaving that trap for the next person.
+- **Supabase Auth URL config** is environment-specific: site URL and redirect allow-list must
+  include each deployment origin, and the magic-link email template must point at
+  `/auth/callback?token_hash={{ .TokenHash }}&type=magiclink`. Set for localhost; **not yet
+  set for any deployed environment**, and sign-in will silently fail without it.
 - **The offer aggregation gap.** An offer must currently cover a whole request on its own.
   Eight people offering two mercados each will not satisfy a request for twelve, even though
   together they would. Splitting across offers is allocation, and §13 says humans decide — so
@@ -263,7 +296,7 @@ Easy to lose because the build prompt does not list it.
 
 ---
 
-## 6. Risks
+## 7. Risks
 
 | Risk | Impact | Mitigation |
 |---|---|---|
@@ -276,7 +309,7 @@ Easy to lose because the build prompt does not list it.
 
 ---
 
-## 7. Non-goals for v1
+## 8. Non-goals for v1
 
 Unchanged from §13, minus the SMS/IVR contradiction that D1 resolves:
 
@@ -289,8 +322,9 @@ Unchanged from §13, minus the SMS/IVR contradiction that D1 resolves:
 
 ---
 
-## 8. What to do next
+## 9. What to do next
 
+0. Answer **D10** — it decides whether M5 is the next build or a web intake driver is.
 1. Answer **D1** and **D2** — they gate two milestones and have procurement lead times.
 2. Start **D3** and **D4** with the partner in parallel with everything else.
 3. **Collect a real message corpus.** M4 should not start without one.
