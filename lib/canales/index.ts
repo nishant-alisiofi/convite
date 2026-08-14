@@ -19,6 +19,7 @@ export { extensionDe, limpiarExif, procesarMedia, proveedorMediaWhatsApp } from 
 export type { MediaDescargada, MediaGuardada, ProveedorMedia } from './media'
 export {
   esConfiable,
+  normalizadorLexico,
   normalizadorPendiente,
   PROPUESTA_VACIA,
   UMBRAL_CONFIANZA,

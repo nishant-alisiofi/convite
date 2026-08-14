@@ -1,0 +1,23 @@
+{"_cabecera":"CORPUS INVENTADO — NO ES ACEPTACIÓN","_advertencia":"Estos mensajes los escribimos nosotros. Prueban el ARNÉS, no el normalizador. PRD §7 es explícito: el vocabulario chocoano es justamente donde falla un clasificador genérico, y validar contra ejemplos inventados no demuestra nada sobre mensajes reales. La aceptación real de M4 exige el corpus de la línea de WhatsApp del socio (o un piloto). Cuando exista, apúntese CONVITE_CORPUS a ese archivo y este mismo test corre sin tocar código.","_version":"2026-08-14","_pendiente":"D-corpus: conseguir mensajes reales antes de declarar M4 aceptado."}
+{"texto":"Buenas, aquí en Tagachí necesitamos mercados, somos como 12 familias","espera":{"codigo":"11","familias":12},"nota":"caso base: ítem claro + conteo de hogares"}
+{"texto":"Manden mercaditos por favor, no hay nada que comer","espera":{"codigo":"11"},"nota":"diminutivo + refuerzo"}
+{"texto":"se acabó la bienestarina para los pelaos","espera":{"codigo":"13"},"nota":"alimentación infantil, palabra local"}
+{"texto":"mandaron colada de plátano pero ya se acabó","espera":{"codigo":"13"},"nota":"colada = infantil, no bebida genérica"}
+{"texto":"necesitamos agua para tomar, el río está muy sucio","espera":{"codigo":"12"},"nota":"agua potable"}
+{"texto":"hace falta cloro para poder tomar el agua del río","espera":{"codigo":"44"},"nota":"tratamiento de agua, no agua"}
+{"texto":"hay mucho zancudo, hacen falta toldillos","espera":{"codigo":"31"},"nota":"control de vectores"}
+{"texto":"necesitamos pañitos talla 3","espera":{"codigo":"42"},"nota":"pañales, diminutivo local, pide detalle"}
+{"texto":"la señora necesita el remedio para la tensión","espera":{"codigo":"22"},"nota":"crónico, pide detalle"}
+{"texto":"hay que sacar a un enfermo, está muy grave","espera":{"codigo":"23","urgencia":3},"nota":"traslado + urgencia escrita"}
+{"texto":"se cayó el puente de Tagachí","espera":{"codigo":"92"},"nota":"daño fluvial"}
+{"texto":"hubo un derrumbe y la vía está tapada","espera":{"codigo":"91"},"nota":"daño vial"}
+{"texto":"se dañó el acueducto de la vereda","espera":{"codigo":"94"},"nota":"daño de agua"}
+{"texto":"tengo unos almuerzos preparados para mañana, los puedo donar","espera":{"codigo":"11","perecedero":true},"nota":"oferta perecedera con fecha"}
+{"texto":"manden 20 mercados","espera":{"codigo":"11","cantidad":20},"nota":"cantidad con unidad al lado"}
+{"texto":"Muchas cosas!! De todo!!!","espera":{"codigo":null},"nota":"PRD: sin categoría"}
+{"texto":"🍲 90","espera":{"codigo":null,"cantidad":null},"nota":"PRD: sin cantidad"}
+{"texto":"necesitamos de todo, lo que sea","espera":{"codigo":null},"nota":"vago explícito"}
+{"texto":"manden 20 mercados y 5 toldillos","espera":{"codigo":null},"nota":"dos ítems: los separa un humano"}
+{"texto":"estamos mal por acá","espera":{"codigo":null},"nota":"vago, va a aclaración"}
+{"texto":"buenos días","espera":{"codigo":null},"nota":"saludo, nada que extraer"}
+{"texto":"90 12 3","espera":{"codigo":null,"cantidad":null},"nota":"sintaxis codificada: 2.11 la prohíbe, no la interpretamos"}

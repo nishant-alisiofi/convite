@@ -9,7 +9,6 @@ import {
   COPIA,
   manejadorDescargarMedia,
   manejadorWebhookWhatsApp,
-  type NormalizadorPort,
   PROVEEDOR_WHATSAPP,
   type ProveedorMedia,
   transcripcionPendiente,
@@ -17,11 +16,15 @@ import {
 import type { Job } from '@/lib/jobs/tipos'
 import {
   PHONE_NUMBER_ID,
+  WAMID_RESPUESTA,
   WAMID_SALIENTE,
   WAMID_TEXTO,
+  WAMID_VAGO,
   WEBHOOK_ESTADO,
   WEBHOOK_NOTA_DE_VOZ,
+  WEBHOOK_RESPUESTA,
   WEBHOOK_TEXTO,
+  WEBHOOK_VAGO,
 } from './fixtures/whatsapp'
 
 /**
@@ -91,13 +94,6 @@ async function contar(sql: string, params: unknown[] = []): Promise<number> {
   return Number(rows[0]!.n)
 }
 
-/** A normalizer that is sure, for the branch M4 will eventually take. */
-const normalizadorSeguro: NormalizadorPort = {
-  async proponer() {
-    return { tipo: 'necesidad', codigoItem: '11', cantidad: 12, unidad: 'mercados', confianza: 0.95 }
-  },
-}
-
 conBase('el webhook de WhatsApp', () => {
   it('crea el reporte al recibir, no al confirmar', async () => {
     // 2.13. If the person never answers, the report still exists and a coordinator can act.
@@ -124,9 +120,50 @@ conBase('el webhook de WhatsApp', () => {
     expect(reporte.canal).toBe('whatsapp')
     expect(reporte.folio).toBeGreaterThan(0)
     expect(reporte.detalle_libre).toContain('mercados')
-    // The normalizer is M4 and stays below threshold, so nothing is assigned (2.12).
-    expect(reporte.tipo).toBe('sin_clasificar')
-    expect(reporte.codigo_item).toBeNull()
+    // M4 reads «manden mercados» as a food parcel, so the record arrives classified.
+    // Classified or not, it exists the moment the message did — that is the rule (2.13).
+    expect(reporte.tipo).toBe('necesidad')
+    expect(reporte.codigo_item?.trim()).toBe('11')
+  })
+
+  it('deja el reporte sin clasificar cuando no se entiende, en vez de adivinar', async () => {
+    // «Muchas cosas!! De todo!!!» — PRD §4 M4. The record still exists (2.13); what it does
+    // not have is a category somebody invented for it (2.12).
+    await manejadorWebhookWhatsApp()(job({ webhook: WEBHOOK_VAGO }), client)
+
+    const { rows } = await client.query<{
+      tipo: string
+      codigo_item: string | null
+      estado: string
+    }>(
+      `select r.tipo, r.codigo_item, r.estado from reportes r
+         join mensajes m on m.reporte_id = r.id
+        where m.proveedor_mensaje_id = $1`,
+      [WAMID_VAGO],
+    )
+    expect(rows).toHaveLength(1)
+    expect(rows[0]!.tipo).toBe('sin_clasificar')
+    expect(rows[0]!.codigo_item).toBeNull()
+    expect(rows[0]!.estado).toBe('RECIBIDO')
+  })
+
+  it('el núcleo aplica urgencia_min del catálogo, no el extractor', async () => {
+    // Traslado médico is urgency 3 because catalogo_items says so — a coordinator can change
+    // that from the Catálogo screen and the behaviour follows, with no deploy (2.8).
+    // Deliberately no urgent wording: the 3 can only have come from the catalogue.
+    await manejadorWebhookWhatsApp()(
+      job({ webhook: otroMensaje(WEBHOOK_TEXTO, 'wamid.TRASLADO', 'necesitamos un traslado para el puesto de salud') }),
+      client,
+    )
+
+    const { rows } = await client.query<{ codigo_item: string; urgencia: number }>(
+      `select r.codigo_item, r.urgencia from reportes r
+         join mensajes m on m.reporte_id = r.id
+        where m.proveedor_mensaje_id = $1`,
+      ['wamid.TRASLADO'],
+    )
+    expect(rows[0]!.codigo_item.trim()).toBe('23')
+    expect(rows[0]!.urgencia).toBe(3)
   })
 
   it('el mismo payload dos veces deja una sola fila', async () => {
@@ -170,17 +207,23 @@ conBase('el webhook de WhatsApp', () => {
 
     expect(rows).toHaveLength(2)
     const [texto, voz] = rows as [(typeof rows)[number], (typeof rows)[number]]
-    // Same shape: the channel of arrival is not a difference in kind. Only the text differs,
-    // and the voice note's arrives later as a transcript that never overwrites the original.
-    expect(voz.tipo).toBe(texto.tipo)
-    expect(voz.estado).toBe(texto.estado)
-    expect(voz.canal).toBe(texto.canal)
-    expect(texto.contacto_id).toBeTruthy()
-    expect(voz.contacto_id).toBeTruthy()
+    // Same shape, which is not the same content: both are a reporte on the same channel,
+    // for the same person, in the same state, each with its own folio. What differs is that
+    // the voice note carries no words yet — its classification arrives with the transcript,
+    // and D8 is still open, so it waits in the audio inbox as `sin_clasificar` rather than
+    // being guessed at from an empty string (2.12).
+    for (const r of [texto, voz]) {
+      expect(r.estado).toBe('RECIBIDO')
+      expect(r.canal).toBe('whatsapp')
+      expect(r.contacto_id).toBeTruthy()
+      expect(r.folio).toBeGreaterThan(0)
+    }
+    expect(texto.folio).not.toBe(voz.folio)
+    expect(voz.tipo).toBe('sin_clasificar')
   })
 
   it('una entrada de baja confianza dispara exactamente una pregunta, y no es un menú', async () => {
-    await manejadorWebhookWhatsApp()(job({ webhook: WEBHOOK_TEXTO }), client)
+    await manejadorWebhookWhatsApp()(job({ webhook: WEBHOOK_VAGO }), client)
 
     const { rows } = await client.query<{ cuerpo: string }>(
       `select s.cuerpo from salidas_pendientes s
@@ -201,10 +244,10 @@ conBase('el webhook de WhatsApp', () => {
 
   it('no vuelve a preguntar mientras la aclaración siga viva', async () => {
     // Every round trip costs this person battery and money (Section 6.5). A second message
-    // adds to what a coordinator reads; it does not earn a second question.
-    await manejadorWebhookWhatsApp()(job({ webhook: WEBHOOK_TEXTO }), client)
+    // that still says nothing usable does not earn a second question.
+    await manejadorWebhookWhatsApp()(job({ webhook: WEBHOOK_VAGO }), client)
     await manejadorWebhookWhatsApp()(
-      job({ webhook: otroMensaje(WEBHOOK_TEXTO, 'wamid.SEGUNDO', 'y también toldillos') }),
+      job({ webhook: otroMensaje(WEBHOOK_VAGO, 'wamid.SEGUNDO', 'de verdad estamos mal') }),
       client,
     )
 
@@ -216,10 +259,11 @@ conBase('el webhook de WhatsApp', () => {
         ['+573000000001'],
       ),
     ).toBe(1)
-    // Both messages are still recorded, and both still made a reporte.
+    // Both messages are recorded either way: not asking again is not the same as not
+    // listening (2.13).
     expect(
       await contar('select count(*) as n from mensajes where proveedor_mensaje_id in ($1, $2)', [
-        WAMID_TEXTO,
+        WAMID_VAGO,
         'wamid.SEGUNDO',
       ]),
     ).toBe(2)
@@ -227,7 +271,7 @@ conBase('el webhook de WhatsApp', () => {
 
   it('la conversación de aclaración dura días, no minutos', async () => {
     // 2.13: a reply arriving three days later must still attach to the right record.
-    await manejadorWebhookWhatsApp()(job({ webhook: WEBHOOK_TEXTO }), client)
+    await manejadorWebhookWhatsApp()(job({ webhook: WEBHOOK_VAGO }), client)
 
     const { rows } = await client.query<{ dias: number; flujo: string; paso: string }>(
       `select extract(epoch from (s.expira_en - s.creado_en)) / 86400 as dias, s.flujo, s.paso
@@ -242,11 +286,8 @@ conBase('el webhook de WhatsApp', () => {
     expect(rows[0]!.paso).toBe('esperando_aclaracion')
   })
 
-  it('con un normalizador seguro responde el folio y clasifica', async () => {
-    await manejadorWebhookWhatsApp({ normalizador: normalizadorSeguro })(
-      job({ webhook: WEBHOOK_TEXTO }),
-      client,
-    )
+  it('cuando entiende el mensaje responde con el folio', async () => {
+    await manejadorWebhookWhatsApp()(job({ webhook: WEBHOOK_TEXTO }), client)
 
     const { rows } = await client.query<{ tipo: string; codigo_item: string; folio: number }>(
       `select r.tipo, r.codigo_item, r.folio from reportes r
@@ -282,6 +323,92 @@ conBase('el webhook de WhatsApp', () => {
       [PHONE_NUMBER_ID],
     )
     expect(rows[0]!.organizacion_id).toBe(orgs[0]!.id)
+  })
+
+  it('la respuesta a la aclaración completa el reporte, no crea otro', async () => {
+    // The second exchange closing. «Muchas cosas!! De todo!!!» asked a question; the answer
+    // names the item, and the two only mean something read together.
+    await manejadorWebhookWhatsApp()(job({ webhook: WEBHOOK_VAGO }), client)
+    await manejadorWebhookWhatsApp()(job({ webhook: WEBHOOK_RESPUESTA }), client)
+
+    // One report, not two: an answer is not a new need. Scoped to the two messages, because
+    // the seeded basin already holds reports for this contact.
+    const reportes = await contar(
+      `select count(distinct m.reporte_id) as n from mensajes m
+        where m.proveedor_mensaje_id in ($1, $2)`,
+      [WAMID_VAGO, WAMID_RESPUESTA],
+    )
+    expect(reportes).toBe(1)
+
+    const { rows } = await client.query<{
+      tipo: string
+      codigo_item: string | null
+      familias: number | null
+      detalle_libre: string
+      descripcion: string | null
+      estado: string
+    }>(
+      `select distinct r.tipo, r.codigo_item, r.familias, r.detalle_libre, r.descripcion, r.estado
+         from reportes r
+         join mensajes m on m.reporte_id = r.id
+        where m.proveedor_mensaje_id in ($1, $2)`,
+      [WAMID_VAGO, WAMID_RESPUESTA],
+    )
+    const reporte = rows[0]!
+    expect(reporte.tipo).toBe('necesidad')
+    expect(reporte.codigo_item?.trim()).toBe('11')
+    expect(reporte.familias).toBe(12)
+    // Nothing auto-verifies. The extractor proposes; a verificador disposes (M7).
+    expect(reporte.estado).toBe('RECIBIDO')
+  })
+
+  it('nunca sobrescribe el texto original', async () => {
+    // PRD §4 M4: transcripts get corrected, the original does not. The answer lands in its
+    // own column so what the person first wrote is always recoverable.
+    await manejadorWebhookWhatsApp()(job({ webhook: WEBHOOK_VAGO }), client)
+    await manejadorWebhookWhatsApp()(job({ webhook: WEBHOOK_RESPUESTA }), client)
+
+    const { rows } = await client.query<{ detalle_libre: string; descripcion: string | null }>(
+      `select distinct r.detalle_libre, r.descripcion from reportes r
+         join mensajes m on m.reporte_id = r.id
+        where m.proveedor_mensaje_id in ($1, $2)`,
+      [WAMID_VAGO, WAMID_RESPUESTA],
+    )
+    expect(rows[0]!.detalle_libre).toBe('Muchas cosas!! De todo!!! estamos mal por acá')
+    expect(rows[0]!.descripcion).toContain('mercados')
+  })
+
+  it('ata el mensaje de respuesta al reporte que responde', async () => {
+    await manejadorWebhookWhatsApp()(job({ webhook: WEBHOOK_VAGO }), client)
+    await manejadorWebhookWhatsApp()(job({ webhook: WEBHOOK_RESPUESTA }), client)
+
+    const { rows } = await client.query<{ n: string }>(
+      `select count(distinct reporte_id) as n from mensajes
+        where proveedor_mensaje_id in ($1, $2) and reporte_id is not null`,
+      [WAMID_VAGO, WAMID_RESPUESTA],
+    )
+    // Both messages, one report: the bitácora keeps the whole exchange together.
+    expect(Number(rows[0]!.n)).toBe(1)
+  })
+
+  it('cierra la aclaración cuando queda resuelta', async () => {
+    await manejadorWebhookWhatsApp()(job({ webhook: WEBHOOK_VAGO }), client)
+    expect(
+      await contar(
+        `select count(*) as n from conversaciones s
+           join contactos c on c.id = s.contacto_id where c.telefono = $1`,
+        ['+573000000001'],
+      ),
+    ).toBe(1)
+
+    await manejadorWebhookWhatsApp()(job({ webhook: WEBHOOK_RESPUESTA }), client)
+    expect(
+      await contar(
+        `select count(*) as n from conversaciones s
+           join contactos c on c.id = s.contacto_id where c.telefono = $1`,
+        ['+573000000001'],
+      ),
+    ).toBe(0)
   })
 
   it('aplica el acuse de entrega al mensaje saliente que le corresponde', async () => {

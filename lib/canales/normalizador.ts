@@ -1,35 +1,32 @@
-import type { TipoReporte } from '@/db/schema/vocabulario'
+import {
+  type Catalogo,
+  extraer,
+  PROPUESTA_NULA,
+  type PropuestaExtractor,
+  UMBRAL,
+} from '@/lib/normalizador'
 
 /**
- * The seam M4 plugs into.
+ * The seam between intake and the normalizer (M4).
  *
- * Everything downstream of intake assumes a normalizer exists, and it does not yet — M4 is
- * gated on a corpus of real messages that has not been collected (PRD §7). Rather than let
- * that block M5, intake talks to this interface and ships with an implementation that never
- * claims to understand anything.
+ * Intake never calls the extractor directly: it holds this port, so the thing that turns
+ * «manden mercados» into `codigo_item = 11` can be swapped — for a better lexicon, for a
+ * model behind a flag, for a stub in a test — without the intake path changing shape.
  *
- * 2.12 is the rule the whole seam exists to honour: **returning null must be cheaper than
- * guessing.** A wrong `codigo_item` sends a boat up a river with the wrong cargo; a null
- * sends a coordinator one question. The threshold is therefore a floor on confidence, not a
- * tie-breaker between candidates.
+ * 2.12 is the rule the seam exists to honour: **returning null must be cheaper than
+ * guessing.** The threshold is a floor on confidence, not a tie-breaker between candidates.
  */
 
-export const UMBRAL_CONFIANZA = 0.7
+/** Re-exported so callers do not have to know the extractor's module layout. */
+export type PropuestaNormalizador = PropuestaExtractor
 
-export type PropuestaNormalizador = {
-  /** `necesidad` or `dano`. Null when the text does not say, which is common and fine. */
-  tipo: TipoReporte | null
-  /** From the catalogue. Proposed, never fixed — a human or the threshold decides. */
-  codigoItem: string | null
-  cantidad: number | null
-  unidad: string | null
-  /** 0..1. Below UMBRAL_CONFIANZA nothing is assigned and the record goes to clarification. */
-  confianza: number
-}
+export const UMBRAL_CONFIANZA = UMBRAL
 
 export type EntradaNormalizador = {
   /** Free text, or a transcript. Null when the message was audio we have not transcribed. */
   texto: string | null
+  /** Injected, never read from the wall clock — same discipline as the matcher. */
+  ahora?: Date
 }
 
 export interface NormalizadorPort {
@@ -37,20 +34,31 @@ export interface NormalizadorPort {
 }
 
 export const PROPUESTA_VACIA: PropuestaNormalizador = {
-  tipo: null,
-  codigoItem: null,
-  cantidad: null,
-  unidad: null,
-  confianza: 0,
+  ...PROPUESTA_NULA,
+  motivos: [],
+  versionLexico: 'ninguna',
 }
 
 /**
- * The placeholder. Always below threshold, on purpose.
+ * The real one: lexicon + rules over a catalogue snapshot.
  *
- * This is not a stub that will be forgotten: while it is installed every intake takes the
- * clarification path, which means that path is the one exercised in production from day
- * one instead of being the rarely-trodden branch that breaks when it finally runs. When M4
- * lands it replaces this object and nothing else changes.
+ * The catalogue is passed in rather than read here, because it is data a coordinator edits
+ * (2.8) and because it keeps the extractor pure and therefore testable without Postgres.
+ */
+export function normalizadorLexico(catalogo: Catalogo): NormalizadorPort {
+  return {
+    async proponer(entrada) {
+      return extraer(entrada.texto, { catalogo, ahora: entrada.ahora ?? new Date() })
+    },
+  }
+}
+
+/**
+ * The one that declines to answer.
+ *
+ * Kept after M4 shipped, because it is how a test pins the clarification path without
+ * depending on what the lexicon happens to know today: a fixture whose wording the lexicon
+ * later learns would otherwise silently stop exercising that branch.
  */
 export const normalizadorPendiente: NormalizadorPort = {
   async proponer(): Promise<PropuestaNormalizador> {

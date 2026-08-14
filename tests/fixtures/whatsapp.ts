@@ -141,6 +141,41 @@ export const WEBHOOK_TIPO_DESCONOCIDO = webhook({
   ],
 })
 
+/**
+ * A message nobody can act on. PRD §4 M4 names it: «Muchas cosas!! De todo!!!» must yield no
+ * category. It is here so the clarification path is exercised end to end against the real
+ * normalizer rather than against a stub.
+ */
+export const WEBHOOK_VAGO = webhook({
+  contacts: [{ profile: { name: 'Rosa Palacios' }, wa_id: '573000000001' }],
+  messages: [
+    {
+      from: '573000000001',
+      id: 'wamid.HBgMNTczMDAwMDAwMDAxFQIAEhggVkFHTzAwMDAwMDAwMDAwMDAx',
+      timestamp: '1786647731',
+      type: 'text',
+      text: { body: 'Muchas cosas!! De todo!!! estamos mal por acá' },
+    },
+  ],
+})
+
+/** The reply to the clarification question, arriving later as its own webhook. */
+export const WEBHOOK_RESPUESTA = webhook({
+  contacts: [{ profile: { name: 'Rosa Palacios' }, wa_id: '573000000001' }],
+  messages: [
+    {
+      from: '573000000001',
+      id: 'wamid.HBgMNTczMDAwMDAwMDAxFQIAEhggUkVTUFVFU1RBMDAwMDAwMDAx',
+      timestamp: '1786653603',
+      type: 'text',
+      text: { body: 'perdón, es que necesitamos mercados, somos 12 familias' },
+    },
+  ],
+})
+
+export const WAMID_VAGO = 'wamid.HBgMNTczMDAwMDAwMDAxFQIAEhggVkFHTzAwMDAwMDAwMDAwMDAx'
+export const WAMID_RESPUESTA = 'wamid.HBgMNTczMDAwMDAwMDAxFQIAEhggUkVTUFVFU1RBMDAwMDAwMDAx'
+
 /** The `wamid` of the message inside WEBHOOK_TEXTO, for idempotency assertions. */
 export const WAMID_TEXTO = 'wamid.HBgMNTczMDAwMDAwMDAxFQIAEhggM0E0N0YwQjJDMUQ4RTkwQTAx'
 
