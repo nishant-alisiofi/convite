@@ -37,6 +37,26 @@ sin drift de esquema.** Staging desplegado en Railway.
 - `/robots.txt` → 404 (no 503), `x-robots-tag: noindex, nofollow` en `/` y en la página 503 —
   staging fuera de índices, verificado en vivo.
 
+## Hallazgos del walk manual (post-cierre, founder pidió prueba propia)
+
+Probando la superficie pública en vivo aparecieron tres defectos que la suite no podía atrapar
+—todas sus aserciones sobre la página pública eran negativas («no filtra X»), y una página que
+dice «no hay solicitudes» las pasa todas. Corregidos en `778c5fe`, verificados en vivo:
+
+1. **La página pública mostraba el basin vacío** («Todavía no hay solicitudes registradas», todo en
+   0) pese a 10 reportes + 7 pedidos sembrados — el seed nunca corría el emparejador y `mapa_publico`
+   solo cuenta estados post-matcher. Quien caminara staging (Codex, founder) veía un sistema vacío.
+   Fix: el seed corre una pasada del emparejador. Ahora la página muestra «7 solicitudes en espera».
+2. **El vacío-copy contradecía la tabla** — el mensaje se decidía por la suma de conteos, la tabla
+   por el número de filas; filas todo-en-cero mostraban ambos a la vez. Fix: se descartan filas sin
+   información, así las dos condiciones concuerdan por construcción.
+3. **Un test anclado a reloj de pared** (`enlace.db.test.ts`, `AHORA=15:00Z`) empezó a fallar al
+   cruzar las 15:00Z UTC reales, sin cambio de código. Anclado al reloj real.
+
+**Verificado en vivo por mí:** página pública muestra 7 pendientes en 6 filas, sin fugas, solo
+«Quibdó»/«Otras zonas». El resto del producto (panel autenticado) sigue sin caminarse — bloqueado
+por Supabase, ver arriba.
+
 ## Validación
 
 - **488 tests** verde tras un rebuild limpio; primer all-green de la noche (una falsa alarma de
