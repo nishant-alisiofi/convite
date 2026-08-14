@@ -1,8 +1,13 @@
 # Contrato del evento canónico — borrador v0.1
 
-La Ruta B (construcción conjunta por módulos) exige acordar esto **antes** de escribir el primer
-adaptador. Este documento es el borrador para la sesión técnica con Orgánico Studio; nada aquí es
-definitivo hasta que ambos equipos lo firmen y quede versionado en el repo.
+> **Nota (2026-08-13):** el PRD §3 fija la misma idea como "el canal es un puerto" —
+> `lib/canales/` tendrá un sobre normalizado y dos drivers (WhatsApp + simulador sin
+> credenciales), con la regla de 24 h por encima del driver. Este borrador es el insumo para
+> definir ese sobre en M5; reconciliar campo por campo contra el esquema real
+> (`db/migrations/`) antes de escribir el primer driver.
+
+Acordar esto **antes** de escribir el primer adaptador. Nada aquí es definitivo hasta que quede
+versionado junto al código en `lib/canales/`.
 
 **Idea central:** cada canal tiene un adaptador cuya única responsabilidad es (1) traducir su
 payload nativo a este evento y (2) descartar duplicados. Nada aguas abajo sabe qué canal existe.

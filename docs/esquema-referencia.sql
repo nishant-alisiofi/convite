@@ -1,6 +1,7 @@
--- Red de Ayuda — esquema de referencia
--- Fuente: especificacion-tecnica.md §7. NO es una migración: las migraciones reales se escriben
--- contra el ORM y el sistema de migraciones de Orgánico Studio, cuando tengamos el repo.
+-- Red de Ayuda — esquema de referencia [SUPERADO 2026-08-13]
+-- El esquema real vive en db/migrations/ (18 migraciones SQL escritas a mano) con espejo
+-- tipado en db/schema/. Este archivo queda solo como registro del diseño original.
+-- Fuente: especificacion-tecnica.md §7.
 -- Convención: text + check en lugar de enum de Postgres (agregar un valor a un enum en
 -- producción es doloroso; a un check constraint no).
 -- Requiere PostGIS (verificar disponibilidad en su proveedor — punto del intake §2).

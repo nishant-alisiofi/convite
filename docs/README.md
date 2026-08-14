@@ -15,41 +15,51 @@ que la verificación y el despacho siempre los decide una persona.
 
 ## Estado
 
-**Fase: pre-código.** Ya se envió la carta de propuesta a Orgánico Studio con la especificación y
-el plan adjuntos; esperamos acceso de solo lectura a su repositorio. Mientras tanto, este repo
-contiene los artefactos que se pueden acordar antes de tocar código.
+**Fase: M1–M3 construidos y verificados; M4–M12 por delante.** Este repo ya contiene el sistema
+nuevo (Next.js 15 + Drizzle sobre Supabase con PostGIS y RLS): esquema con 18 migraciones SQL,
+motor de emparejamiento con cola de trabajos, auth por magic-link con allowlist de staff, y el
+Tablero del coordinador leyendo datos vivos. **Ningún canal de entrada existe todavía** — nada ha
+recibido un mensaje real.
 
-La pregunta abierta más importante ya está planteada en la carta: **¿el WhatsApp actual corre
-sobre la API oficial de Meta, un BSP, o una librería no oficial (Baileys y similares)?** Eso
-define si el trabajo es integración (días) o migración (semanas).
+La fuente de verdad de lo que falta es **[`PRD.md`](PRD.md)** (M4–M12, decisiones D1–D10, riesgos).
+Los documentos originales de especificación y plan siguen aquí como contexto de diseño; donde
+contradigan al PRD o al código, **ganan el PRD y el código**.
+
+Las dos preguntas con lead time externo siguen abiertas: **cuál cuenta de WhatsApp Business
+(WABA) del socio y su token** (D3), y **el corpus de mensajes reales** sin el cual el
+normalizador (M4) no se puede validar.
 
 ## Documentos
 
-| Documento | Qué es |
-|---|---|
-| [`especificacion-tecnica.md`](especificacion-tecnica.md) | Arquitectura, tiers, catálogo, canales, esquema de datos |
-| [`plan-de-ejecucion.md`](plan-de-ejecucion.md) | Permisos, costos, financiación, rutas de trabajo, calendario |
-| [`decisiones-pendientes.md`](decisiones-pendientes.md) | Las 5 decisiones que se responden en una llamada — con su estado |
-| [`intake-codigo.md`](intake-codigo.md) | Checklist a correr el día que llegue el código de ellos |
-| [`contrato-evento-canonico.md`](contrato-evento-canonico.md) | Borrador v0.1 del evento canónico — el prerequisito de la Ruta B |
-| [`plantillas-whatsapp.md`](plantillas-whatsapp.md) | Borradores de las 5 plantillas *utility* para enviar a aprobación |
-| [`esquema-referencia.sql`](esquema-referencia.sql) | SQL de referencia de la especificación (se adapta a su ORM) |
+| Documento | Qué es | Vigencia |
+|---|---|---|
+| [`PRD.md`](PRD.md) | **El documento rector**: estado real, M4–M12, decisiones D1–D10, riesgos | **Vigente** |
+| [`decisiones-pendientes.md`](decisiones-pendientes.md) | Estado de las decisiones originales + nuestras recomendaciones sobre D1–D10 | Vigente |
+| [`plantillas-whatsapp.md`](plantillas-whatsapp.md) | Borradores de las 5 plantillas *utility* — listas para D4 cuando exista la WABA | Vigente |
+| [`contrato-evento-canonico.md`](contrato-evento-canonico.md) | Borrador v0.1 del sobre canónico — a reconciliar con `lib/canales/` en M5 | Vigente como insumo |
+| [`especificacion-tecnica.md`](especificacion-tecnica.md) | Arquitectura, tiers, catálogo, canales — el diseño original | Contexto; el PRD registra sus conflictos internos |
+| [`plan-de-ejecucion.md`](plan-de-ejecucion.md) | Permisos, costos, financiación, calendario | Contexto; trámites y costos siguen vigentes |
+| [`intake-codigo.md`](intake-codigo.md) | Checklist de intake del código — **ya corrido**, respuestas al inicio del archivo | Cerrado |
+| [`esquema-referencia.sql`](esquema-referencia.sql) | SQL de referencia del diseño original | **Superado** por `db/migrations/` |
 
-## Postura acordada (propuesta, pendiente de confirmar con el equipo)
+## Postura vigente
 
-- **Alcance 2 — alcance rural mínimo**: consolidar lo existente + pipeline de audio + adaptador
-  SMS con tarjeta impresa. IVR y envíos programados quedan para después del piloto.
-- **Ruta B — construcción conjunta por módulos**: ellos conservan núcleo, panel y adaptador de
-  WhatsApp; nosotros tomamos capa de adaptadores, pipeline de audio, IVR con topes y políticas de
-  acceso, entregados integrados a su repositorio.
-- Piloto con **dos comunidades** (una tier 1, una tier 2), no con treinta.
+- **Código nuevo, no integración.** El plan original suponía integrarse al sistema existente de
+  Orgánico Studio; lo que ocurrió fue una construcción nueva (este repo). Orgánico Studio sigue
+  siendo el socio de territorio: su línea de WhatsApp, su red de reportantes y su acceso
+  comunitario son lo que el sistema necesita para operar — y la fuente del corpus para M4.
+- **WhatsApp primero para comunidades; formulario web después para donantes** (D10, acordado).
+  El canal vive detrás de un puerto (`lib/canales/`), así que agregar un driver web no es un
+  rewrite.
+- **SMS entra a v1** (recomendación sobre D1); IVR es M10. Piloto con **dos comunidades**, no
+  con treinta.
+- Los topes de gasto de voz del plan original siguen siendo ley cuando llegue M10.
 
-## Orden de trabajo al llegar el código
+## Qué sigue (PRD §9)
 
-1. Correr [`intake-codigo.md`](intake-codigo.md) — determina el escenario de WhatsApp (A/B/C) y el
-   stack real.
-2. Sesión técnica: acordar el [contrato del evento canónico](contrato-evento-canonico.md) sobre el
-   borrador v0.1.
-3. Escribir las migraciones concretas (`necesidades` → `reportes` + `comunidades` +
-   `catalogo_items`) contra su ORM.
-4. Empezar T1/T2 con adaptador falso — nada de esto depende de trámites ni de permisos de Meta.
+1. Responder **D1/D2** (SMS y proveedor) y arrancar **D3/D4** con el socio — tienen lead time
+   externo.
+2. **Conseguir el corpus de mensajes reales** — de la línea existente de Orgánico o de un grupo
+   piloto. M4 no arranca sin esto.
+3. Construir **M4 (normalizador)** — el hito de mayor riesgo del proyecto.
+4. Decidir **D5** y desplegar (app + worker de la cola).

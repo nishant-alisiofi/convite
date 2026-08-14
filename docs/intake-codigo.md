@@ -1,9 +1,34 @@
-# Checklist de intake — el día que llegue el código
+# Checklist de intake — CERRADO (2026-08-13)
 
-Objetivo: en una sola pasada de lectura del repositorio de Orgánico Studio, responder todo lo que
-el *Plan de ejecución* §12 necesita para convertir el diseño en migraciones y módulos concretos.
-Nada de esto requiere ejecutar su sistema; con la estructura del repo y el archivo de dependencias
-alcanza para empezar.
+**Este checklist ya se corrió, con un giro: no llegó el código de Orgánico Studio — llegó un
+sistema nuevo construido en este mismo repo (M1–M3).** Las respuestas quedan aquí; el detalle
+vivo está en [`PRD.md`](PRD.md).
+
+## Resultado
+
+- **Escenario de WhatsApp: N/A para el código, abierto para el socio.** El repo no contiene
+  ningún canal todavía (M5 pendiente); la pregunta A/B/C sobrevive como D3 — cuál WABA del socio
+  y si hay token. Nada en `package.json` sugiere librerías no oficiales, y el diseño (puerto de
+  canal + plantillas + ventana de 24 h) asume API oficial. Correcto.
+- **Stack:** TypeScript · Next.js 15 (App Router) · React 19 · Drizzle como espejo tipado ·
+  migraciones SQL escritas a mano (18, `db/migrations/`) · `pnpm db:check` detecta drift ·
+  Vitest (116 tests, corren contra base viva).
+- **Cola de trabajos:** existe (`lib/jobs/`). Falta el proceso worker en despliegue (PRD §6).
+- **Postgres:** Supabase us-east-1, PostGIS habilitado, RLS para los cinco roles, **PostgREST no
+  expuesto** (decisión de arquitectura, PRD §3). Supabase solo para identidad.
+- **Modelo de datos:** construcción nueva — no hay migración desde `necesidades` porque no se
+  hereda base anterior. Seed: 13 comunidades, grafo de rutas de 36 aristas, 26 ítems de catálogo.
+- **Accesos:** magic-link + allowlist de staff, cinco roles vía RLS, probados a nivel de base.
+  Sin secretos en el repo (`.env.example` limpio).
+- **Despliegue:** en ninguna parte todavía (D5).
+
+El checklist original queda abajo como referencia de método.
+
+---
+
+Objetivo original: en una sola pasada de lectura del repositorio de Orgánico Studio, responder
+todo lo que el *Plan de ejecución* §12 necesita para convertir el diseño en migraciones y módulos
+concretos.
 
 ## 1. Escenario de WhatsApp (la respuesta que cambia el calendario)
 
