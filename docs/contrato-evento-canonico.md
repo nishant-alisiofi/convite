@@ -1,13 +1,29 @@
-# Contrato del evento canónico — borrador v0.1
+# Contrato del evento canónico — v0.2 (implementado)
 
-> **Nota (2026-08-13):** el PRD §3 fija la misma idea como "el canal es un puerto" —
-> `lib/canales/` tendrá un sobre normalizado y dos drivers (WhatsApp + simulador sin
-> credenciales), con la regla de 24 h por encima del driver. Este borrador es el insumo para
-> definir ese sobre en M5; reconciliar campo por campo contra el esquema real
-> (`db/migrations/`) antes de escribir el primer driver.
+> **Nota (2026-08-14): el sobre ya existe en código. La fuente de verdad es
+> `lib/canales/tipos.ts`** (zod), con la bitácora/idempotencia en `lib/canales/bitacora.ts`,
+> la regla de 24 h en `lib/canales/ventana.ts` y el driver simulador en
+> `lib/canales/simulador.ts`. Este documento queda como registro de diseño; si contradice al
+> código, gana el código.
+>
+> **Reconciliaciones v0.1 → v0.2** (el esquema real ganó en todas):
+>
+> 1. **Clave de idempotencia:** no es `(canal, id_externo)` sino
+>    `(proveedor, proveedor_mensaje_id)` — índice único parcial ya existente en `mensajes`.
+>    El sobre lleva `proveedor` porque un mismo canal puede pasar por varios proveedores
+>    (un número que migra de BSP).
+> 2. **Fuentes de ubicación:** `gps` · `centroide` · `referida` · `manual`
+>    (no `pin_whatsapp`/`declarada`). Un pin de WhatsApp es `gps` con radio 0.
+> 3. **Tipos de media:** `adjuntos.tipo` admite `audio`/`foto`/`firma`; `documento` no tiene
+>    dónde vivir hoy — pregunta abierta para Nishant.
+> 4. **`tipo` del sobre:** el puerto acepta `necesidad`/`dano`/`confirmacion_entrega`/
+>    `texto_libre`, pero solo los dos primeros pueden volverse `reporte`
+>    (`reportes_tipo_check`).
+> 5. **Referencia de media:** el campo se llama `refProveedor` a propósito —
+>    `adjuntos.storage_key` rechaza URLs por constraint, y las refs del proveedor expiran en
+>    minutos; el nombre hace difícil cablear una en la otra por accidente.
 
-Acordar esto **antes** de escribir el primer adaptador. Nada aquí es definitivo hasta que quede
-versionado junto al código en `lib/canales/`.
+Lo que sigue de este documento es el borrador v0.1 original, como registro de diseño.
 
 **Idea central:** cada canal tiene un adaptador cuya única responsabilidad es (1) traducir su
 payload nativo a este evento y (2) descartar duplicados. Nada aguas abajo sabe qué canal existe.
