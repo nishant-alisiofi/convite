@@ -5,6 +5,9 @@ import type {
   Modo,
   Temporada,
 } from '@/db/schema/vocabulario'
+// The pickup domain owns this number; the matcher borrows it so the two cannot disagree
+// about what "collectable" means. Constants only — nothing here reaches a database.
+import { ALCANCE_RECOGIDA_M } from '@/lib/recogidas/plan'
 
 /**
  * Inputs and outputs of the matching engine.
@@ -104,9 +107,13 @@ export type ContextoEmparejamiento = {
   /**
    * How far an offer may sit from a node and still be collectable, in metres.
    *
-   * Straight-line, and provisional: pickup is an urban, road-based problem where Google
-   * Route Matrix is genuinely good (Section 9.5), and M8 replaces this with drive time.
-   * A radius is defensible inside a town in a way it never is across the basin — 7.3's ban
+   * A coarse yes-or-no, and deliberately still straight-line: this is the pure resolver,
+   * which never touches a database, and the question it asks is only "is this offer in the
+   * same town as that node". Which stops to make and in what order is a different question
+   * with a different answer — see lib/recogidas, where PostGIS clusters the offers into
+   * neighbourhoods and orders one run over them.
+   *
+   * A radius is defensible inside a town in a way it never is across the basin: 7.3's ban
    * on straight-line distance is about river legs, where 5 km can mean 90 minutes upriver.
    */
   radioRecogidaM: number
@@ -131,7 +138,17 @@ export type Resolucion = {
 
 export const HORIZONTE_DIAS_POR_DEFECTO = 14
 export const DIAS_PARA_CONTEO_VIEJO = 14
-export const RADIO_RECOGIDA_M = 15_000
+/**
+ * Was 15 km, which inside Quibdó means the whole town and a good part of the road out of
+ * it. Now the same reach the pickup planner uses, so the matcher cannot call an offer
+ * collectable that no run would ever go and fetch.
+ *
+ * Real drive time would be better still and is not available: it needs a routing engine for
+ * a territory where the roads are six pairs and the rest is river, which is the trade the
+ * project already declined (PRD §3). What replaced the guess is not a better radius, it is
+ * that the run itself is now planned over real distances in Postgres.
+ */
+export const RADIO_RECOGIDA_M = ALCANCE_RECOGIDA_M
 
 /**
  * Pedido states the matcher is allowed to touch. Anything dispatched or closed is somebody

@@ -118,6 +118,29 @@ export const CONTACTOS_SEMILLA = [
     comunidad: 'QBD',
     canalPreferido: 'whatsapp' as const,
   },
+  // Three more donors so the pickup run has two stops in each of three neighbourhoods —
+  // the shape the first-mile clustering exists to handle (M8).
+  {
+    telefono: '+573000000014',
+    nombre: 'Bernardina Palacios',
+    rol: 'donante' as const,
+    comunidad: 'QBD',
+    canalPreferido: 'whatsapp' as const,
+  },
+  {
+    telefono: '+573000000015',
+    nombre: 'Panadería La Esperanza',
+    rol: 'donante' as const,
+    comunidad: 'QBD',
+    canalPreferido: 'whatsapp' as const,
+  },
+  {
+    telefono: '+573000000016',
+    nombre: 'Ferretería El Tornillo',
+    rol: 'donante' as const,
+    comunidad: 'QBD',
+    canalPreferido: 'whatsapp' as const,
+  },
 ]
 
 /**
@@ -148,7 +171,14 @@ export type OfertaSemilla = {
   direccionTexto?: string
 }
 
+/**
+ * The located offers sit in three real Quibdó neighbourhoods, two in each: Yesquita by the
+ * river, Roma to the south, Niño Jesús to the north. Roughly a kilometre between
+ * neighbourhoods and under a hundred metres within one, which is what makes them cluster
+ * into three stops on one run rather than six separate errands (M8).
+ */
 export const OFERTAS_SEMILLA: OfertaSemilla[] = [
+  // ── Yesquita ──────────────────────────────────────────────────────────────────────
   {
     telefono: '+573000000010',
     textoOriginal: 'Buenas tengo 6 mercados completos para los damnificados, arroz panela aceite y atun',
@@ -158,10 +188,25 @@ export const OFERTAS_SEMILLA: OfertaSemilla[] = [
     confianza: 0.92,
     estado: 'DISPONIBLE',
     necesitaRecogida: true,
-    lat: 5.6921,
-    lon: -76.6558,
+    lat: 5.6935,
+    lon: -76.6552,
     direccionTexto: 'Barrio Yesquita, casa de portón azul',
   },
+  {
+    telefono: '+573000000014',
+    textoOriginal: 'yo tengo cuatro cobijas y dos toldillos que no estoy usando',
+    codigoItem: '31',
+    cantidad: 4,
+    unidad: 'cobijas',
+    confianza: 0.83,
+    estado: 'DISPONIBLE',
+    necesitaRecogida: true,
+    lat: 5.6941,
+    lon: -76.6546,
+    direccionTexto: 'Barrio Yesquita, al lado de la tienda',
+  },
+
+  // ── Roma ──────────────────────────────────────────────────────────────────────────
   {
     telefono: '+573000000011',
     textoOriginal: 'tenemos 40 almuerzos listos para mañana, hay que recogerlos temprano',
@@ -170,14 +215,34 @@ export const OFERTAS_SEMILLA: OfertaSemilla[] = [
     unidad: 'almuerzos',
     confianza: 0.88,
     estado: 'DISPONIBLE',
-    // Non-negotiable 2.15: cooked meals for tomorrow do not wait behind blankets.
+    // Non-negotiable 2.15: cooked meals for tomorrow do not wait behind blankets. This is
+    // also why the run starts in Roma — a deadline sets the departure time for the whole
+    // trip, not just for its own stop.
     perecedero: true,
     venceEnHoras: 30,
     necesitaRecogida: true,
-    lat: 5.6903,
-    lon: -76.6612,
-    direccionTexto: 'Calle 24 con carrera 5, local 2',
+    lat: 5.6822,
+    lon: -76.6604,
+    direccionTexto: 'Barrio Roma, frente a la cancha',
   },
+  {
+    telefono: '+573000000015',
+    textoOriginal: 'Podemos donar pan y colada todos los días mientras dure la emergencia',
+    codigoItem: '11',
+    // No quantity stated and no deadline given: it is supply, and it is not a perishable we
+    // can sort by a date nobody wrote down (2.12, 2.15).
+    cantidad: null,
+    unidad: null,
+    confianza: 0.64,
+    requiereAclaracion: true,
+    estado: 'DISPONIBLE',
+    necesitaRecogida: true,
+    lat: 5.6816,
+    lon: -76.6611,
+    direccionTexto: 'Barrio Roma, esquina de la calle 30',
+  },
+
+  // ── Niño Jesús ────────────────────────────────────────────────────────────────────
   {
     telefono: '+573000000012',
     textoOriginal: 'Tenemos losartan y metformina disponible para donar, digan cuanto necesitan',
@@ -189,9 +254,22 @@ export const OFERTAS_SEMILLA: OfertaSemilla[] = [
     requiereAclaracion: true,
     estado: 'DISPONIBLE',
     necesitaRecogida: true,
-    lat: 5.6935,
-    lon: -76.6589,
-    direccionTexto: 'Droguería frente al parque',
+    lat: 5.7018,
+    lon: -76.6538,
+    direccionTexto: 'Barrio Niño Jesús, droguería de la esquina',
+  },
+  {
+    telefono: '+573000000016',
+    textoOriginal: 'tengo 20 tejas de zinc y unos plasticos grandes, paso el dato',
+    codigoItem: '33',
+    cantidad: 20,
+    unidad: 'tejas',
+    confianza: 0.86,
+    estado: 'DISPONIBLE',
+    necesitaRecogida: true,
+    lat: 5.7024,
+    lon: -76.6532,
+    direccionTexto: 'Barrio Niño Jesús, ferretería',
   },
   {
     telefono: '+573000000013',
