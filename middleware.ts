@@ -64,9 +64,51 @@ function sinAutenticacion(): NextResponse {
   )
 }
 
+/**
+ * Per-IP rate limiting for the public page (M12).
+ *
+ * In-process and therefore per-instance: it resets on deploy and does not coordinate across
+ * replicas, so on two containers it is a limit of 2N. Written down rather than assumed —
+ * the real answer when that day comes is a shared counter. What it buys today is that the
+ * one page a stranger can reach cannot be used to hammer Postgres from a single source.
+ */
+const VENTANA_MS = 60_000
+const MAXIMO_POR_VENTANA = 60
+const golpes = new Map<string, { desde: number; n: number }>()
+
+function excedeLimite(ip: string, ahora: number): boolean {
+  const previo = golpes.get(ip)
+  if (!previo || ahora - previo.desde > VENTANA_MS) {
+    golpes.set(ip, { desde: ahora, n: 1 })
+    // Cheap sweep so a long-lived process does not keep an entry per address ever seen.
+    if (golpes.size > 5_000) {
+      for (const [clave, v] of golpes) if (ahora - v.desde > VENTANA_MS) golpes.delete(clave)
+    }
+    return false
+  }
+  previo.n += 1
+  return previo.n > MAXIMO_POR_VENTANA
+}
+
 export async function middleware(request: NextRequest) {
   const ruta = request.nextUrl.pathname
   const esPublica = esRutaPublica(ruta)
+
+  // Only the public page is metered. The panel is behind a session, the webhooks carry a
+  // signature and their own idempotency, and the job runner is called by cron.
+  if (ruta === '/') {
+    const ip =
+      request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+      request.headers.get('x-real-ip') ??
+      'desconocida'
+
+    if (excedeLimite(ip, Date.now())) {
+      return new NextResponse('Demasiadas solicitudes. Intente en un minuto.', {
+        status: 429,
+        headers: { 'Retry-After': '60', 'Cache-Control': 'no-store' },
+      })
+    }
+  }
 
   // Identity missing: the public surface carries on, the private one fails closed and says
   // why. This is what makes a database-only staging deploy possible — intake, the queue and
@@ -105,6 +147,11 @@ export async function middleware(request: NextRequest) {
     destino.searchParams.set('desde', ruta)
     return NextResponse.redirect(destino)
   }
+
+  // Nothing behind a session is ever cached: a shared cache holding a coordinator's screen
+  // is a leak with a long tail. The public page's cacheability is Next's to set from its own
+  // `revalidate` — setting it here too would just fight the framework.
+  if (ruta !== '/') respuesta.headers.set('Cache-Control', 'private, no-store')
 
   return respuesta
 }

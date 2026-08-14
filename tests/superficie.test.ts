@@ -1,0 +1,284 @@
+import { spawn, type ChildProcess } from 'node:child_process'
+import { existsSync, readdirSync, statSync } from 'node:fs'
+import { createServer } from 'node:net'
+import { join } from 'node:path'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { COMUNIDADES_SEMILLA } from '@/db/seed/comunidades'
+
+/**
+ * M12 acceptance, PRD verbatim: «an unauthenticated request cannot obtain any coordinate,
+ * community name or phone number *by any route, including direct API calls*».
+ *
+ * Two things make this a surface test rather than a page test.
+ *
+ * It runs over HTTP against a real `next start`, because "any route" means what a stranger
+ * with curl can reach — middleware, redirects, error bodies and all. Calling route handlers
+ * as functions would skip the only layer that decides who gets in.
+ *
+ * And the route list is read off the filesystem, not typed here. A hardcoded list rots: the
+ * route somebody adds next month is exactly the one nobody remembers to check. Every route
+ * found must appear in POLITICA below, and an unclassified one fails the suite with a
+ * message telling whoever added it to decide what it is.
+ */
+
+const url = process.env.DATABASE_URL
+const conBase = describe.skipIf(!url)
+
+/**
+ * What each route is *supposed* to be. Adding a route means adding a line here — that is
+ * the point, and the test refuses to guess on your behalf.
+ */
+const POLITICA: Record<string, 'publica' | 'autenticada'> = {
+  '/': 'publica',
+  '/entrar': 'publica',
+  '/auth/callback': 'publica',
+  '/api/salud': 'publica',
+  '/api/webhooks/whatsapp': 'publica',
+  '/api/jobs/correr': 'publica',
+  '/tablero': 'autenticada',
+  '/mapa': 'autenticada',
+  '/rutas': 'autenticada',
+  '/recogidas': 'autenticada',
+  '/ajustes': 'autenticada',
+  '/verificacion': 'autenticada',
+  '/verificacion/audio/[id]': 'autenticada',
+  '/envios': 'autenticada',
+  '/envios/[id]': 'autenticada',
+  '/envios/[id]/manifiesto': 'autenticada',
+}
+
+/** Concrete values for the dynamic segments, so a real request can be made. */
+const EJEMPLOS: Record<string, string> = {
+  '[id]': '00000000-0000-4000-8000-000000000001',
+}
+
+function rutasDeLaApp(dir = 'app', prefijo = ''): string[] {
+  const encontradas: string[] = []
+
+  for (const entrada of readdirSync(dir)) {
+    const ruta = join(dir, entrada)
+
+    if (statSync(ruta).isDirectory()) {
+      // (panel) and friends are route groups: they organise files, not URLs.
+      const segmento = entrada.startsWith('(') && entrada.endsWith(')') ? '' : `/${entrada}`
+      encontradas.push(...rutasDeLaApp(ruta, prefijo + segmento))
+      continue
+    }
+
+    if (entrada === 'page.tsx' || entrada === 'route.ts') {
+      encontradas.push(prefijo === '' ? '/' : prefijo)
+    }
+  }
+
+  return encontradas
+}
+
+function concreta(ruta: string): string {
+  return ruta.replace(/\[[^\]]+\]/g, (seg) => EJEMPLOS[seg] ?? 'x')
+}
+
+/** Anything that looks like a place, a person, or a way to reach them. */
+const PATRONES_PROHIBIDOS: { nombre: string; patron: RegExp }[] = [
+  // Chocó sits around 4–8 N, 75–78 W. Any decimal pair in that box is a real coordinate.
+  { nombre: 'coordenada de la cuenca', patron: /\b[4-8]\.\d{3,}\s*,?\s*-7[5-8]\.\d{3,}/ },
+  { nombre: 'longitud del Chocó', patron: /-7[5-8]\.\d{4,}/ },
+  { nombre: 'teléfono E.164', patron: /\+57\d{10}/ },
+  { nombre: 'WKB/GeoJSON de un punto', patron: /"type"\s*:\s*"Point"|0101000020E6100000/i },
+]
+
+const NOMBRES_SEMBRADOS = COMUNIDADES_SEMILLA.map((c) => c.nombre)
+
+/** Municipality names are published on purpose; a community name never is. */
+const SOLO_COMUNIDADES = NOMBRES_SEMBRADOS.filter(
+  (n) => !['Quibdó', 'Yuto', 'Bellavista', 'Beté', 'Paimadó'].includes(n),
+)
+
+let servidor: ChildProcess | null = null
+let base = ''
+
+async function puertoLibre(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const s = createServer()
+    s.once('error', reject)
+    s.listen(0, () => {
+      const dir = s.address()
+      const puerto = typeof dir === 'object' && dir ? dir.port : 0
+      s.close(() => resolve(puerto))
+    })
+  })
+}
+
+function correr(cmd: string, args: string[]): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const p = spawn(cmd, args, { stdio: 'ignore' })
+    p.on('exit', (codigo) => (codigo === 0 ? resolve() : reject(new Error(`${cmd} salió ${codigo}`))))
+    p.on('error', reject)
+  })
+}
+
+beforeAll(async () => {
+  if (!url) return
+
+  // Build if there is nothing to serve. Deliberately not skipped when absent: a security
+  // test that quietly does not run is worse than no security test.
+  if (!existsSync('.next/BUILD_ID')) {
+    await correr('npx', ['next', 'build'])
+  }
+
+  const puerto = await puertoLibre()
+  base = `http://127.0.0.1:${puerto}`
+  servidor = spawn('npx', ['next', 'start', '-p', String(puerto)], {
+    stdio: 'ignore',
+    env: { ...process.env },
+  })
+
+  const limite = Date.now() + 60_000
+  for (;;) {
+    try {
+      await fetch(`${base}/`, { redirect: 'manual' })
+      break
+    } catch {
+      if (Date.now() > limite) throw new Error('El servidor no arrancó.')
+      await new Promise((r) => setTimeout(r, 300))
+    }
+  }
+}, 180_000)
+
+afterAll(() => {
+  servidor?.kill('SIGTERM')
+})
+
+conBase('toda la superficie, no solo la página', () => {
+  it('conoce todas las rutas de la app, sin lista escrita a mano', () => {
+    const rutas = rutasDeLaApp()
+    expect(rutas.length).toBeGreaterThan(10)
+
+    const sinClasificar = rutas.filter((r) => !(r in POLITICA))
+    // Si esto falla es porque alguien añadió una ruta: decida qué es y anótela arriba.
+    expect(sinClasificar, `rutas nuevas sin clasificar: ${sinClasificar.join(', ')}`).toEqual([])
+  })
+
+  it('ninguna ruta autenticada entrega datos a un desconocido', async () => {
+    const autenticadas = rutasDeLaApp().filter((r) => POLITICA[r] === 'autenticada')
+    expect(autenticadas.length).toBeGreaterThan(5)
+
+    for (const ruta of autenticadas) {
+      const respuesta = await fetch(`${base}${concreta(ruta)}`, { redirect: 'manual' })
+      const cuerpo = await respuesta.text()
+
+      // Redirigido al login, o negado. Nunca 200 con contenido.
+      expect(
+        [301, 302, 303, 307, 308, 401, 403, 404].includes(respuesta.status),
+        `${ruta} devolvió ${respuesta.status} a un desconocido`,
+      ).toBe(true)
+
+      for (const { nombre, patron } of PATRONES_PROHIBIDOS) {
+        expect(patron.test(cuerpo), `${ruta} filtró ${nombre}`).toBe(false)
+      }
+      for (const comunidad of SOLO_COMUNIDADES) {
+        expect(cuerpo.includes(comunidad), `${ruta} nombró a ${comunidad}`).toBe(false)
+      }
+    }
+  })
+
+  it('las rutas públicas no filtran coordenadas, nombres de comunidad ni teléfonos', async () => {
+    const publicas = rutasDeLaApp().filter((r) => POLITICA[r] === 'publica')
+
+    for (const ruta of publicas) {
+      const respuesta = await fetch(`${base}${concreta(ruta)}`, { redirect: 'manual' })
+      const cuerpo = await respuesta.text()
+
+      for (const { nombre, patron } of PATRONES_PROHIBIDOS) {
+        expect(patron.test(cuerpo), `${ruta} filtró ${nombre}`).toBe(false)
+      }
+      for (const comunidad of SOLO_COMUNIDADES) {
+        expect(cuerpo.includes(comunidad), `${ruta} nombró a ${comunidad}`).toBe(false)
+      }
+    }
+  })
+
+  it('la página pública muestra conteos y nada más', async () => {
+    const respuesta = await fetch(`${base}/`)
+    expect(respuesta.status).toBe(200)
+    const cuerpo = await respuesta.text()
+
+    expect(cuerpo).toContain('Convite')
+    // Los municipios de una sola comunidad se pliegan: la fila no habla de un pueblo.
+    expect(cuerpo).not.toContain('Bojayá')
+    expect(cuerpo).not.toContain('Medio Atrato')
+    expect(cuerpo).not.toContain('Río Quito')
+  })
+
+  it('la página pública se puede cachear; el panel nunca', async () => {
+    const publica = await fetch(`${base}/`)
+    const cabecera = publica.headers.get('cache-control') ?? ''
+    // `s-maxage` is the shared-cache directive; Next emits it from `revalidate` without the
+    // literal `public` token. What matters is that a cache may hold it and that nothing
+    // marks it private.
+    expect(cabecera).toMatch(/s-maxage=\d+|public/)
+    expect(cabecera).not.toMatch(/private|no-store/)
+
+    const panel = await fetch(`${base}/tablero`, { redirect: 'manual' })
+    expect(panel.headers.get('cache-control') ?? '').not.toMatch(/\bpublic\b/)
+  })
+
+  it('el límite por IP responde 429 antes de reventar la base', async () => {
+    // La ventana es de 60 por minuto; se piden bastantes más de golpe.
+    const respuestas = await Promise.all(
+      Array.from({ length: 90 }, () => fetch(`${base}/`, { redirect: 'manual' })),
+    )
+    const codigos = respuestas.map((r) => r.status)
+    expect(codigos).toContain(429)
+  })
+})
+
+conBase('lo que responden las rutas que sí son públicas', () => {
+  it('el webhook falla cerrado y sin contar por qué', async () => {
+    const respuesta = await fetch(`${base}/api/webhooks/whatsapp`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ intento: 'sin firma' }),
+    })
+
+    // Cerrado, y sin haber procesado nada.
+    expect(respuesta.status).toBeGreaterThanOrEqual(400)
+    expect(respuesta.status).toBeLessThan(500)
+
+    const cuerpo = (await respuesta.text()).toLowerCase()
+
+    /*
+     * Que diga «firma inválida» se revisó y se deja pasar: el esquema de firma de Meta es
+     * público y documentado, así que nombrarlo no le enseña nada a nadie. Lo que sí sería
+     * un problema es que el error se lleve por delante algo de adentro — el secreto, un
+     * digest calculado, una variable de entorno, una traza — porque eso sí es material para
+     * seguir intentando.
+     */
+    for (const filtracion of [
+      'whatsapp_app_secret',
+      'process.env',
+      'at async',
+      'node_modules',
+      '/users/',
+      'sha256=',
+    ]) {
+      expect(cuerpo.includes(filtracion), `el webhook filtró «${filtracion}»`).toBe(false)
+    }
+
+    // Y nunca datos de la cuenca, que es lo que M12 exige de verdad.
+    for (const { nombre, patron } of PATRONES_PROHIBIDOS) {
+      expect(patron.test(cuerpo), `el webhook filtró ${nombre}`).toBe(false)
+    }
+  })
+
+  it('salud responde conteos, sin datos de nadie', async () => {
+    const respuesta = await fetch(`${base}/api/salud`, { redirect: 'manual' })
+    const cuerpo = await respuesta.text()
+
+    for (const { nombre, patron } of PATRONES_PROHIBIDOS) {
+      expect(patron.test(cuerpo), `salud filtró ${nombre}`).toBe(false)
+    }
+    for (const comunidad of SOLO_COMUNIDADES) {
+      expect(cuerpo.includes(comunidad), `salud nombró a ${comunidad}`).toBe(false)
+    }
+  })
+})

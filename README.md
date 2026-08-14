@@ -34,6 +34,9 @@ to `pedido`. See [La verificación](#la-verificación).
 **M9 — De la capacidad al despacho.** Capacity registration, the planner, the rationing gate,
 offer aggregation, and the printable manifest. See [El despacho](#el-despacho).
 
+**M12 — Vista pública y prueba de toda la superficie.** The public page, served from our own
+route as `anon`, and a test that walks every route over HTTP. See [Lo público](#lo-público).
+
 **Infra.** Live Supabase project `convite` (us-east-1, ref `kjwkvulmsjffzhuchwpy`). All 18
 migrations applied, basin seeded, 116 tests green against the real database.
 
@@ -82,6 +85,40 @@ that gets logged in `decisiones_asignacion` (2.9), not something the engine reso
 
 `motivo` is the product surface — «Hay 180 mercados en Bodega Central Quibdó, pero nadie va para
 Bellavista en los próximos 14 días» — and it names the stock's age whenever the count is old.
+
+## Lo público
+
+`/` is everything a stranger can see: counts by zone and family of need. No coordinate, no
+community name, no phone number, no individual request.
+
+**A municipality that is one village is that village.** Decision D6 removed `agrupador` from
+the public view because a sub-municipal grouping «in a basin of thirteen communities is close
+enough to naming them». That reasoning stopped one level too high: of the five municipalities
+here, **four contain exactly one community**, so «Bojayá · Alimentación · 7 pendientes» was
+the sentence "Bellavista has seven households without food", published to `anon` under the
+name of an aggregate. Migration 0027 folds any municipality holding fewer than three
+communities into one basin-wide bucket. (The reference schema's `st_centroid` column — whose
+degenerate case is the same defect wearing coordinates — never made it into the implemented
+view, so the identity leak had survived without it.)
+
+The page reads as `anon`, not as the owner. Serving it ourselves rather than through
+PostgREST means nothing *forces* it to be unprivileged, so it assumes the role explicitly: a
+future edit that adds `select nombre from comunidades` returns nothing rather than publishing
+a village. Cached a minute via `revalidate`; rate limited per IP in the middleware
+(in-process, so per-instance — written down rather than assumed).
+
+### The whole surface, not just the page
+
+`tests/superficie.test.ts` walks **every route** against a real `next start`, over HTTP,
+because "any route" means what a stranger with curl can reach — middleware, redirects and
+error bodies included. Routes are enumerated from the filesystem, never typed into a list: a
+hardcoded list rots, and the route added next month is exactly the one nobody remembers to
+check. Any route missing from the policy table fails the suite until somebody classifies it.
+
+Authed routes must redirect or refuse. Public routes are scanned for basin coordinates,
+seeded community names and E.164 numbers. The detectors were each verified by planting a real
+leak on the public page and confirming the suite goes red — a security test that passes
+because its patterns never match anything is worth nothing.
 
 ## El despacho
 
