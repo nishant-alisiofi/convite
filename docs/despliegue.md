@@ -156,3 +156,32 @@ vivo», significa «el sistema está haciendo su trabajo».
 Lo primero que hay que mirar después del primer despliegue es que el worker esté procesando:
 si `jobs.sinProcesarMin` crece mientras `jobs.pendientes` es mayor que cero, el servicio del
 worker no está corriendo o no tiene `DATABASE_URL`.
+
+---
+
+## Checklist de variables, en formato legible por máquina
+
+Para empujar con los wrappers sin leer ningún valor. `secreto: false` no quiere decir
+inofensivo — quiere decir que ese valor viaja al navegador de todos modos y no es un secreto
+que proteger.
+
+```json
+[
+  {"nombre":"DATABASE_URL","servicio":"ambos","secreto":true,"obligatoria":true,"nota":"Postgres con PostGIS. Sin PostGIS las migraciones fallan en 0000."},
+  {"nombre":"DATA_DIR","servicio":"ambos","secreto":false,"obligatoria":true,"nota":"Volumen persistente. En un contenedor efímero las notas de voz desaparecen en cada despliegue."},
+  {"nombre":"NEXT_PUBLIC_SUPABASE_URL","servicio":"app","secreto":false,"obligatoria":true,"nota":"BLOQUEANTE: sin esto TODAS las rutas dan 500, incluido /api/salud."},
+  {"nombre":"NEXT_PUBLIC_SUPABASE_ANON_KEY","servicio":"app","secreto":false,"obligatoria":true,"nota":"BLOQUEANTE, igual que la anterior. La clave anon es pública por diseño."},
+  {"nombre":"SUPABASE_SERVICE_ROLE_KEY","servicio":"app","secreto":true,"obligatoria":false,"nota":"Alta de staff desde el servidor."},
+  {"nombre":"CRON_SECRET","servicio":"app","secreto":true,"obligatoria":true,"nota":"Protege /api/jobs/correr y el detalle de /api/salud. En producción esas rutas fallan cerradas si falta."},
+  {"nombre":"APP_BASE_URL","servicio":"app","secreto":false,"obligatoria":true,"nota":"Origen público; entra en los enlaces mágicos."},
+  {"nombre":"PORT","servicio":"app","secreto":false,"obligatoria":false,"nota":"La pone la plataforma. next start la respeta sola."},
+  {"nombre":"WHATSAPP_APP_SECRET","servicio":"app","secreto":true,"obligatoria":false,"nota":"Verificación de firma. Sin esto el webhook rechaza todo, que es el fallo correcto. D3."},
+  {"nombre":"WHATSAPP_WEBHOOK_VERIFY_TOKEN","servicio":"app","secreto":true,"obligatoria":false,"nota":"hub.verify_token de la suscripción. D3."},
+  {"nombre":"WHATSAPP_ACCESS_TOKEN","servicio":"ambos","secreto":true,"obligatoria":false,"nota":"El worker lo necesita para bajar media. D3."},
+  {"nombre":"WHATSAPP_PHONE_NUMBER_ID","servicio":"app","secreto":false,"obligatoria":false,"nota":"D3."},
+  {"nombre":"WHATSAPP_BUSINESS_ACCOUNT_ID","servicio":"app","secreto":false,"obligatoria":false,"nota":"D3."}
+]
+```
+
+El worker no necesita `PORT`, ni las claves de Supabase, ni `CRON_SECRET`: no atiende
+tráfico. Le basta `DATABASE_URL`, `DATA_DIR` y, para bajar media, `WHATSAPP_ACCESS_TOKEN`.
