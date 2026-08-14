@@ -30,3 +30,6 @@ drizzle/
 
 # Supabase CLI local state
 supabase/.temp/
+
+# Operational data lives outside the repo
+/data/
