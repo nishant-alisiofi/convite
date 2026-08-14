@@ -1,8 +1,8 @@
 import type { PoolClient } from 'pg'
 import { z } from 'zod'
 import { MODOS, TEMPORADAS, type Modo, type Temporada } from '@/db/schema/vocabulario'
-import { Grafo } from '@/lib/matching/grafo'
-import type { RutaGrafo, TemporadaActual } from '@/lib/matching/tipos'
+import { alcanzables, cargarCuenca, perdidas } from '@/lib/alcance'
+import type { TemporadaActual } from '@/lib/matching/tipos'
 
 /**
  * The river-route editor.
@@ -279,48 +279,10 @@ export async function comunidadesQueQuedanSinPaso(
   rutaId: string,
   temporada: TemporadaActual,
 ): Promise<string[]> {
-  const { rows: rutas } = await client.query<{
-    id: string
-    origen_id: string
-    destino_id: string
-    modo: Modo
-    minutos: number | null
-    temporada: Temporada
-    activa: boolean
-  }>(`select id, origen_id, destino_id, modo, minutos, temporada, activa from rutas`)
-
-  const { rows: nodos } = await client.query<{ comunidad_id: string }>(
-    `select distinct comunidad_id from nodos where activo`,
+  const cuenca = await cargarCuenca(client)
+  return perdidas(
+    cuenca,
+    alcanzables(cuenca, temporada),
+    alcanzables(cuenca, temporada, { sinRuta: rutaId }),
   )
-  const { rows: comunidades } = await client.query<{ id: string; nombre: string }>(
-    `select id, nombre from comunidades where activa`,
-  )
-
-  const aGrafo = (filas: typeof rutas): RutaGrafo[] =>
-    filas.map((r) => ({
-      id: r.id,
-      origenId: r.origen_id,
-      destinoId: r.destino_id,
-      modo: r.modo,
-      minutos: r.minutos,
-      temporada: r.temporada,
-      activa: r.activa,
-    }))
-
-  const alcanzables = (filas: typeof rutas): Set<string> => {
-    const grafo = new Grafo(aGrafo(filas), temporada)
-    const vistas = new Set<string>()
-    for (const nodo of nodos) {
-      for (const destino of grafo.desde(nodo.comunidad_id).keys()) vistas.add(destino)
-    }
-    return vistas
-  }
-
-  const antes = alcanzables(rutas)
-  const despues = alcanzables(rutas.map((r) => (r.id === rutaId ? { ...r, activa: false } : r)))
-
-  return comunidades
-    .filter((c) => antes.has(c.id) && !despues.has(c.id))
-    .map((c) => c.nombre)
-    .sort()
 }

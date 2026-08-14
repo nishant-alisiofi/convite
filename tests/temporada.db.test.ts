@@ -1,6 +1,7 @@
 import type { PoolClient } from 'pg'
 import { Pool } from 'pg'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { efectoDeLaTemporada } from '@/lib/alcance'
 import { emparejar } from '@/lib/matching/persistencia'
 import { CLAVE_TEMPORADA, fijarTemporada, temporadaVigente } from '@/lib/temporada'
 
@@ -161,6 +162,20 @@ conBase('cambiar la temporada cambia lo que el motor cree alcanzable', () => {
     )
     return rows[0]!.estado
   }
+
+  it('avisa a quién deja sin paso antes de que el admin confirme', async () => {
+    await client.query('savepoint caso')
+
+    // Lo que la pantalla de ajustes le muestra al admin antes de dejarlo cambiar.
+    const aSeca = await efectoDeLaTemporada(client, 'lluvias', 'seca')
+    expect(aSeca.pierden).toEqual(['Winandó'])
+    expect(aSeca.ganan).toEqual([])
+
+    // Y al revés: volver a lluvias vuelve a abrir el caño.
+    const aLluvias = await efectoDeLaTemporada(client, 'seca', 'lluvias')
+    expect(aLluvias.ganan).toEqual(['Winandó'])
+    expect(aLluvias.pierden).toEqual([])
+  })
 
   it('en lluvias Winandó se alcanza; en seca queda SIN_RUTA', async () => {
     await client.query('savepoint caso')
