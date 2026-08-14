@@ -166,9 +166,14 @@ conBase('toda la superficie, no solo la página', () => {
       const respuesta = await fetch(`${base}${concreta(ruta)}`, { redirect: 'manual' })
       const cuerpo = await respuesta.text()
 
-      // Redirigido al login, o negado. Nunca 200 con contenido.
+      /*
+       * Un desconocido puede ser rechazado de tres formas legítimas, y ninguna es 200:
+       * lo mandan al login (3xx) cuando hay identidad configurada, se lo niegan (401/403),
+       * o le dicen que la identidad no está configurada (503). Lo que nunca puede pasar es
+       * que la página se dibuje.
+       */
       expect(
-        [301, 302, 303, 307, 308, 401, 403, 404].includes(respuesta.status),
+        [301, 302, 303, 307, 308, 401, 403, 404, 503].includes(respuesta.status),
         `${ruta} devolvió ${respuesta.status} a un desconocido`,
       ).toBe(true)
 
