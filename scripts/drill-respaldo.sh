@@ -54,10 +54,19 @@ docker exec "$CONTENEDOR" psql -U "$USUARIO" -d postgres -q \
   -c "drop database if exists ${SCRATCH} with (force)" \
   -c "create database ${SCRATCH}"
 
+# --no-owner because we restore as `convite` rather than the original owner, which is what a
+# real recovery into a fresh project looks like.
+#
+# NOT --no-privileges, and that flag's absence is load-bearing. It was there first, and the
+# drill caught what it did: every row came back and every GRANT did not, so `anon` ended up
+# with no access to `mapa_publico` at all. A restore like that looks perfect from a row count
+# and leaves the public boundary unconfigured — which is either a dead public page or, worse,
+# somebody "fixing" it with a grant far broader than 2.4 allows.
+#
 # pg_restore reports benign noise for extensions it cannot recreate as a non-superuser;
 # --exit-on-error would fail the drill for something that does not affect our data.
-docker exec -i "$CONTENEDOR" pg_restore -U "$USUARIO" -d "$SCRATCH" --no-owner --no-privileges \
-  < "$ARCHIVO" 2> >(grep -v 'must be owner of extension' >&2 || true)
+docker exec -i "$CONTENEDOR" pg_restore -U "$USUARIO" -d "$SCRATCH" --no-owner \
+  < "$ARCHIVO" 2> >(grep -vE 'must be owner of extension|must be owner of schema' >&2 || true)
 
 echo "── Comparación fila por fila ─────────────────────────────"
 # The check that matters: every table has the same number of rows on both sides. A restore
@@ -83,6 +92,25 @@ else
   RESULTADO=1
 fi
 
+# ── La prueba que un conteo no da ───────────────────────────────────────────────────────
+# Las filas pueden estar todas y la base seguir inservible: lo que hace cumplir las
+# no-negociables son las constraints, las políticas RLS y las funciones `security definer`,
+# y un `pg_restore` puede traerse los datos sin traerse eso. Correr las pruebas de base
+# contra la copia es lo único que lo demuestra — son exactamente las mismas aserciones que
+# protegen la base real.
+if [ "$RESULTADO" -eq 0 ]; then
+  echo "── Aserciones de la suite contra la copia ────────────────"
+  URL_COPIA="postgresql://${USUARIO}:${USUARIO}@localhost:5433/${SCRATCH}"
+  if DATABASE_URL="$URL_COPIA" pnpm vitest run tests/esquema.db.test.ts tests/rls.db.test.ts \
+       --reporter=dot > /tmp/drill-suite.log 2>&1; then
+    echo "  ✓ esquema y RLS pasan contra la restauración"
+  else
+    echo "  ✗ la copia tiene los datos pero NO hace cumplir las reglas:" >&2
+    tail -25 /tmp/drill-suite.log >&2
+    RESULTADO=1
+  fi
+fi
+
 echo "── Limpieza ──────────────────────────────────────────────"
 docker exec "$CONTENEDOR" psql -U "$USUARIO" -d postgres -q \
   -c "drop database if exists ${SCRATCH} with (force)"
@@ -96,7 +124,7 @@ fi
 
 if [ "$RESULTADO" -eq 0 ]; then
   echo
-  echo "Drill OK: el respaldo se restaura y los datos cuadran."
+  echo "Drill OK: el respaldo se restaura, los datos cuadran y las reglas se hacen cumplir."
 else
   echo
   echo "Drill FALLIDO: el respaldo no reproduce la base." >&2

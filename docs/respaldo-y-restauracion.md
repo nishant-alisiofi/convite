@@ -21,13 +21,33 @@ Qué hace, en orden:
 1. `pg_dump -Fc` de la base local a `$DATA_DIR/respaldos/` (fuera del repo).
 2. Crea una base de trabajo `convite_drill` y restaura el volcado ahí.
 3. **Compara el conteo de filas de cada tabla** entre el original y la copia.
-4. Borra la base de trabajo y, salvo `--conservar`, el archivo.
+4. **Corre `esquema.db.test.ts` y `rls.db.test.ts` contra la copia.**
+5. Borra la base de trabajo y, salvo `--conservar`, el archivo.
 
-El paso 3 es el que importa. Un `pg_restore` que "terminó bien" habiendo perdido una tabla
-en el camino sale con código 0 y se ve igual que uno correcto; el conteo por tabla es lo
-único que distingue las dos cosas.
+**Última corrida:** 2026-08-14 — 32 tablas, 8 681 filas idénticas, esquema y RLS verdes.
 
-**Última corrida:** 2026-08-14 — 32 tablas, 8 681 filas, idénticas.
+### Qué quiere decir «restauración verificada»
+
+Las dos cosas, no una:
+
+- **Los datos están**: el conteo por tabla cuadra. Un `pg_restore` que "terminó bien" habiendo
+  perdido una tabla sale con código 0 y se ve igual que uno correcto.
+- **Las reglas se hacen cumplir**: las constraints, las políticas RLS, los `grants` y las
+  funciones `security definer` volvieron. Esto es lo que un conteo no puede ver, y es lo que
+  hace cumplir las no-negociables — una base con todas las filas y sin RLS no es una copia de
+  este sistema, es una filtración con los mismos datos.
+
+### El error que este drill ya atrapó
+
+La primera versión restauraba con `--no-privileges`. Todas las filas volvieron, el conteo
+cuadró, y **trece aserciones fallaron**: `anon` quedó sin ningún permiso, ni siquiera el
+`SELECT` sobre `mapa_publico`. Una restauración así se ve impecable en un conteo y deja el
+borde público sin configurar — o la página pública muerta, o peor, alguien "arreglándola" con
+un grant mucho más ancho de lo que 2.4 permite.
+
+Se restaura con `--no-owner` (uno restaura como otro usuario, que es lo que pasa de verdad en
+una recuperación) pero **nunca** con `--no-privileges`. Vale para el proyecto alojado igual
+que para el local.
 
 El script se niega a correr si `DATABASE_URL` no apunta a `localhost` o `127.0.0.1`. El drill
 crea y borra bases de datos: eso es inofensivo contra docker y catastrófico en cualquier otro
@@ -56,7 +76,8 @@ No se restaura sobre producción. Se restaura **a un proyecto nuevo** y se compa
 4. Correr la misma comparación de conteos que hace el drill.
 5. **Correr la suite contra la copia**: `DATABASE_URL=<copia> pnpm test`. Es la verificación
    real — prueba las constraints, las políticas RLS y las funciones, no solo que las filas
-   estén. Los tests con `.db.` son exactamente esa comprobación.
+   estén. Los tests con `.db.` son exactamente esa comprobación, y es el mismo paso 4 que el
+   drill local ya automatiza.
 6. Anotar aquí la fecha, el tamaño y cuánto tardó.
 
 Mientras eso no se haya hecho, el plan de recuperación de este sistema es una suposición.

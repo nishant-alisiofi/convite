@@ -3,9 +3,11 @@ import { Pool } from 'pg'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import {
   estadoSistema,
+  HORAS_MEDIANA_VERIFICACION,
   HORAS_SALIDA_VIEJA,
   MINUTOS_JOB_ATRASADO,
   MINUTOS_JOB_COLGADO,
+  MINUTOS_SIN_PROCESAR,
 } from '@/lib/observabilidad/salud'
 
 /**
@@ -56,6 +58,10 @@ beforeEach(async () => {
   if (!url) return
   await client.query('rollback to savepoint caso')
   // The seed leaves a clean queue; each case creates exactly the failure it is about.
+  // Only the two tables these cases own. Deleting `reportes` here would be correct in
+  // isolation and wrong in practice: vitest runs files in parallel, and holding locks on
+  // rows the matcher's suite is using turns both files flaky for reasons neither describes.
+  // The seed verifies nothing, so the verification cases can just add their own rows.
   await client.query('delete from jobs')
   await client.query('delete from salidas_pendientes')
 })
@@ -174,6 +180,107 @@ conBase('el estado del sistema', () => {
     const estado = await estadoSistema(client, AHORA)
 
     expect(estado.alertas.length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('detecta la cola detenida: hay trabajo y nada termina', async () => {
+    // The stall the brief asks for. Note it cannot be a scheduled job: a queue cannot report
+    // its own death, because the job that would raise the alarm is stuck behind the stall.
+    await client.query(
+      `insert into jobs (tipo, estado, correr_en, actualizado_en)
+       values ('emparejar_todo', 'hecho', $1, $1)`,
+      [haceMin(MINUTOS_SIN_PROCESAR + 20)],
+    )
+    await client.query(
+      `insert into jobs (tipo, estado, correr_en) values ('descargar_media', 'pendiente', $1)`,
+      [haceMin(2)],
+    )
+
+    const estado = await estadoSistema(client, AHORA)
+
+    expect(estado.jobs.sinProcesarMin).toBeGreaterThan(MINUTOS_SIN_PROCESAR)
+    expect(estado.ok).toBe(false)
+    expect(estado.alertas.join(' ')).toContain('detenida')
+  })
+
+  it('una cola vacía que lleva rato quieta no es una cola detenida', async () => {
+    // Nothing waiting means nothing wrong. A quiet night is allowed to look quiet.
+    await client.query(
+      `insert into jobs (tipo, estado, correr_en, actualizado_en)
+       values ('emparejar_todo', 'hecho', $1, $1)`,
+      [haceMin(600)],
+    )
+    const estado = await estadoSistema(client, AHORA)
+
+    expect(estado.jobs.pendientes).toBe(0)
+    expect(estado.alertas.join(' ')).not.toContain('detenida')
+  })
+
+  /** How many verified reports the median is already averaging over. */
+  async function verificadosEnLaVentana(): Promise<number> {
+    const { rows } = await client.query<{ n: string }>(
+      `select count(*) as n from reportes
+        where verificado_en is not null and creado_en >= $1::timestamptz - interval '7 days'`,
+      [AHORA],
+    )
+    return Number(rows[0]!.n)
+  }
+
+  /** Adds `cuantos` reports that each took `horas` to verify. */
+  async function verificadosQueTardaron(horas: number, cuantos: number): Promise<void> {
+    const { rows: usuarios } = await client.query<{ id: string }>('select id from usuarios limit 1')
+    for (let i = 0; i < cuantos; i++) {
+      await client.query(
+        `insert into reportes (organizacion_id, tipo, canal, estado, verificado_por, verificado_en, creado_en)
+         values ($1, 'necesidad', 'whatsapp', 'VERIFICADO', $2, $3, $4)`,
+        [organizacion, usuarios[0]!.id, AHORA, haceMin(horas * 60)],
+      )
+    }
+  }
+
+  it('mide la mediana de RECIBIDO a VERIFICADO', async () => {
+    // PRD §6's day-one metric. The seed verifies its reports in the same instant they
+    // arrive, so the baseline median is 0 — which is why this asserts the direction rather
+    // than a fixed number: slow verifications must move it, whatever the seed happens to be.
+    const antes = await estadoSistema(client, AHORA)
+    expect(antes.verificacion.medianaHoras).not.toBeNull()
+
+    await verificadosQueTardaron(6, (await verificadosEnLaVentana()) + 1)
+    const despues = await estadoSistema(client, AHORA)
+
+    expect(despues.verificacion.medianaHoras!).toBeGreaterThan(antes.verificacion.medianaHoras!)
+    expect(despues.verificacion.medianaHoras!).toBeLessThanOrEqual(6)
+  })
+
+  it('avisa cuando la verificación tarda más de un día', async () => {
+    // Enough slow ones to dominate whatever is already there, so the alert is about the
+    // threshold and not about how big the seed is.
+    await verificadosQueTardaron(
+      HORAS_MEDIANA_VERIFICACION + 10,
+      (await verificadosEnLaVentana()) + 1,
+    )
+    const estado = await estadoSistema(client, AHORA)
+
+    expect(estado.verificacion.medianaHoras!).toBeGreaterThan(HORAS_MEDIANA_VERIFICACION)
+    expect(estado.ok).toBe(false)
+    expect(estado.alertas.join(' ')).toContain('falta una persona')
+  })
+
+  it('no se deja engañar por una mediana que se ve sana', async () => {
+    // The trap under the metric, and the seed shows it perfectly: everything that was
+    // verified was verified instantly, so the median reads 0 h — the healthiest number
+    // possible — while a report nobody has touched in three days sits in the queue. A
+    // dashboard reading only the median would show green through exactly that.
+    await client.query(
+      `insert into reportes (organizacion_id, tipo, canal, estado, creado_en)
+       values ($1, 'necesidad', 'whatsapp', 'RECIBIDO', $2)`,
+      [organizacion, haceMin(HORAS_MEDIANA_VERIFICACION * 3 * 60)],
+    )
+    const estado = await estadoSistema(client, AHORA)
+
+    expect(estado.verificacion.medianaHoras!).toBeLessThan(HORAS_MEDIANA_VERIFICACION)
+    expect(estado.verificacion.pendientes).toBeGreaterThan(0)
+    expect(estado.ok).toBe(false)
+    expect(estado.alertas.join(' ')).toContain('sin verificar')
   })
 
   it('no devuelve nada que identifique a nadie', async () => {
