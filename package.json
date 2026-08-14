@@ -26,7 +26,8 @@
     "worker": "tsx scripts/worker.ts",
     "vista:mapa": "tsx scripts/vista-mapa.ts",
     "vista:bandeja": "tsx --tsconfig tsconfig.scripts.json scripts/vista-bandeja.tsx",
-    "vista:manifiesto": "tsx --tsconfig tsconfig.scripts.json scripts/vista-manifiesto.tsx"
+    "vista:manifiesto": "tsx --tsconfig tsconfig.scripts.json scripts/vista-manifiesto.tsx",
+    "build:limpio": "env -u DATABASE_URL -u NEXT_PUBLIC_SUPABASE_URL -u NEXT_PUBLIC_SUPABASE_ANON_KEY -u SUPABASE_URL -u SUPABASE_ANON_KEY next build"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",

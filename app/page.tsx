@@ -1,12 +1,22 @@
 import { cargarMapaPublico } from '@/lib/publico'
 
 /**
- * Re-rendered at most once a minute rather than per request. The counts move when the
- * matcher sweeps, not when somebody refreshes, and `force-dynamic` would make Next emit
- * `no-store` — which is exactly wrong for the one page that should be cacheable, and would
- * put a database round trip behind every visitor.
+ * Rendered per request, never at build time.
+ *
+ * `revalidate` looked right — the counts move when the matcher sweeps, not when somebody
+ * refreshes — but it makes Next statically prerender this page during `next build`, which
+ * means opening a database connection in the build container. Railway hands DATABASE_URL to
+ * the *runtime*; no build container will ever have it, so the build died on «Configuración
+ * inválida: DATABASE_URL: Required» and staging never came up.
+ *
+ * Serving it dynamically is also the more honest shape. A prerendered shell built without a
+ * database would say «todavía no hay solicitudes registradas» — not a stale number, an
+ * actively false one — and ISR would serve that to the first visitors after every deploy.
+ *
+ * Cacheability comes from next.config's headers() instead, which is the only place a
+ * dynamic route's Cache-Control survives.
  */
-export const revalidate = 60
+export const dynamic = 'force-dynamic'
 
 /**
  * The public page.

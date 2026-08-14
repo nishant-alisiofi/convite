@@ -1,5 +1,6 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { existsSync, readdirSync, statSync } from 'node:fs'
+import { join as unir } from 'node:path'
 import { createServer } from 'node:net'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -118,12 +119,46 @@ function correr(cmd: string, args: string[]): Promise<void> {
   })
 }
 
+/** Newest mtime under a directory, ignoring build output and dependencies. */
+function masReciente(dir: string): number {
+  let ultimo = 0
+  for (const entrada of readdirSync(dir)) {
+    if (entrada === 'node_modules' || entrada === '.next') continue
+    const ruta = unir(dir, entrada)
+    const info = statSync(ruta)
+    ultimo = Math.max(ultimo, info.isDirectory() ? masReciente(ruta) : info.mtimeMs)
+  }
+  return ultimo
+}
+
+/**
+ * Whether the build on disk is older than the code it is supposed to be serving.
+ *
+ * This is not housekeeping. The whole point of this file is that it tests the real HTTP
+ * surface, and `next start` serves whatever is in `.next` — so a stale build means every
+ * assertion here is about code that is no longer in the repository. It fails one way (a fix
+ * that landed is reported broken, which is what happened to the rate limiter on main) and
+ * passes the other (a regression that landed is reported fine), and the second is the one
+ * that would matter.
+ */
+function construccionVieja(): boolean {
+  if (!existsSync('.next/BUILD_ID')) return true
+
+  const construida = statSync('.next/BUILD_ID').mtimeMs
+  const fuentes = ['app', 'lib', 'db', 'middleware.ts', 'next.config.ts']
+    .filter((f) => existsSync(f))
+    .map((f) => (statSync(f).isDirectory() ? masReciente(f) : statSync(f).mtimeMs))
+
+  return Math.max(...fuentes) > construida
+}
+
 beforeAll(async () => {
   if (!url) return
 
-  // Build if there is nothing to serve. Deliberately not skipped when absent: a security
-  // test that quietly does not run is worse than no security test.
-  if (!existsSync('.next/BUILD_ID')) {
+  // Build when there is nothing to serve, or when what is there is out of date. Deliberately
+  // never skipped: a security test that quietly does not run — or that runs against last
+  // week's bundle — is worse than no security test.
+  if (construccionVieja()) {
     await correr('npx', ['next', 'build'])
   }
 
