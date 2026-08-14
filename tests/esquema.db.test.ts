@@ -179,7 +179,9 @@ conBase('2.4 — el borde público es de la base de datos', () => {
         where table_schema = 'public' and table_name = 'mapa_publico'`,
     )
     const columnas = rows.map((r) => r.column_name).sort()
-    expect(columnas).toEqual(['agrupador', 'atendidos', 'familia_label', 'municipio', 'pendientes'])
+    // PRD D6 took `agrupador` out: municipality is as fine-grained as the public surface
+    // gets, because a sub-municipal grouping is a handful of settlements.
+    expect(columnas).toEqual(['atendidos', 'familia_label', 'municipio', 'pendientes'])
   })
 
   it('anon no alcanza ninguna tabla de Convite', async () => {
