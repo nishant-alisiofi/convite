@@ -145,6 +145,9 @@ export default async function Envio({
   const libre = manifiesto.cupoFamilias - asignadas
   const planeado = manifiesto.estado === 'PLANEADO'
   const yaEnPlan = new Set(manifiesto.paradas.map((p) => p.pedidoId))
+  // What is left to offer, not what the trip could theoretically serve. Everything already
+  // on board is not a candidate, and a heading over an empty list reads as a broken screen.
+  const porSubir = candidatos.filter((c) => !yaEnPlan.has(c.pedidoId))
 
   return (
     <main>
@@ -269,7 +272,7 @@ export default async function Envio({
         </section>
       )}
 
-      {planeado && puedeDespachar && candidatos.length > 0 && (
+      {planeado && puedeDespachar && porSubir.length > 0 && (
         <section className="mt-8">
           <h2 className="font-semibold text-stone-900">Lo que este viaje podría llevar</h2>
           <p className="mt-1 max-w-3xl text-sm text-stone-700">
@@ -278,9 +281,7 @@ export default async function Envio({
           </p>
 
           <ul className="mt-3 divide-y divide-stone-200 rounded-lg border border-barro-200 bg-white">
-            {candidatos
-              .filter((c) => !yaEnPlan.has(c.pedidoId))
-              .map((c) => (
+            {porSubir.map((c) => (
                 <li key={c.pedidoId} className="px-4 py-3 text-sm">
                   <div className="flex flex-wrap items-baseline gap-x-2">
                     <span className="font-medium text-stone-900">{c.comunidad}</span>
@@ -321,9 +322,9 @@ export default async function Envio({
                       así es mandar comida dañada.
                     </p>
                   )}
-                  {c.motivo && <p className="mt-1 text-stone-600">{c.motivo}</p>}
-                </li>
-              ))}
+                {c.motivo && <p className="mt-1 text-stone-600">{c.motivo}</p>}
+              </li>
+            ))}
           </ul>
         </section>
       )}

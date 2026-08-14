@@ -35,13 +35,27 @@ export default async function Recogidas({ searchParams }: { searchParams: Params
   const { nodos, plan, nodoActivo } = await conSesion(sesion, async (client) => {
     const nodos = await nodosParaRecogida(client)
     const ubicados = nodos.filter((n) => n.ubicado)
-    const nodoActivo = ubicados.find((n) => n.id === nodoPedido) ?? ubicados[0] ?? null
 
-    return {
-      nodos,
-      nodoActivo,
-      plan: nodoActivo ? await planearRecogida(client, nodoActivo.id) : null,
+    const pedido = nodoPedido ? ubicados.find((n) => n.id === nodoPedido) : undefined
+    if (pedido) {
+      return { nodos, nodoActivo: pedido, plan: await planearRecogida(client, pedido.id) }
     }
+
+    /*
+     * With no node asked for, open on the one that actually has a run.
+     *
+     * The obvious default — the first node — is alphabetical, which lands on «Acopio
+     * Tagachí» while every offer in the basin is around the Quibdó warehouse. The screen
+     * then greets the person whose job this is with «no hay ofrecimientos por recoger»,
+     * and they have to know to click elsewhere to find out that is false.
+     */
+    const planes = []
+    for (const nodo of ubicados) {
+      planes.push({ nodo, plan: await planearRecogida(client, nodo.id) })
+    }
+    const mejor = planes.sort((a, b) => b.plan.paradas.length - a.plan.paradas.length)[0]
+
+    return { nodos, nodoActivo: mejor?.nodo ?? null, plan: mejor?.plan ?? null }
   })
 
   if (!PUEDEN_PLANEAR.includes(sesion.rolStaff)) {

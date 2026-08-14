@@ -8,6 +8,7 @@ import {
   type ComunidadEnSilencio,
 } from '@/lib/observabilidad/silencio'
 import { confirmacionesAmbiguas, type ConfirmacionAmbigua } from '@/lib/verificacion/danos'
+import { getPool } from '@/db/client'
 import { conSesion, sesionActual } from '@/lib/sesion'
 
 export const dynamic = 'force-dynamic'
@@ -42,12 +43,28 @@ export default async function Estado() {
     )
   }
 
-  const { salud, silencio, danos, ambiguas } = await conSesion(sesion, async (client) => ({
-    salud: await estadoSistema(client),
-    silencio: await comunidadesEnSilencio(client),
-    danos: await agrupacionesDeDanos(client),
-    ambiguas: await confirmacionesAmbiguas(client),
-  }))
+  /*
+   * System diagnostics are read with the owner pool, not through `conSesion`, and that is a
+   * decision rather than a shortcut.
+   *
+   * `estadoSistema` counts `jobs`, `salidas_pendientes` and `_migraciones` — infrastructure
+   * tables with no policy for `authenticated`, because no human role has any business
+   * reading a queue row. Under a coordinator's session the first of those queries raises
+   * «permission denied for table jobs», so this page threw for every real user; it only
+   * appeared to work when rendered with the owner connection.
+   *
+   * Reading them as the owner exposes nothing new: these are counts, not anybody's data,
+   * and `/api/salud` already publishes the same numbers with no session at all. What gates
+   * this screen is the role check above.
+   */
+  const pool = getPool()
+  const salud = await estadoSistema(pool)
+  const silencio = await comunidadesEnSilencio(pool)
+  const danos = await agrupacionesDeDanos(pool)
+
+  // The ambiguity check reads entregas, pedidos and comunidades — real domain tables with
+  // real policies — so it stays behind the session, where RLS applies.
+  const ambiguas = await conSesion(sesion, (client) => confirmacionesAmbiguas(client))
 
   return (
     <main>
