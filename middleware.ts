@@ -7,7 +7,16 @@ import { NextResponse, type NextRequest } from 'next/server'
  * This is a convenience, not a security boundary: the boundary is RLS. A request that got
  * past here with no staff record still reads nothing (db/migrations/0017).
  */
-const PUBLICAS = ['/entrar', '/auth', '/api/webhooks', '/api/jobs']
+/**
+ * Routes that answer without a session.
+ *
+ * Exported so a test can assert the list rather than trusting it. Anything reachable by
+ * something that cannot hold a cookie belongs here: a provider posting a webhook, a cron
+ * hitting the job runner, an uptime monitor reading the health check. Miss one and it does
+ * not fail loudly — it 307s to the sign-in page, and the caller sees a redirect it has no
+ * idea what to do with.
+ */
+export const PUBLICAS = ['/entrar', '/auth', '/api/webhooks', '/api/jobs', '/api/salud']
 
 export async function middleware(request: NextRequest) {
   let respuesta = NextResponse.next({ request })

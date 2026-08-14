@@ -57,7 +57,7 @@ Solo los **nombres**. Los valores no viven en el repo ni en este documento.
 |---|---|
 | `PORT` | La pone la plataforma; `next start` la respeta sola. No hay que tocarla. |
 | `APP_BASE_URL` | Origen público. Entra en los enlaces mágicos. |
-| `SUPABASE_URL`, `SUPABASE_ANON_KEY` | Identidad (solo eso: PostgREST no se expone, PRD §3). |
+| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | **Los que hay que poner.** Ver el aviso abajo. |
 | `SUPABASE_SERVICE_ROLE_KEY` | Alta de staff desde el servidor. |
 | `WHATSAPP_APP_SECRET` | Verificación de firma del webhook. Sin esto el webhook rechaza todo, que es el fallo correcto. |
 | `WHATSAPP_WEBHOOK_VERIFY_TOKEN` | El `hub.verify_token` de la suscripción. |
@@ -70,6 +70,20 @@ Le basta `DATABASE_URL` y `DATA_DIR`, más `WHATSAPP_ACCESS_TOKEN` para bajar me
 necesita `PORT` ni las claves de Supabase: no atiende tráfico.
 
 ---
+
+### ⚠️ Sin Supabase la aplicación no levanta — ni siquiera a medias
+
+Comprobado en el ensayo, no deducido: **si faltan `NEXT_PUBLIC_SUPABASE_URL` y
+`NEXT_PUBLIC_SUPABASE_ANON_KEY`, TODAS las rutas devuelven 500.** El middleware corre en cada
+petición y construye el cliente de Supabase antes de mirar si la ruta es pública, así que se
+cae también `/api/salud` y también el webhook de WhatsApp. No existe un despliegue «solo base
+de datos, autenticación después»: sin esas dos variables no hay nada en pie, el monitor no
+puede ni preguntar, y Meta reintenta contra un 500.
+
+Y ojo con el nombre: el código lee **`NEXT_PUBLIC_SUPABASE_URL`**, mientras que `.env.example`
+y `lib/env.ts` hablaban de `SUPABASE_URL`. Poner las variables documentadas y no las que el
+código lee deja exactamente el mismo 500, sin ninguna pista de por qué. Es la trampa más cara
+de esta lista.
 
 ## Supabase: la configuración que hay que hacer a mano
 

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { GET } from '@/app/api/salud/route'
+import { PUBLICAS } from '@/middleware'
 
 /**
  * The two levels of the health route.
@@ -19,6 +20,24 @@ afterEach(() => {
 
 const pedir = (url: string, cabeceras: Record<string, string> = {}) =>
   GET(new Request(url, { headers: cabeceras }))
+
+describe('la ruta de salud es alcanzable sin sesión', () => {
+  it('está en la lista de rutas públicas del middleware', () => {
+    // Found in the deploy rehearsal, not by reading the code: /api/salud answered 307 to
+    // /entrar because it was never added here. A liveness check behind a sign-in redirect is
+    // not a liveness check — the monitor follows the redirect, gets an HTML login page, and
+    // reports the system healthy while the queue is dead.
+    expect(PUBLICAS).toContain('/api/salud')
+  })
+
+  it('todo lo que responde sin cookie está en esa lista', () => {
+    // A webhook provider, a cron, and a monitor all share the same problem: none of them can
+    // hold a session, and none of them can do anything sensible with a redirect.
+    for (const ruta of ['/api/webhooks', '/api/jobs', '/api/salud', '/entrar', '/auth']) {
+      expect(PUBLICAS, ruta).toContain(ruta)
+    }
+  })
+})
 
 describe('la ruta de salud', () => {
   it('responde el liveness sin sesión, y solo cuenta las alertas', async () => {
