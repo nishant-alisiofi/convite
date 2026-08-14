@@ -36,7 +36,12 @@ export const dynamic = 'force-dynamic'
  */
 
 export default async function Inicio() {
-  const filas = await cargarMapaPublico()
+  // A row with nothing in either column says nothing: there are pedidos in that municipality
+  // and family, but none in a state the public view counts. Dropping them also makes the two
+  // conditions below agree by construction — the page used to decide its copy from the SUMS
+  // and its table from the ROW COUNT, so an all-zero result printed «todavía no hay
+  // solicitudes» directly above a table of zeroes. Two true statements, contradicting.
+  const filas = (await cargarMapaPublico()).filter((f) => f.pendientes > 0 || f.atendidos > 0)
 
   const totalPendientes = filas.reduce((n, f) => n + f.pendientes, 0)
   const totalAtendidos = filas.reduce((n, f) => n + f.atendidos, 0)

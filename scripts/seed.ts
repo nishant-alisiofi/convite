@@ -19,6 +19,8 @@ import {
   VOLUNTARIOS_SEMILLA,
 } from '@/db/seed/operacion'
 import { RUTAS_SEMILLA } from '@/db/seed/rutas'
+import { emparejar } from '@/lib/matching/persistencia'
+import { temporadaVigente } from '@/lib/temporada'
 
 /**
  * Idempotent seed. Running it twice leaves the same basin — every insert is keyed on a
@@ -61,7 +63,38 @@ async function main() {
     client.release()
   }
 
+  await clasificar()
   await resumen()
+}
+
+/**
+ * Runs one matcher sweep over what was just seeded.
+ *
+ * A basin where seven requests exist and the engine has never looked at them is not a state
+ * any real deployment is ever in — the worker sweeps continuously — so leaving it that way
+ * makes the seed a half-built fixture rather than a picture of the system.
+ *
+ * It also made staging lie. `mapa_publico` counts pedidos in the matcher's OUTPUT states
+ * (SIN_RUTA / SIN_EXISTENCIA / SIN_CAPACIDAD / LISTO); freshly seeded ones sit at ABIERTO,
+ * which is in none of them. So the public page reported «todavía no hay solicitudes» over a
+ * basin holding seven, and anyone walking the deployment — the founder, a reviewer, the
+ * partner — saw an empty system that was not empty.
+ *
+ * Safe on every boot, like the rest of the seed: the matcher is idempotent by design (a
+ * second sweep changes nothing), it evaluates zero pedidos on an empty database, and it
+ * never decrements stock or commits a boat — it only reclassifies.
+ */
+async function clasificar(): Promise<void> {
+  const pool = getPool()
+  const client = await pool.connect()
+  try {
+    const resultado = await emparejar(client, { temporada: await temporadaVigente(client) })
+    if (resultado.cambiados > 0) {
+      console.log(`\nEmparejador: ${resultado.cambiados} pedido(s) clasificado(s).`)
+    }
+  } finally {
+    client.release()
+  }
 }
 
 // ── Blocks ────────────────────────────────────────────────────────────────────────────
@@ -685,7 +718,7 @@ async function resumen(): Promise<void> {
   const { rows: pendientes } = await pool.query<{ estado: string; n: string }>(
     'select estado, count(*)::text as n from pedidos group by estado order by estado',
   )
-  console.log('\nPedidos por estado (el emparejador aún no ha corrido — eso es M2):')
+  console.log('\nPedidos por estado (ya pasaron por el emparejador):')
   for (const p of pendientes) console.log(`  ${p.estado.padEnd(16)} ${p.n}`)
   console.log()
 }

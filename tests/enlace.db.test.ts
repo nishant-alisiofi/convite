@@ -31,7 +31,19 @@ let client: PoolClient
 let rosa: string
 let organizacion: string
 
-const AHORA = new Date('2026-08-14T15:00:00Z')
+/**
+ * Anchored to the real clock, a minute ahead, and not to a fixed date.
+ *
+ * `despachar` writes `salidas_pendientes.enviar_despues_de` with the DATABASE's now(), while
+ * `entregarPendientes` filters `enviar_despues_de <= ahora`. With a hardcoded AHORA those two
+ * clocks agree only until the wall clock passes it — this file was pinned to 15:00Z and
+ * started failing at 15:00Z on the day it was written, with no code change involved. A test
+ * that expires is worse than no test: it fails later, in someone else's change, and looks
+ * like their bug.
+ *
+ * Everything here is expressed as an offset from this instant, so the file is time-invariant.
+ */
+const AHORA = new Date(Date.now() + 60_000)
 const HACE_TRES_DIAS = new Date(AHORA.getTime() - 3 * 86_400_000)
 
 beforeAll(async () => {
