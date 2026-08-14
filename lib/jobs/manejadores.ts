@@ -1,27 +1,20 @@
 import { emparejar } from '@/lib/matching/persistencia'
 import { vencerOfertas } from '@/lib/matching/vencimientos'
-import type { TemporadaActual } from '@/lib/matching/tipos'
+import { temporadaVigente } from '@/lib/temporada'
 import type { ManejadorJob } from './tipos'
 
 /**
- * Which season we resolve for.
- *
- * Chocó is one of the wettest places on earth, so `lluvias` is the normal state and the
- * safe default. This is a placeholder for a real answer: it should become a setting a
- * coordinator flips when the river drops, because getting it wrong silently changes which
- * communities the engine believes are reachable.
+ * The season is read per run from `configuracion` (see lib/temporada.ts), not captured at
+ * import time: an admin who flips it mid-response expects the next sweep to use the new
+ * answer, not the one this process booted with.
  */
-export function temporadaActual(): TemporadaActual {
-  return process.env.CONVITE_TEMPORADA === 'seca' ? 'seca' : 'lluvias'
-}
-
 export const MANEJADORES: Record<string, ManejadorJob> = {
   /** Full sweep. Cheap enough at basin scale, and immune to a missed trigger. */
   emparejar_todo: async (_job, client) => {
     // Expire first: a sweep that plans a run around food that spoiled overnight is worse
     // than one that finds nothing (2.15).
     await vencerOfertas(client)
-    await emparejar(client, { temporada: temporadaActual() })
+    await emparejar(client, { temporada: await temporadaVigente(client) })
   },
 
   /** Hourly. Perishables leave the queue on their own and the offerer gets told. */
@@ -33,6 +26,6 @@ export const MANEJADORES: Record<string, ManejadorJob> = {
   emparejar_pedido: async (job, client) => {
     const pedidoId = job.payload.pedidoId
     if (typeof pedidoId !== 'string') throw new Error('emparejar_pedido requiere pedidoId.')
-    await emparejar(client, { temporada: temporadaActual(), pedidoId })
+    await emparejar(client, { temporada: await temporadaVigente(client), pedidoId })
   },
 }

@@ -170,6 +170,13 @@ export const rutas = pgTable(
     activa: boolean('activa').notNull().default(true),
     /** Why it was deactivated, who said so — never deactivate without one. */
     notas: text('notas'),
+    /**
+     * Section 9.3: closing a leg is a person's decision, never a consequence of a damage
+     * report arriving. Closing MER→TAG cuts off Tagachí, Beté and Bellavista at once, so
+     * the name and the timestamp are not paperwork.
+     */
+    desactivadaPor: uuid('desactivada_por').references(() => usuarios.id),
+    desactivadaEn: timestamp('desactivada_en', { withTimezone: true, mode: 'date' }),
     creadoEn: creadoEn(),
     actualizadoEn: actualizadoEn(),
   },
@@ -189,6 +196,12 @@ export const rutas = pgTable(
     check(
       'rutas_fluvial_manual_check',
       sql`fuente <> 'google' or modo not in (${sql.raw(MODOS_FLUVIALES.map((m) => `'${m}'`).join(', '))})`,
+    ),
+    // Same shape as `envios_despacho_check`: the state that matters cannot be reached
+    // without a person and a timestamp attached to it (2.1).
+    check(
+      'rutas_desactivacion_check',
+      sql`activa or (desactivada_por is not null and desactivada_en is not null)`,
     ),
   ],
 )

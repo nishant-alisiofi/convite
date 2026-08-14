@@ -1,7 +1,7 @@
 import 'dotenv/config'
 import { closeDb, getPool } from '@/db/client'
-import { temporadaActual } from '@/lib/jobs/manejadores'
 import { emparejar } from '@/lib/matching/persistencia'
+import { temporadaVigente } from '@/lib/temporada'
 
 /**
  * Runs one matcher sweep and prints the board. `pnpm emparejar` — for development and for
@@ -10,10 +10,10 @@ import { emparejar } from '@/lib/matching/persistencia'
 async function main() {
   const pool = getPool()
   const client = await pool.connect()
-  const temporada = temporadaActual()
 
   try {
     await client.query('begin')
+    const temporada = await temporadaVigente(client)
     const resumen = await emparejar(client, { temporada })
     await client.query('commit')
     console.log(

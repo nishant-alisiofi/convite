@@ -96,6 +96,13 @@ export const MODOS_TERRESTRES = ['carretera', 'trocha'] as const
 
 export const TEMPORADAS = ['todo_el_ano', 'lluvias', 'seca'] as const
 
+/**
+ * The seasons the basin can actually be in. `todo_el_ano` is a property of a route — a leg
+ * open whatever the river does — never an answer to "which season is it now", which is what
+ * the `temporada` setting in `configuracion` holds.
+ */
+export const TEMPORADAS_OPERATIVAS = ['lluvias', 'seca'] as const
+
 export const FUENTES_RUTA = ['google', 'manual'] as const
 
 export const ESTADOS_CAPACIDAD = ['OFRECIDA', 'COMPROMETIDA', 'CANCELADA', 'COMPLETADA'] as const

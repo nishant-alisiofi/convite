@@ -11,7 +11,7 @@ import {
 } from 'drizzle-orm/pg-core'
 import { actualizadoEn, creadoEn, enLista, pk } from './_shared'
 import { usuarios } from './core'
-import { ESTADOS_JOB } from './vocabulario'
+import { ESTADOS_JOB, TEMPORADAS_OPERATIVAS } from './vocabulario'
 
 /**
  * Section 3: the job queue is a table plus a worker route invoked by cron. No Redis, no
@@ -59,5 +59,38 @@ export const auditoria = pgTable(
   (t) => [
     index('auditoria_entidad_idx').on(t.entidad, t.entidadId),
     index('auditoria_creado_idx').on(t.creadoEn),
+  ],
+)
+
+/**
+ * Settings a coordinator changes without a deploy.
+ *
+ * `temporada` is the one that matters today, and it is here rather than in the environment
+ * because getting it wrong raises no error: `rutas.temporada` filters the reachability
+ * graph, so the wrong season silently removes communities from every plan. Winandó has no
+ * row at all in `seca`. A value with that reach needs a name attached to each change, which
+ * is what the `auditar_configuracion()` trigger writes into `auditoria`.
+ *
+ * Read through `lib/temporada.ts`, which falls back to `CONVITE_TEMPORADA` when the row is
+ * missing — a fresh clone still runs before anybody has opened the admin screen.
+ */
+export const configuracion = pgTable(
+  'configuracion',
+  {
+    clave: text('clave').primaryKey(),
+    valor: text('valor').notNull(),
+    descripcion: text('descripcion'),
+    /** Null only for the values the migration seeded. Every later write carries a person. */
+    actualizadoPor: uuid('actualizado_por').references(() => usuarios.id),
+    actualizadoEn: actualizadoEn(),
+    creadoEn: creadoEn(),
+  },
+  () => [
+    // A controlled vocabulary per key. Code branches on this value, so an unrecognised one
+    // would fall through to a default and look like a working system with a wrong answer.
+    check(
+      'configuracion_temporada_check',
+      sql`clave <> 'temporada' or ${enLista('valor', TEMPORADAS_OPERATIVAS)}`,
+    ),
   ],
 )
