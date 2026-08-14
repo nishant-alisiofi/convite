@@ -269,7 +269,9 @@ export const emparejamientos = pgTable(
     envioId: uuid('envio_id'),
   },
   (t) => [
-    uniqueIndex('emparejamientos_pedido_capacidad_key').on(t.pedidoId, t.capacidadId),
+    // Includes oferta_id so a human can attach several offers to one request (PRD §6),
+    // while the matcher proposing the same source twice is still refused.
+    uniqueIndex('emparejamientos_pedido_fuente_key').on(t.pedidoId, t.capacidadId, t.ofertaId),
     index('emparejamientos_pedido_idx').on(t.pedidoId),
     check('emparejamientos_cantidad_check', sql`cantidad > 0`),
     check(

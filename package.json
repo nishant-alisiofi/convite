@@ -25,7 +25,8 @@
     "drill:respaldo": "bash scripts/drill-respaldo.sh",
     "worker": "tsx scripts/worker.ts",
     "vista:mapa": "tsx scripts/vista-mapa.ts",
-    "vista:bandeja": "tsx --tsconfig tsconfig.scripts.json scripts/vista-bandeja.tsx"
+    "vista:bandeja": "tsx --tsconfig tsconfig.scripts.json scripts/vista-bandeja.tsx",
+    "vista:manifiesto": "tsx --tsconfig tsconfig.scripts.json scripts/vista-manifiesto.tsx"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",

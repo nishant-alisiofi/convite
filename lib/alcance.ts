@@ -50,12 +50,19 @@ export async function cargarCuenca(client: PoolClient): Promise<Cuenca> {
   }
 }
 
-/** Community ids reachable from somewhere holding supply, optionally with one leg removed. */
-export function alcanzables(
+/**
+ * The reachability graph for this basin.
+ *
+ * Exported because the rows come out of Postgres in snake_case and `RutaGrafo` is camel:
+ * casting between them compiles and produces a graph with no edges at all, which then
+ * reports everything as unreachable rather than failing. Everyone who needs a graph builds
+ * it here.
+ */
+export function grafoDe(
   cuenca: Cuenca,
   temporada: TemporadaActual,
   opciones: { sinRuta?: string } = {},
-): Set<string> {
+): Grafo {
   const rutas: RutaGrafo[] = cuenca.rutas.map((r) => ({
     id: r.id,
     origenId: r.origen_id,
@@ -65,8 +72,16 @@ export function alcanzables(
     temporada: r.temporada,
     activa: r.activa && r.id !== opciones.sinRuta,
   }))
+  return new Grafo(rutas, temporada)
+}
 
-  const grafo = new Grafo(rutas, temporada)
+/** Community ids reachable from somewhere holding supply, optionally with one leg removed. */
+export function alcanzables(
+  cuenca: Cuenca,
+  temporada: TemporadaActual,
+  opciones: { sinRuta?: string } = {},
+): Set<string> {
+  const grafo = grafoDe(cuenca, temporada, opciones)
   const vistas = new Set<string>()
   for (const comunidadId of cuenca.comunidadesConNodo) {
     for (const destino of grafo.desde(comunidadId).keys()) vistas.add(destino)

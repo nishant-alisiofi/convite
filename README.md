@@ -31,6 +31,9 @@ instead of an environment variable. See [El mapa](#el-mapa) and [Las recogidas](
 then age, voice notes played inline, transcript correction, duplicate marking, and promotion
 to `pedido`. See [La verificación](#la-verificación).
 
+**M9 — De la capacidad al despacho.** Capacity registration, the planner, the rationing gate,
+offer aggregation, and the printable manifest. See [El despacho](#el-despacho).
+
 **Infra.** Live Supabase project `convite` (us-east-1, ref `kjwkvulmsjffzhuchwpy`). All 18
 migrations applied, basin seeded, 116 tests green against the real database.
 
@@ -79,6 +82,48 @@ that gets logged in `decisiones_asignacion` (2.9), not something the engine reso
 
 `motivo` is the product surface — «Hay 180 mercados en Bodega Central Quibdó, pero nadie va para
 Bellavista en los próximos 14 días» — and it names the stock's age whenever the count is old.
+
+## El despacho
+
+Planning a shipment is arithmetic plus a judgement, and the two are kept apart. The engine
+works out who is reachable on a given trip, what is already committed, and how much room is
+left. What it never does is decide who waits.
+
+**A shipment that shorts somebody cannot leave until that decision is written down.** If any
+stop is served with fewer families than it asked for, `envios_exigen_decision` (migration
+0025) refuses the dispatch until a `decisiones_asignacion` row exists — carrying the rule
+applied, the person who applied it, and who was deferred. It is a trigger rather than a
+policy for the same reason as the pedidos guard: `service_role` bypasses RLS, and every job
+and webhook runs as `service_role`. The test attempts the dispatch **as the table owner** and
+is refused. The row itself has a SELECT and an INSERT policy and deliberately no UPDATE or
+DELETE — that absence is the feature.
+
+**Stops are ordered by geography, not by urgency.** Urgency decides who gets on the boat;
+where they sit in the run is a different question. Las Mercedes lies between Quibdó and
+Tagachí, so a manifest listing Tagachí first sends the boat past Las Mercedes, upriver, and
+back down again.
+
+**Several offers can cover one request** — the PRD §6 gap. Eight people offering two mercados
+each now satisfy a request for twelve, by a person selecting them; each selection is its own
+confirmed `emparejamientos` row carrying the share it covers. Splitting a request across
+offers is allocation, and allocation is a human decision.
+
+**The driver's window works now.** `convite_conduce_hacia()` had existed since 0016 and was
+referenced by no policy at all — the one function whose whole purpose is to time-limit a
+transporter's access was inert. Four policies now hang off it: a driver sees their own stops,
+their communities' locations and their confirmation codes, but only between dispatch and
+return. Somebody who ran a trip in March cannot pull coordinates in August.
+
+The manifest is HTML with a print stylesheet, not a generated PDF: no dependency, no font
+embedding, and the browser's print dialogue already makes a PDF when one has to go out over
+WhatsApp.
+
+```bash
+pnpm build && pnpm vista:manifiesto   # renders a real manifest to .data/vista-manifiesto/
+```
+
+It plans and dispatches against the seeded basin inside a transaction it always rolls back,
+so looking at the sheet changes nothing. That is how the stop-ordering bug above was found.
 
 ## La verificación
 
