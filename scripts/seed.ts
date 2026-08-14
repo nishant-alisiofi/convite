@@ -529,7 +529,7 @@ async function sembrarCapacidades(
 
     const { rowCount } = await client.query(
       'select 1 from capacidades where contacto_id = $1 and hasta_comunidad_id = $2 and notas = $3',
-      [contactoId, comunidadId, c.notas],
+      [contactoId, comunidadId, marcado(c.notas)],
     )
     if (rowCount) continue
 
@@ -538,7 +538,7 @@ async function sembrarCapacidades(
          contacto_id, modo, origen_nodo_id, hasta_comunidad_id,
          sale_en, cupo_familias, estado, notas
        ) values ($1, $2, $3, $4, now() + make_interval(days => $5), $6, 'OFRECIDA', $7)`,
-      [contactoId, c.modo, nodoId, comunidadId, c.enDias, c.cupoFamilias, c.notas],
+      [contactoId, c.modo, nodoId, comunidadId, c.enDias, c.cupoFamilias, marcado(c.notas)],
     )
   }
 }
@@ -554,7 +554,7 @@ async function sembrarOfertas(
     // `texto_original` is the natural key here: it is the one thing that never changes.
     const { rowCount } = await client.query(
       'select 1 from ofertas where contacto_id = $1 and texto_original = $2',
-      [contactoId, o.textoOriginal],
+      [contactoId, marcado(o.textoOriginal)],
     )
     if (rowCount) continue
 
@@ -576,7 +576,7 @@ async function sembrarOfertas(
        )`,
       [
         contactoId,
-        o.textoOriginal,
+        marcado(o.textoOriginal),
         o.codigoItem,
         o.cantidad,
         o.unidad,
@@ -634,6 +634,20 @@ async function sembrarVoluntarios(
  * in the one field the verification inbox actually prints.
  */
 export const MARCA_PRUEBA = '[DATO DE PRUEBA]'
+
+/**
+ * A note on `ofertas.texto_original`, which this also marks.
+ *
+ * That column holds what a person said, and 2.11 is emphatic that it is never rewritten.
+ * The rule protects real inbound text from being edited after the fact — it does not oblige
+ * us to invent fake testimony and then present it as somebody's actual words. These strings
+ * were written by us; the marker says so.
+ *
+ * It is also the natural key the offer de-duplication compares, so the marker has to be
+ * applied on BOTH sides or the guard stops matching and the seed inserts a fresh copy on
+ * every boot. Same for `capacidades.notas`. Verified: three consecutive runs leave 10
+ * reportes, 7 ofertas, 1 capacidad, 1 voluntario.
+ */
 
 function marcado(descripcion: string | null): string {
   return descripcion ? `${MARCA_PRUEBA} ${descripcion}` : MARCA_PRUEBA
