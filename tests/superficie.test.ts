@@ -4,6 +4,7 @@ import { createServer } from 'node:net'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { COMUNIDADES_SEMILLA } from '@/db/seed/comunidades'
+import { esRutaPublica } from '@/middleware'
 
 /**
  * M12 acceptance, PRD verbatim: «an unauthenticated request cannot obtain any coordinate,
@@ -40,6 +41,7 @@ const POLITICA: Record<string, 'publica' | 'autenticada'> = {
   '/rutas': 'autenticada',
   '/recogidas': 'autenticada',
   '/ajustes': 'autenticada',
+  '/estado': 'autenticada',
   '/verificacion': 'autenticada',
   '/verificacion/audio/[id]': 'autenticada',
   '/envios': 'autenticada',
@@ -149,6 +151,17 @@ afterAll(() => {
 })
 
 conBase('toda la superficie, no solo la página', () => {
+  it('la página pública está declarada pública en el middleware', () => {
+    /*
+     * Sin esto la prueba pasa por la razón equivocada: una página que no figura como
+     * pública responde 307 al inicio de sesión, y «no hay coordenadas en la respuesta»
+     * se cumple contra la pantalla de login sin decir nada de la página. Verde por el
+     * motivo contrario al que se buscaba, justo en la prueba que existe para el límite.
+     */
+    expect(esRutaPublica('/')).toBe(true)
+    expect(esRutaPublica('/tablero')).toBe(false)
+  })
+
   it('conoce todas las rutas de la app, sin lista escrita a mano', () => {
     const rutas = rutasDeLaApp()
     expect(rutas.length).toBeGreaterThan(10)

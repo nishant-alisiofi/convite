@@ -13,8 +13,10 @@ import {
   verificar,
   type FiltroTipo,
 } from '@/lib/verificacion/bandeja'
+import { rutasAfectadasPor, type RutaAfectada } from '@/lib/verificacion/danos'
 import Tarjeta from './tarjeta'
 import { conSesion, sesionActual } from '@/lib/sesion'
+import { temporadaVigente } from '@/lib/temporada'
 
 export const dynamic = 'force-dynamic'
 
@@ -50,11 +52,28 @@ export default async function Verificacion({ searchParams }: { searchParams: Par
   const filtro = (FILTROS.find((f) => f.valor === tipo)?.valor ?? 'todo') as FiltroTipo
   const puedeVerificar = PUEDEN_VERIFICAR.includes(sesion.rolStaff)
 
-  const { bandeja, catalogo, candidatos } = await conSesion(sesion, async (client) => ({
-    bandeja: await cargarBandeja(client, filtro),
-    catalogo: await itemsDelCatalogo(client),
-    candidatos: duplicado ? await posiblesDuplicados(client, duplicado) : [],
-  }))
+  const { bandeja, catalogo, candidatos, rutasPorReporte } = await conSesion(
+    sesion,
+    async (client) => {
+      const bandeja = await cargarBandeja(client, filtro)
+      const temporada = await temporadaVigente(client)
+
+      // Section 9.3: a damage report never closes a leg on its own. What it can do is show
+      // the verifier which legs it might be about, so the decision is one click from the
+      // evidence instead of a hunt through the route table.
+      const rutasPorReporte = new Map<string, RutaAfectada[]>()
+      for (const r of bandeja.pendientes.filter((f) => f.tipo === 'dano')) {
+        rutasPorReporte.set(r.id, await rutasAfectadasPor(client, r.id, temporada))
+      }
+
+      return {
+        bandeja,
+        catalogo: await itemsDelCatalogo(client),
+        candidatos: duplicado ? await posiblesDuplicados(client, duplicado) : [],
+        rutasPorReporte,
+      }
+    },
+  )
 
   async function accion(formData: FormData) {
     'use server'
@@ -178,6 +197,7 @@ export default async function Verificacion({ searchParams }: { searchParams: Par
             catalogo={catalogo}
             abriendoDuplicado={duplicado === r.id}
             candidatos={duplicado === r.id ? candidatos : []}
+            rutasAfectadas={rutasPorReporte.get(r.id) ?? []}
           />
         ))}
       </ul>

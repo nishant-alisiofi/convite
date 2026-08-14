@@ -18,6 +18,7 @@ const SECCIONES = [
   { href: '/envios', etiqueta: 'Envíos', listo: true },
   { href: '/comunidades', etiqueta: 'Comunidades' },
   { href: '/catalogo', etiqueta: 'Catálogo' },
+  { href: '/estado', etiqueta: 'Estado', listo: true },
   { href: '/ajustes', etiqueta: 'Ajustes', listo: true },
 ]
 

@@ -5,10 +5,12 @@ import {
   Mic,
   Phone,
   Radio,
+  Route,
   TriangleAlert,
 } from 'lucide-react'
 import Link from 'next/link'
 import type { FiltroTipo, FilaBandeja } from '@/lib/verificacion/bandeja'
+import type { RutaAfectada } from '@/lib/verificacion/danos'
 
 /**
  * One report in the inbox.
@@ -41,6 +43,7 @@ export default function Tarjeta({
   catalogo,
   abriendoDuplicado,
   candidatos,
+  rutasAfectadas = [],
 }: {
   reporte: FilaBandeja
   puedeVerificar: boolean
@@ -49,6 +52,8 @@ export default function Tarjeta({
   catalogo: { codigo: string; item_label: string; tipo: string; entregable: boolean }[]
   abriendoDuplicado: boolean
   candidatos: FilaBandeja[]
+  /** Only ever populated for a `dano`: legs this report might be about. */
+  rutasAfectadas?: RutaAfectada[]
 }) {
   const IconoCanal = ICONO_CANAL[r.canal] ?? MessageSquare
   const sinClasificar = r.tipo === 'sin_clasificar'
@@ -175,6 +180,45 @@ export default function Tarjeta({
             </p>
           </div>
         ))}
+
+      {rutasAfectadas.length > 0 && (
+        <div className="mt-3 rounded border border-atrato-100 bg-atrato-50 px-3 py-3">
+          <p className="flex items-center gap-2 text-sm font-medium text-stone-900">
+            <Route className="size-4" aria-hidden />
+            Tramos que este daño podría haber cerrado
+          </p>
+          <ul className="mt-2 space-y-1 text-sm">
+            {rutasAfectadas.map((r) => (
+              <li key={r.id} className="flex flex-wrap items-baseline gap-x-2">
+                <span className="text-stone-900">
+                  {r.origen} → {r.destino}
+                </span>
+                <span className="text-stone-600">
+                  {r.modo}
+                  {r.minutos !== null && ` · ${r.minutos} min`}
+                </span>
+                {r.dejaSinPaso.length > 0 && (
+                  <span className="text-rose-800">
+                    cerrarlo deja sin paso a {r.dejaSinPaso.join(', ')}
+                  </span>
+                )}
+                {puedeVerificar && (
+                  <Link
+                    href={`/rutas?cerrar=${r.id}`}
+                    className="ml-auto text-stone-700 underline"
+                  >
+                    Cerrar este tramo
+                  </Link>
+                )}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs text-stone-600">
+            Un reporte no cierra un tramo. Lo cierra una persona, después de verificarlo, y
+            queda su nombre — un solo reporte exagerado no puede incomunicar una cuenca.
+          </p>
+        </div>
+      )}
 
       {puedeVerificar && (
         <div className="mt-3 border-t border-stone-200 pt-3">
