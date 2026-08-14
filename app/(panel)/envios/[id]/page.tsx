@@ -152,14 +152,14 @@ export default async function Envio({
   return (
     <main>
       <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <h1 className="font-mono text-xl font-semibold text-stone-900">{manifiesto.codigo}</h1>
-        <Link href={`/envios/${id}/manifiesto`} className="flex items-center gap-1 text-sm text-stone-700 underline">
+        <h1 className="font-mono text-xl font-semibold text-barro-900">{manifiesto.codigo}</h1>
+        <Link href={`/envios/${id}/manifiesto`} className="flex items-center gap-1 text-sm text-barro-700 underline">
           <FileText className="size-4" aria-hidden />
           Manifiesto para imprimir
         </Link>
       </div>
 
-      <p className="mt-1 text-sm text-stone-700">
+      <p className="mt-1 text-sm text-barro-700">
         {manifiesto.modo} · {manifiesto.transportista} · desde {manifiesto.origenNodo} · sale{' '}
         {manifiesto.salidaProgramada?.toLocaleString('es-CO') ?? 'sin fecha'} · cupo{' '}
         {manifiesto.cupoFamilias} familias · <span className="font-medium">{manifiesto.estado.toLowerCase()}</span>
@@ -172,38 +172,38 @@ export default async function Envio({
       )}
 
       <section className="mt-6">
-        <h2 className="font-semibold text-stone-900">
+        <h2 className="font-semibold text-barro-900">
           Paradas
-          <span className="ml-2 font-normal text-stone-600">
+          <span className="ml-2 font-normal text-barro-600">
             {asignadas}/{manifiesto.cupoFamilias} familias
             {libre > 0 && planeado && ` · quedan ${libre}`}
           </span>
         </h2>
 
         {manifiesto.paradas.length === 0 ? (
-          <p className="mt-3 text-sm text-stone-600">Todavía no lleva nada.</p>
+          <p className="mt-3 text-sm text-barro-600">Todavía no lleva nada.</p>
         ) : (
-          <ol className="mt-3 divide-y divide-stone-200 rounded-lg border border-barro-200 bg-white">
+          <ol className="mt-3 divide-y divide-barro-200 rounded-lg border border-barro-200 bg-white">
             {manifiesto.paradas.map((p) => (
               <li key={p.pedidoId} className="flex flex-wrap items-baseline gap-x-2 px-4 py-3 text-sm">
-                <span className="font-semibold text-stone-900">{p.orden}.</span>
-                <span className="font-medium text-stone-900">{p.comunidad}</span>
-                <span className="text-stone-700">{p.item}</span>
-                <span className={p.familiasAsignadas < p.familiasPedidas ? 'text-rose-800' : 'text-stone-600'}>
+                <span className="font-semibold text-barro-900">{p.orden}.</span>
+                <span className="font-medium text-barro-900">{p.comunidad}</span>
+                <span className="text-barro-700">{p.item}</span>
+                <span className={p.familiasAsignadas < p.familiasPedidas ? 'text-rose-800' : 'text-barro-600'}>
                   {p.familiasAsignadas} de {p.familiasPedidas} familias
                 </span>
                 {p.codigoConfirmacion && (
-                  <span className="font-mono text-stone-700">{p.codigoConfirmacion}</span>
+                  <span className="font-mono text-barro-700">{p.codigoConfirmacion}</span>
                 )}
                 {planeado && puedeDespachar && (
                   <span className="ml-auto flex items-center gap-3">
-                    <Link href={`/envios/${id}?cubrir=${p.pedidoId}`} className="text-stone-700 underline">
+                    <Link href={`/envios/${id}?cubrir=${p.pedidoId}`} className="text-barro-700 underline">
                       Cubrir con varios
                     </Link>
                     <form action={accion}>
                       <input type="hidden" name="accion" value="quitar" />
                       <input type="hidden" name="pedidoId" value={p.pedidoId} />
-                      <button type="submit" className="flex items-center gap-1 text-stone-600 underline">
+                      <button type="submit" className="flex items-center gap-1 text-barro-600 underline">
                         <X className="size-3.5" aria-hidden />
                         Quitar
                       </button>
@@ -218,10 +218,10 @@ export default async function Envio({
 
       {cobertura && planeado && puedeDespachar && (
         <section className="mt-6 rounded-lg border border-barro-200 bg-white px-4 py-4">
-          <h2 className="font-semibold text-stone-900">
+          <h2 className="font-semibold text-barro-900">
             Cubrir {cobertura.item} entre varios
           </h2>
-          <p className="mt-1 max-w-3xl text-sm text-stone-700">
+          <p className="mt-1 max-w-3xl text-sm text-barro-700">
             Se piden {cobertura.familias} familias y hay {cobertura.cubierto} cubiertas. Ningún
             ofrecimiento tiene que alcanzar solo: escoja cuántas familias cubre cada uno.
           </p>
@@ -230,7 +230,7 @@ export default async function Envio({
             <input type="hidden" name="accion" value="combinar" />
             <input type="hidden" name="pedidoId" value={cobertura.pedidoId} />
 
-            <ul className="divide-y divide-stone-200">
+            <ul className="divide-y divide-barro-200">
               {cobertura.candidatas.map((o) => (
                 <li key={o.ofertaId} className="flex flex-wrap items-center gap-x-3 py-2 text-sm">
                   <input type="hidden" name="ofertaId" value={o.ofertaId} />
@@ -241,8 +241,8 @@ export default async function Envio({
                     aria-label={`Familias que cubre ${o.ofrecidoPor ?? 'este ofrecimiento'}`}
                     className="w-16 rounded border border-barro-200 px-2 py-1 text-sm"
                   />
-                  <span className="font-medium text-stone-900">{o.ofrecidoPor}</span>
-                  <span className="text-stone-600">
+                  <span className="font-medium text-barro-900">{o.ofrecidoPor}</span>
+                  <span className="text-barro-600">
                     {o.cantidad === null ? 'sin cantidad dicha' : `${o.cantidad} ${o.unidad ?? ''}`}
                   </span>
                   {o.perecedero && (
@@ -251,8 +251,8 @@ export default async function Envio({
                       vence {o.venceEn?.toLocaleString('es-CO')}
                     </span>
                   )}
-                  {o.comprometida && <span className="text-stone-500">ya comprometido</span>}
-                  <span className="ml-auto text-stone-600">«{o.textoOriginal}»</span>
+                  {o.comprometida && <span className="text-barro-500">ya comprometido</span>}
+                  <span className="ml-auto text-barro-600">«{o.textoOriginal}»</span>
                 </li>
               ))}
             </ul>
@@ -264,7 +264,7 @@ export default async function Envio({
               >
                 Asignar estos ofrecimientos
               </button>
-              <Link href={`/envios/${id}`} className="px-3 py-1.5 text-sm text-stone-700 underline">
+              <Link href={`/envios/${id}`} className="px-3 py-1.5 text-sm text-barro-700 underline">
                 Cancelar
               </Link>
             </div>
@@ -274,27 +274,27 @@ export default async function Envio({
 
       {planeado && puedeDespachar && porSubir.length > 0 && (
         <section className="mt-8">
-          <h2 className="font-semibold text-stone-900">Lo que este viaje podría llevar</h2>
-          <p className="mt-1 max-w-3xl text-sm text-stone-700">
+          <h2 className="font-semibold text-barro-900">Lo que este viaje podría llevar</h2>
+          <p className="mt-1 max-w-3xl text-sm text-barro-700">
             Comunidades a las que va o por las que pasa. El orden que ve es urgencia y luego
             días esperando; el reparto lo decide usted.
           </p>
 
-          <ul className="mt-3 divide-y divide-stone-200 rounded-lg border border-barro-200 bg-white">
+          <ul className="mt-3 divide-y divide-barro-200 rounded-lg border border-barro-200 bg-white">
             {porSubir.map((c) => (
                 <li key={c.pedidoId} className="px-4 py-3 text-sm">
                   <div className="flex flex-wrap items-baseline gap-x-2">
-                    <span className="font-medium text-stone-900">{c.comunidad}</span>
-                    <span className="text-stone-700">{c.item}</span>
-                    <span className="text-stone-600">{c.familias} familias</span>
+                    <span className="font-medium text-barro-900">{c.comunidad}</span>
+                    <span className="text-barro-700">{c.item}</span>
+                    <span className="text-barro-600">{c.familias} familias</span>
                     {c.urgencia === 3 && (
                       <span className="rounded bg-rose-100 px-1.5 py-0.5 text-xs font-medium text-rose-900">
                         urgente
                       </span>
                     )}
-                    {c.minutos !== null && <span className="text-stone-500">{c.minutos} min</span>}
-                    <span className="text-stone-500">hace {c.dias} d</span>
-                    {c.yaAsignado && <span className="text-stone-500">ya va en otro envío</span>}
+                    {c.minutos !== null && <span className="text-barro-500">{c.minutos} min</span>}
+                    <span className="text-barro-500">hace {c.dias} d</span>
+                    {c.yaAsignado && <span className="text-barro-500">ya va en otro envío</span>}
 
                     <form action={accion} className="ml-auto flex items-center gap-2">
                       <input type="hidden" name="accion" value="poner" />
@@ -308,7 +308,7 @@ export default async function Envio({
                       />
                       <button
                         type="submit"
-                        className="rounded border border-barro-200 bg-white px-3 py-1 text-sm text-stone-800"
+                        className="rounded border border-barro-200 bg-white px-3 py-1 text-sm text-barro-800"
                       >
                         Subir al viaje
                       </button>
@@ -322,7 +322,7 @@ export default async function Envio({
                       así es mandar comida dañada.
                     </p>
                   )}
-                {c.motivo && <p className="mt-1 text-stone-600">{c.motivo}</p>}
+                {c.motivo && <p className="mt-1 text-barro-600">{c.motivo}</p>}
               </li>
             ))}
           </ul>
@@ -331,21 +331,21 @@ export default async function Envio({
 
       {manifiesto.decision ? (
         <section className="mt-8 rounded-lg border border-barro-200 bg-white px-4 py-4">
-          <h2 className="flex items-center gap-2 font-semibold text-stone-900">
+          <h2 className="flex items-center gap-2 font-semibold text-barro-900">
             <Scale className="size-4" aria-hidden />
             Cómo se repartió
           </h2>
-          <p className="mt-1 text-sm text-stone-900">{manifiesto.decision.reglaAplicada}</p>
+          <p className="mt-1 text-sm text-barro-900">{manifiesto.decision.reglaAplicada}</p>
           {manifiesto.decision.nota && (
-            <p className="mt-1 text-sm text-stone-700">{manifiesto.decision.nota}</p>
+            <p className="mt-1 text-sm text-barro-700">{manifiesto.decision.nota}</p>
           )}
           {manifiesto.decision.postergados.length > 0 && (
-            <p className="mt-2 text-sm text-stone-800">
+            <p className="mt-2 text-sm text-barro-800">
               Quedaron para después:{' '}
               {manifiesto.decision.postergados.map((p) => `${p.comunidad} (${p.pedidas})`).join(', ')}.
             </p>
           )}
-          <p className="mt-2 text-xs text-stone-600">
+          <p className="mt-2 text-xs text-barro-600">
             Registrado el {manifiesto.decision.confirmadoEn.toLocaleString('es-CO')}. Nadie puede
             editarlo ni borrarlo, y esa es la idea.
           </p>
@@ -355,11 +355,11 @@ export default async function Envio({
         puedeDespachar &&
         recortados.length > 0 && (
           <section className="mt-8 rounded-lg border border-atrato-100 bg-atrato-50 px-4 py-4">
-            <h2 className="flex items-center gap-2 font-semibold text-stone-900">
+            <h2 className="flex items-center gap-2 font-semibold text-barro-900">
               <Scale className="size-4" aria-hidden />
               Hay que decir cómo se repartió
             </h2>
-            <p className="mt-1 max-w-3xl text-sm text-stone-800">
+            <p className="mt-1 max-w-3xl text-sm text-barro-800">
               {recortados.length === 1
                 ? `${recortados[0]!.comunidad} recibe menos de lo que pidió.`
                 : `${recortados.length} comunidades reciben menos de lo que pidieron.`}{' '}
@@ -371,7 +371,7 @@ export default async function Envio({
             <form action={accion} className="mt-3">
               <input type="hidden" name="accion" value="decidir" />
               <label className="block text-sm">
-                <span className="font-medium text-stone-800">¿Con qué criterio repartió?</span>
+                <span className="font-medium text-barro-800">¿Con qué criterio repartió?</span>
                 <input
                   name="regla"
                   required
@@ -380,7 +380,7 @@ export default async function Envio({
                 />
               </label>
               <label className="mt-2 block text-sm">
-                <span className="font-medium text-stone-800">Nota (opcional)</span>
+                <span className="font-medium text-barro-800">Nota (opcional)</span>
                 <input
                   name="nota"
                   className="mt-1 w-full max-w-2xl rounded border border-barro-200 bg-white px-3 py-2 text-sm"
@@ -407,7 +407,7 @@ export default async function Envio({
             <Send className="size-4" aria-hidden />
             Despachar
           </button>
-          <p className="mt-2 text-sm text-stone-600">
+          <p className="mt-2 text-sm text-barro-600">
             Queda su nombre y la hora. Se generan los códigos de cuatro dígitos que cada
             comunidad va a leer de vuelta.
           </p>

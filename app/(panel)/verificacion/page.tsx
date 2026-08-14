@@ -138,13 +138,13 @@ export default async function Verificacion({ searchParams }: { searchParams: Par
   return (
     <main>
       <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <h1 className="text-xl font-semibold text-stone-900">Verificación</h1>
-        <p className="text-sm text-stone-600">
+        <h1 className="text-xl font-semibold text-barro-900">Verificación</h1>
+        <p className="text-sm text-barro-600">
           {total === 0 ? 'Nada esperando.' : `${total} esperando revisión`}
         </p>
       </div>
 
-      <p className="mt-2 max-w-3xl text-sm text-stone-700">
+      <p className="mt-2 max-w-3xl text-sm text-barro-700">
         Todo lo que entra queda registrado apenas llega, sin que nadie lo apruebe. Nada se
         convierte en pedido hasta que una persona lo lee, lo cree y lo firma.
       </p>
@@ -156,8 +156,8 @@ export default async function Verificacion({ searchParams }: { searchParams: Par
             href={`/verificacion?tipo=${f.valor}`}
             className={`rounded border px-3 py-1.5 text-sm ${
               f.valor === filtro
-                ? 'border-selva-600 bg-selva-50 font-medium text-stone-900'
-                : 'border-barro-200 bg-white text-stone-700'
+                ? 'border-selva-600 bg-selva-50 font-medium text-barro-900'
+                : 'border-barro-200 bg-white text-barro-700'
             }`}
           >
             {f.etiqueta}
@@ -172,7 +172,7 @@ export default async function Verificacion({ searchParams }: { searchParams: Par
       )}
 
       {!puedeVerificar && (
-        <p className="mt-4 rounded-lg border border-barro-200 bg-white px-4 py-3 text-sm text-stone-700">
+        <p className="mt-4 rounded-lg border border-barro-200 bg-white px-4 py-3 text-sm text-barro-700">
           Su rol puede leer la cola pero no verificar. Verificar y despachar son trabajos
           distintos a propósito: quien confirma que una necesidad es real no decide después
           que se salta.
@@ -180,7 +180,7 @@ export default async function Verificacion({ searchParams }: { searchParams: Par
       )}
 
       {total === 0 && (
-        <p className="mt-8 text-stone-600">
+        <p className="mt-8 text-barro-600">
           No hay nada por revisar. Cuando entre un mensaje aparece acá, con su audio y su
           transcripción al lado.
         </p>
@@ -204,21 +204,21 @@ export default async function Verificacion({ searchParams }: { searchParams: Par
 
       {bandeja.derivaciones.length > 0 && (
         <section className="mt-10">
-          <h2 className="flex items-center gap-2 font-semibold text-stone-900">
+          <h2 className="flex items-center gap-2 font-semibold text-barro-900">
             <HandHeart className="size-4" aria-hidden />
             Derivaciones
-            <span className="font-normal text-stone-600">{bandeja.derivaciones.length}</span>
+            <span className="font-normal text-barro-600">{bandeja.derivaciones.length}</span>
           </h2>
-          <p className="mt-1 max-w-3xl text-sm text-stone-700">
+          <p className="mt-1 max-w-3xl text-sm text-barro-700">
             Verificadas y atendidas por una visita, no por una caja. No entran a despacho: no
             son carga.
           </p>
-          <ul className="mt-3 divide-y divide-stone-200 rounded-lg border border-barro-200 bg-white">
+          <ul className="mt-3 divide-y divide-barro-200 rounded-lg border border-barro-200 bg-white">
             {bandeja.derivaciones.map((r) => (
               <li key={r.id} className="px-4 py-3 text-sm">
-                <span className="font-medium text-stone-900">{r.comunidad ?? 'Sin comunidad'}</span>
-                <span className="ml-2 text-stone-700">{r.item}</span>
-                <p className="mt-1 text-stone-700">{r.descripcion}</p>
+                <span className="font-medium text-barro-900">{r.comunidad ?? 'Sin comunidad'}</span>
+                <span className="ml-2 text-barro-700">{r.item}</span>
+                <p className="mt-1 text-barro-700">{r.descripcion}</p>
               </li>
             ))}
           </ul>

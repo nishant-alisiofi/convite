@@ -61,8 +61,8 @@ export default async function Recogidas({ searchParams }: { searchParams: Params
   if (!PUEDEN_PLANEAR.includes(sesion.rolStaff)) {
     return (
       <main>
-        <h1 className="text-xl font-semibold text-stone-900">Recogidas</h1>
-        <p className="mt-4 max-w-2xl text-stone-700">
+        <h1 className="text-xl font-semibold text-barro-900">Recogidas</h1>
+        <p className="mt-4 max-w-2xl text-barro-700">
           Planear una recogida es trabajo de coordinación. Su rol no ve dónde vive quien dona,
           y eso es a propósito: una dirección junto a un nombre y «tiene mercado» es un blanco.
         </p>
@@ -75,16 +75,16 @@ export default async function Recogidas({ searchParams }: { searchParams: Params
   return (
     <main>
       <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <h1 className="text-xl font-semibold text-stone-900">Recogidas</h1>
+        <h1 className="text-xl font-semibold text-barro-900">Recogidas</h1>
         {plan && (
-          <p className="text-sm text-stone-600">
+          <p className="text-sm text-barro-600">
             {plan.paradas.length} paradas en {plan.grupos}{' '}
             {plan.grupos === 1 ? 'barrio' : 'barrios'} · una sola vuelta
           </p>
         )}
       </div>
 
-      <p className="mt-2 max-w-3xl text-sm text-stone-700">
+      <p className="mt-2 max-w-3xl text-sm text-barro-700">
         Las ofertas que hay que recoger, agrupadas por cercanía y puestas en orden de recorrido.
         Se agrupa lo que está a menos de {RADIO_BARRIO_M} m, que es más o menos una cuadra larga
         de Quibdó. Lo perecedero va primero: marca la hora de salida de toda la vuelta.
@@ -99,8 +99,8 @@ export default async function Recogidas({ searchParams }: { searchParams: Params
               href={`/recogidas?nodo=${n.id}`}
               className={`rounded border px-3 py-1.5 text-sm ${
                 n.id === nodoActivo?.id
-                  ? 'border-selva-600 bg-selva-50 font-medium text-stone-900'
-                  : 'border-barro-200 bg-white text-stone-700'
+                  ? 'border-selva-600 bg-selva-50 font-medium text-barro-900'
+                  : 'border-barro-200 bg-white text-barro-700'
               }`}
             >
               {n.nombre}
@@ -109,41 +109,41 @@ export default async function Recogidas({ searchParams }: { searchParams: Params
       </nav>
 
       {!nodoActivo && (
-        <p className="mt-6 rounded-lg border border-barro-200 bg-white px-4 py-3 text-stone-700">
+        <p className="mt-6 rounded-lg border border-barro-200 bg-white px-4 py-3 text-barro-700">
           Ningún centro tiene ubicación, así que no hay desde dónde medir un recorrido.
         </p>
       )}
 
       {plan && plan.paradas.length === 0 && (
-        <p className="mt-6 rounded-lg border border-barro-200 bg-white px-4 py-3 text-stone-700">
+        <p className="mt-6 rounded-lg border border-barro-200 bg-white px-4 py-3 text-barro-700">
           No hay ofrecimientos por recoger cerca de {nodoActivo?.nombre} en este momento.
         </p>
       )}
 
       {plan && plan.paradas.length > 0 && (
         <section className="mt-6">
-          <h2 className="flex items-center gap-2 font-semibold text-stone-900">
+          <h2 className="flex items-center gap-2 font-semibold text-barro-900">
             <Truck className="size-4" aria-hidden />
             Vuelta hacia {nodoActivo?.nombre}
           </h2>
 
-          <ol className="mt-3 divide-y divide-stone-200 rounded-lg border border-barro-200 bg-white">
+          <ol className="mt-3 divide-y divide-barro-200 rounded-lg border border-barro-200 bg-white">
             {plan.paradas.map((p, i) => {
               const nuevoBarrio = i === 0 || plan.paradas[i - 1]!.grupo !== p.grupo
               return (
                 <li key={p.ofertaId} className="px-4 py-3">
                   {nuevoBarrio && (
-                    <p className="mb-2 text-xs font-medium uppercase tracking-wide text-stone-500">
+                    <p className="mb-2 text-xs font-medium uppercase tracking-wide text-barro-500">
                       Barrio {p.grupo}
                     </p>
                   )}
 
                   <div className="flex flex-wrap items-baseline gap-x-2 text-sm">
-                    <span className="font-semibold text-stone-900">{p.orden}.</span>
-                    <span className="font-medium text-stone-900">
+                    <span className="font-semibold text-barro-900">{p.orden}.</span>
+                    <span className="font-medium text-barro-900">
                       {p.ofrecidoPor ?? 'Sin nombre'}
                     </span>
-                    <span className="text-stone-700">
+                    <span className="text-barro-700">
                       {p.item ?? 'sin clasificar'}
                       {p.cantidad !== null && ` · ${p.cantidad} ${p.unidad ?? ''}`}
                     </span>
@@ -158,19 +158,19 @@ export default async function Recogidas({ searchParams }: { searchParams: Params
                         })}
                       </span>
                     )}
-                    <span className="ml-auto text-stone-500">
+                    <span className="ml-auto text-barro-500">
                       {(p.metrosAlNodo / 1000).toFixed(1)} km
                     </span>
                   </div>
 
-                  {p.direccion && <p className="mt-1 text-sm text-stone-800">{p.direccion}</p>}
-                  <p className="mt-0.5 text-sm text-stone-600">«{p.textoOriginal}»</p>
+                  {p.direccion && <p className="mt-1 text-sm text-barro-800">{p.direccion}</p>}
+                  <p className="mt-0.5 text-sm text-barro-600">«{p.textoOriginal}»</p>
                 </li>
               )
             })}
           </ol>
 
-          <p className="mt-3 flex items-start gap-2 text-sm text-stone-600">
+          <p className="mt-3 flex items-start gap-2 text-sm text-barro-600">
             <PackageCheck className="mt-0.5 size-4 shrink-0" aria-hidden />
             <span>
               Las distancias son en línea recta hasta el centro, para ordenar la vuelta. El
@@ -181,7 +181,7 @@ export default async function Recogidas({ searchParams }: { searchParams: Params
       )}
 
       {sinUbicar.length > 0 && (
-        <p className="mt-6 flex items-start gap-2 rounded-lg border border-barro-200 bg-white px-4 py-3 text-sm text-stone-800">
+        <p className="mt-6 flex items-start gap-2 rounded-lg border border-barro-200 bg-white px-4 py-3 text-sm text-barro-800">
           <MapPinOff className="mt-0.5 size-4 shrink-0" aria-hidden />
           <span>
             Sin ubicación, y por eso sin recorrido posible: {sinUbicar.map((n) => n.nombre).join(', ')}.

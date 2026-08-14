@@ -98,7 +98,7 @@ export default async function Ajustes({ searchParams }: { searchParams: Params }
 
   return (
     <main>
-      <h1 className="text-xl font-semibold text-stone-900">Ajustes</h1>
+      <h1 className="text-xl font-semibold text-barro-900">Ajustes</h1>
 
       {error && (
         <p className="mt-4 rounded-lg border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-900">
@@ -107,7 +107,7 @@ export default async function Ajustes({ searchParams }: { searchParams: Params }
       )}
 
       <section className="mt-6 rounded-lg border border-barro-200 bg-white px-4 py-4">
-        <h2 className="flex items-center gap-2 font-semibold text-stone-900">
+        <h2 className="flex items-center gap-2 font-semibold text-barro-900">
           {temporada === 'lluvias' ? (
             <CloudRain className="size-4" aria-hidden />
           ) : (
@@ -115,14 +115,14 @@ export default async function Ajustes({ searchParams }: { searchParams: Params }
           )}
           Temporada: {DESCRIPCION[temporada].titulo}
         </h2>
-        <p className="mt-1 max-w-3xl text-sm text-stone-700">{DESCRIPCION[temporada].detalle}</p>
-        <p className="mt-2 max-w-3xl text-sm text-stone-600">
+        <p className="mt-1 max-w-3xl text-sm text-barro-700">{DESCRIPCION[temporada].detalle}</p>
+        <p className="mt-2 max-w-3xl text-sm text-barro-600">
           El emparejador decide con esto qué tramos están abiertos, así que ponerla mal no da
           error: simplemente deja comunidades fuera del alcance sin que nadie lo note.
         </p>
 
         {!esAdmin && (
-          <p className="mt-3 text-sm text-stone-600">
+          <p className="mt-3 text-sm text-barro-600">
             Solo un admin puede cambiarla. Si hay que cambiarla, pídalo — queda registrado con
             el nombre de quien la cambie.
           </p>
@@ -134,7 +134,7 @@ export default async function Ajustes({ searchParams }: { searchParams: Params }
               <Link
                 key={t}
                 href={`/ajustes?cambiar=${t}`}
-                className="rounded border border-barro-200 bg-white px-3 py-1.5 text-sm text-stone-800 underline"
+                className="rounded border border-barro-200 bg-white px-3 py-1.5 text-sm text-barro-800 underline"
               >
                 Cambiar a {DESCRIPCION[t].titulo.toLowerCase()}
               </Link>
@@ -145,7 +145,7 @@ export default async function Ajustes({ searchParams }: { searchParams: Params }
         {esAdmin && destino && destino !== temporada && (
           <form action={cambiarTemporada} className="mt-4 rounded border border-atrato-100 bg-atrato-50 px-4 py-3">
             <input type="hidden" name="temporada" value={destino} />
-            <h3 className="flex items-center gap-2 text-sm font-semibold text-stone-900">
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-barro-900">
               <TriangleAlert className="size-4" aria-hidden />
               Pasar a {DESCRIPCION[destino].titulo.toLowerCase()}
             </h3>
@@ -157,18 +157,18 @@ export default async function Ajustes({ searchParams }: { searchParams: Params }
                 hay ruta abierta hacia allá en {DESCRIPCION[destino].titulo.toLowerCase()}.
               </p>
             ) : (
-              <p className="mt-2 text-sm text-stone-800">
+              <p className="mt-2 text-sm text-barro-800">
                 Ninguna comunidad se queda sin paso con este cambio.
               </p>
             )}
 
             {efecto && efecto.ganan.length > 0 && (
-              <p className="mt-1 text-sm text-stone-800">
+              <p className="mt-1 text-sm text-barro-800">
                 Se vuelve a poder llegar a {efecto.ganan.join(', ')}.
               </p>
             )}
 
-            <p className="mt-2 text-xs text-stone-600">
+            <p className="mt-2 text-xs text-barro-600">
               Queda una fila de auditoría con su nombre y la hora. El emparejador usa el valor
               nuevo desde la próxima corrida.
             </p>
@@ -180,7 +180,7 @@ export default async function Ajustes({ searchParams }: { searchParams: Params }
               >
                 Confirmar el cambio
               </button>
-              <Link href="/ajustes" className="px-3 py-1.5 text-sm text-stone-700 underline">
+              <Link href="/ajustes" className="px-3 py-1.5 text-sm text-barro-700 underline">
                 Cancelar
               </Link>
             </div>
@@ -189,39 +189,39 @@ export default async function Ajustes({ searchParams }: { searchParams: Params }
       </section>
 
       <section className="mt-8">
-        <h2 className="flex items-center gap-2 font-semibold text-stone-900">
+        <h2 className="flex items-center gap-2 font-semibold text-barro-900">
           <History className="size-4" aria-hidden />
           Quién la ha cambiado
         </h2>
 
         {historia.length === 0 ? (
-          <p className="mt-3 text-sm text-stone-600">
+          <p className="mt-3 text-sm text-barro-600">
             Nadie todavía: sigue en el valor con el que arrancó el sistema.
           </p>
         ) : (
-          <ul className="mt-3 divide-y divide-stone-200 rounded-lg border border-barro-200 bg-white">
+          <ul className="mt-3 divide-y divide-barro-200 rounded-lg border border-barro-200 bg-white">
             {historia.map((f, i) => (
               <li key={i} className="flex flex-wrap gap-x-2 px-4 py-3 text-sm">
-                <span className="text-stone-900">
+                <span className="text-barro-900">
                   {f.antes ? `${f.antes.valor} → ${f.despues.valor}` : f.despues.valor}
                 </span>
-                <span className="ml-auto text-stone-500">
+                <span className="ml-auto text-barro-500">
                   {f.creado_en.toLocaleString('es-CO')}
                 </span>
               </li>
             ))}
           </ul>
         )}
-        <p className="mt-2 text-xs text-stone-600">
+        <p className="mt-2 text-xs text-barro-600">
           La escribe un trigger, no la pantalla: un cambio hecho desde un script queda igual de
           registrado. Nadie puede editar ni borrar estas filas.
         </p>
       </section>
 
-      <p className="mt-8 text-sm text-stone-600">
-        La clave se llama <code className="text-stone-800">{CLAVE_TEMPORADA}</code> y vive en{' '}
-        <code className="text-stone-800">configuracion</code>. Si la fila no existe, el motor cae
-        a <code className="text-stone-800">CONVITE_TEMPORADA</code> y, sin eso, a lluvias.
+      <p className="mt-8 text-sm text-barro-600">
+        La clave se llama <code className="text-barro-800">{CLAVE_TEMPORADA}</code> y vive en{' '}
+        <code className="text-barro-800">configuracion</code>. Si la fila no existe, el motor cae
+        a <code className="text-barro-800">CONVITE_TEMPORADA</code> y, sin eso, a lluvias.
       </p>
     </main>
   )

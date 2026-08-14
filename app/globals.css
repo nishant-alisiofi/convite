@@ -8,26 +8,44 @@
  * weak connection. So colour carries meaning and nothing else: the five board states each
  * own a hue, and everything outside them stays quiet. A humanitarian dashboard that shouts
  * in ten colours is one where nobody notices the urgent row.
+ *
+ * The neutral is `barro` — warm paper, not screen grey — and it is a full ramp so text and
+ * chrome never have to fall back to Tailwind's cooler `stone`. Each step tracks stone's
+ * luminance closely enough to be a drop-in, but carries the same warmth as the paper it
+ * sits on, so a whole screen reads as one material. Contrast on `barro-50`/white was
+ * checked: 900/800/700/600 clear AA for body and secondary text, 500 for meta at 14px+,
+ * 400 for placeholders only.
  */
 @theme {
-  /* Rainforest — the primary. */
+  /* Rainforest — the primary. Used for resolved, ready, confirmed. */
   --color-selva-50: #eef6f2;
   --color-selva-100: #d4e9df;
+  --color-selva-200: #a9d3bf;
   --color-selva-600: #2c7a5f;
   --color-selva-700: #1f5c4a;
+  --color-selva-800: #17483a;
   --color-selva-900: #12362c;
 
   /* The river: ochre, sediment-heavy. Used for waiting, not for danger. */
   --color-atrato-50: #faf4e8;
   --color-atrato-100: #f3e6c9;
+  --color-atrato-200: #e7d09a;
   --color-atrato-600: #b07d20;
   --color-atrato-700: #8a6229;
+  --color-atrato-800: #6b4c22;
 
-  /* Warm neutrals — paper, not screen grey. */
+  /* Warm neutrals — paper, not screen grey. The full working ramp. */
   --color-barro-50: #faf9f7;
+  --color-barro-100: #f4f1ec;
   --color-barro-200: #e7e3dd;
+  --color-barro-300: #d5cfc5;
+  --color-barro-400: #b0a89c;
+  --color-barro-500: #877e72;
   --color-barro-600: #6f675e;
+  --color-barro-700: #544e46;
+  --color-barro-800: #3a352f;
   --color-barro-900: #2a2622;
+  --color-barro-950: #1c1917;
 }
 
 :root {
@@ -40,4 +58,17 @@ body {
   font-size: 15px;
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/*
+ * A visible focus ring on every interactive element, keyboard or not. Coordinators work
+ * fast on cheap hardware where the mouse cursor is easy to lose; a clear ring is an
+ * accessibility floor, not decoration. Kept quiet (selva, offset) so it never competes
+ * with the board's state colours.
+ */
+:focus-visible {
+  outline: 2px solid var(--color-selva-700);
+  outline-offset: 2px;
+  border-radius: 2px;
 }

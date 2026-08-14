@@ -129,13 +129,13 @@ export default async function Rutas({ searchParams }: { searchParams: Params }) 
   return (
     <main>
       <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <h1 className="text-xl font-semibold text-stone-900">Rutas</h1>
-        <p className="text-sm text-stone-600">
+        <h1 className="text-xl font-semibold text-barro-900">Rutas</h1>
+        <p className="text-sm text-barro-600">
           {activas.length} tramos abiertos · {cerradas.length} cerrados · temporada {temporada}
         </p>
       </div>
 
-      <p className="mt-2 max-w-3xl text-sm text-stone-700">
+      <p className="mt-2 max-w-3xl text-sm text-barro-700">
         Los tramos fluviales los escribe quien conoce el río: no hay proveedor con datos del
         Atrato, y este grafo es el que el emparejador usa para decidir a dónde se puede llegar.
         Nada en esta pantalla consulta un servicio externo.
@@ -149,11 +149,11 @@ export default async function Rutas({ searchParams }: { searchParams: Params }) 
 
       {aCerrar && puedeEditar && (
         <section className="mt-6 rounded-lg border border-rose-300 bg-rose-50 px-4 py-4">
-          <h2 className="flex items-center gap-2 font-semibold text-stone-900">
+          <h2 className="flex items-center gap-2 font-semibold text-barro-900">
             <TriangleAlert className="size-4" aria-hidden />
             Cerrar {aCerrar.origen} → {aCerrar.destino}
           </h2>
-          <p className="mt-1 text-sm text-stone-800">
+          <p className="mt-1 text-sm text-barro-800">
             {aCerrar.modo} · {aCerrar.temporada}
             {aCerrar.minutos !== null && ` · ${aCerrar.minutos} min`}
           </p>
@@ -165,14 +165,14 @@ export default async function Rutas({ searchParams }: { searchParams: Params }) 
               otra forma de llegar en temporada {temporada}.
             </p>
           ) : (
-            <p className="mt-3 text-sm text-stone-800">
+            <p className="mt-3 text-sm text-barro-800">
               Ninguna comunidad queda incomunicada: hay otro camino en temporada {temporada}.
             </p>
           )}
 
           <form action={cerrarTramo} className="mt-4">
             <input type="hidden" name="id" value={aCerrar.id} />
-            <label className="block text-sm font-medium text-stone-800" htmlFor="motivo">
+            <label className="block text-sm font-medium text-barro-800" htmlFor="motivo">
               ¿Por qué se cierra?
             </label>
             <textarea
@@ -184,7 +184,7 @@ export default async function Rutas({ searchParams }: { searchParams: Params }) 
               placeholder="Bajó una palizada y tapó el paso."
               className="mt-1 w-full max-w-xl rounded border border-barro-200 bg-white px-3 py-2 text-sm"
             />
-            <p className="mt-1 text-xs text-stone-600">
+            <p className="mt-1 text-xs text-barro-600">
               Queda registrado con su nombre y la fecha. Un daño reportado no cierra un tramo
               por sí solo: lo cierra una persona.
             </p>
@@ -195,7 +195,7 @@ export default async function Rutas({ searchParams }: { searchParams: Params }) 
               >
                 Cerrar el tramo
               </button>
-              <Link href="/rutas" className="px-3 py-1.5 text-sm text-stone-700 underline">
+              <Link href="/rutas" className="px-3 py-1.5 text-sm text-barro-700 underline">
                 Cancelar
               </Link>
             </div>
@@ -205,7 +205,7 @@ export default async function Rutas({ searchParams }: { searchParams: Params }) 
 
       {puedeEditar && (
         <section className="mt-6 rounded-lg border border-barro-200 bg-white px-4 py-4">
-          <h2 className="flex items-center gap-2 font-semibold text-stone-900">
+          <h2 className="flex items-center gap-2 font-semibold text-barro-900">
             {enEdicion ? <Pencil className="size-4" aria-hidden /> : <Plus className="size-4" aria-hidden />}
             {enEdicion ? `Editar ${enEdicion.origen} → ${enEdicion.destino}` : 'Nuevo tramo'}
           </h2>
@@ -298,7 +298,7 @@ export default async function Rutas({ searchParams }: { searchParams: Params }) 
                 {enEdicion ? 'Guardar cambios' : 'Agregar tramo'}
               </button>
               {enEdicion && (
-                <Link href="/rutas" className="text-sm text-stone-700 underline">
+                <Link href="/rutas" className="text-sm text-barro-700 underline">
                   Cancelar
                 </Link>
               )}
@@ -328,9 +328,9 @@ function Campo({
 }) {
   return (
     <label className="block text-sm">
-      <span className="font-medium text-stone-800">{etiqueta}</span>
+      <span className="font-medium text-barro-800">{etiqueta}</span>
       {children}
-      {ayuda && <span className="mt-0.5 block text-xs text-stone-600">{ayuda}</span>}
+      {ayuda && <span className="mt-0.5 block text-xs text-barro-600">{ayuda}</span>}
     </label>
   )
 }
@@ -348,25 +348,25 @@ function Tabla({
 }) {
   return (
     <section className="mt-8">
-      <h2 className="font-semibold text-stone-900">
+      <h2 className="font-semibold text-barro-900">
         {titulo}
-        <span className="ml-2 font-normal text-stone-600">{rutas.length}</span>
+        <span className="ml-2 font-normal text-barro-600">{rutas.length}</span>
       </h2>
 
-      <ul className="mt-3 divide-y divide-stone-200 rounded-lg border border-barro-200 bg-white">
+      <ul className="mt-3 divide-y divide-barro-200 rounded-lg border border-barro-200 bg-white">
         {rutas.map((r) => (
           <li key={r.id} className="px-4 py-3">
             <div className="flex flex-wrap items-baseline gap-x-2 text-sm">
-              <span className="font-medium text-stone-900">
+              <span className="font-medium text-barro-900">
                 {r.origen} → {r.destino}
               </span>
-              <span className="text-stone-600">{r.modo}</span>
-              <span className="text-stone-500">{r.temporada}</span>
-              <span className="text-stone-600">
+              <span className="text-barro-600">{r.modo}</span>
+              <span className="text-barro-500">{r.temporada}</span>
+              <span className="text-barro-600">
                 {r.minutos === null ? 'sin tiempo' : `${r.minutos} min`}
               </span>
               {r.costoEstimadoCop !== null && (
-                <span className="text-stone-600">
+                <span className="text-barro-600">
                   ${r.costoEstimadoCop.toLocaleString('es-CO')}
                 </span>
               )}
@@ -375,7 +375,7 @@ function Tabla({
                 <span className="ml-auto flex items-center gap-3">
                   <Link
                     href={`/rutas?editar=${r.id}`}
-                    className="flex items-center gap-1 text-stone-700 underline"
+                    className="flex items-center gap-1 text-barro-700 underline"
                   >
                     <Pencil className="size-3.5" aria-hidden />
                     Editar
@@ -404,10 +404,10 @@ function Tabla({
               )}
             </div>
 
-            {r.notas && <p className="mt-1 text-sm text-stone-700">{r.notas}</p>}
+            {r.notas && <p className="mt-1 text-sm text-barro-700">{r.notas}</p>}
 
             {!r.activa && r.desactivadaEn && (
-              <p className="mt-1 text-xs text-stone-600">
+              <p className="mt-1 text-xs text-barro-600">
                 Cerrado el {r.desactivadaEn.toLocaleDateString('es-CO')}
                 {r.desactivadaPor && ' por un miembro del equipo'}.
               </p>

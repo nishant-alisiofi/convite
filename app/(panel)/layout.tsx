@@ -37,18 +37,18 @@ export default async function PanelLayout({ children }: { children: React.ReactN
     <div className="min-h-dvh">
       <header className="border-b border-barro-200 bg-white">
         <div className="mx-auto flex max-w-6xl items-center gap-6 px-6 py-3">
-          <Link href="/tablero" className="font-semibold text-stone-900">
+          <Link href="/tablero" className="font-semibold text-barro-900">
             Convite
           </Link>
           <nav className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
             {SECCIONES.map((s) => (
               <span key={s.href}>
                 {s.listo ? (
-                  <Link href={s.href} className="text-stone-700 hover:text-stone-950">
+                  <Link href={s.href} className="text-barro-700 hover:text-barro-950">
                     {s.etiqueta}
                   </Link>
                 ) : (
-                  <span className="text-stone-400" title="En construcción">
+                  <span className="text-barro-400" title="En construcción">
                     {s.etiqueta}
                   </span>
                 )}
@@ -56,11 +56,11 @@ export default async function PanelLayout({ children }: { children: React.ReactN
             ))}
           </nav>
           <div className="ml-auto flex items-center gap-3 text-sm">
-            <span className="text-stone-500">
+            <span className="text-barro-500">
               {sesion.correo} · {sesion.rolStaff}
             </span>
             <form action={salir}>
-              <button type="submit" className="text-stone-600 underline hover:text-stone-900">
+              <button type="submit" className="text-barro-600 underline hover:text-barro-900">
                 Salir
               </button>
             </form>

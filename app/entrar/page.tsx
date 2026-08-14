@@ -44,19 +44,19 @@ export default async function Entrar({
       <main className="mx-auto grid min-h-dvh max-w-5xl items-center gap-12 px-6 py-12 md:grid-cols-2">
         {/* Left: what this is. A coordinator signing in at 6am should see the point. */}
         <section className="max-w-sm">
-          <div className="flex items-center gap-2 text-stone-900">
+          <div className="flex items-center gap-2 text-barro-900">
             <Waves className="h-6 w-6 text-selva-700" aria-hidden />
             <span className="text-2xl font-semibold tracking-tight">Convite</span>
           </div>
-          <p className="mt-3 text-lg leading-snug text-stone-700">
+          <p className="mt-3 text-lg leading-snug text-barro-700">
             Coordinación de ayuda en la cuenca del Atrato.
           </p>
-          <p className="mt-4 text-stone-600">
+          <p className="mt-4 text-barro-600">
             Para cada solicitud abierta, Convite dice qué es lo que falta: si falta cómo
             llegar, si falta qué mandar, o si falta quién lo lleve.
           </p>
 
-          <ul className="mt-8 space-y-3 text-sm text-stone-700">
+          <ul className="mt-8 space-y-3 text-sm text-barro-700">
             {[
               'Las comunidades no necesitan instalar nada ni tener contraseña.',
               'El inventario siempre muestra cuándo fue la última vez que se contó.',
@@ -78,15 +78,15 @@ export default async function Entrar({
                 <div className="flex h-11 w-11 items-center justify-center rounded-full bg-selva-50">
                   <MailCheck className="h-5 w-5 text-selva-700" aria-hidden />
                 </div>
-                <h1 className="mt-4 text-lg font-semibold text-stone-900">
+                <h1 className="mt-4 text-lg font-semibold text-barro-900">
                   Le mandamos un enlace al correo
                 </h1>
-                <p className="mt-2 text-stone-600">
+                <p className="mt-2 text-barro-600">
                   Ábralo desde este mismo equipo y entra directo. El enlace sirve una sola vez.
                 </p>
-                <p className="mt-4 text-sm text-stone-500">
+                <p className="mt-4 text-sm text-barro-500">
                   ¿No llegó? Revise el correo no deseado, o vuelva a{' '}
-                  <a href="/entrar" className="underline hover:text-stone-800">
+                  <a href="/entrar" className="underline hover:text-barro-800">
                     pedir otro enlace
                   </a>
                   .
@@ -94,11 +94,11 @@ export default async function Entrar({
               </div>
             ) : (
               <>
-                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-stone-100">
-                  <KeyRound className="h-5 w-5 text-stone-700" aria-hidden />
+                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-barro-100">
+                  <KeyRound className="h-5 w-5 text-barro-700" aria-hidden />
                 </div>
-                <h1 className="mt-4 text-lg font-semibold text-stone-900">Entrar</h1>
-                <p className="mt-1 text-stone-600">
+                <h1 className="mt-4 text-lg font-semibold text-barro-900">Entrar</h1>
+                <p className="mt-1 text-barro-600">
                   Solo para el equipo que coordina. Escriba su correo y le mandamos el enlace.
                 </p>
 
@@ -106,7 +106,7 @@ export default async function Entrar({
                   <div>
                     <label
                       htmlFor="correo"
-                      className="block text-sm font-medium text-stone-800"
+                      className="block text-sm font-medium text-barro-800"
                     >
                       Su correo
                     </label>
@@ -120,7 +120,7 @@ export default async function Entrar({
                       placeholder="nombre@organizacion.org"
                       aria-describedby="ayuda-correo"
                       className="mt-1.5 w-full rounded-lg border border-barro-200 bg-white px-3 py-2.5
-                                 text-base text-stone-900 placeholder:text-stone-400
+                                 text-base text-barro-900 placeholder:text-barro-400
                                  focus:border-selva-600 focus:outline-none focus:ring-2
                                  focus:ring-selva-600/20"
                     />
@@ -140,7 +140,7 @@ export default async function Entrar({
                     />
                   </button>
 
-                  <p id="ayuda-correo" className="flex gap-2 text-sm text-stone-500">
+                  <p id="ayuda-correo" className="flex gap-2 text-sm text-barro-500">
                     <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
                     <span>No hay contraseña que recordar ni que perder.</span>
                   </p>
@@ -150,19 +150,19 @@ export default async function Entrar({
           </div>
 
           {error === 'enlace' && (
-            <p className="mt-4 rounded-lg border border-barro-200 bg-white px-4 py-3 text-sm text-stone-700">
+            <p className="mt-4 rounded-lg border border-barro-200 bg-white px-4 py-3 text-sm text-barro-700">
               Ese enlace ya no sirve. Pida uno nuevo y ábralo apenas llegue.
             </p>
           )}
           {error === 'correo' && (
-            <p className="mt-4 rounded-lg border border-barro-200 bg-white px-4 py-3 text-sm text-stone-700">
+            <p className="mt-4 rounded-lg border border-barro-200 bg-white px-4 py-3 text-sm text-barro-700">
               Escriba un correo válido para poder entrar.
             </p>
           )}
           {motivo === 'sin_invitacion' && (
             <div className="mt-4 rounded-lg border border-atrato-100 bg-atrato-50 px-4 py-3">
-              <p className="font-medium text-stone-900">Su correo todavía no está habilitado.</p>
-              <p className="mt-1 text-sm text-stone-700">
+              <p className="font-medium text-barro-900">Su correo todavía no está habilitado.</p>
+              <p className="mt-1 text-sm text-barro-700">
                 Pídale a quien administra Convite en su organización que lo agregue.
               </p>
             </div>

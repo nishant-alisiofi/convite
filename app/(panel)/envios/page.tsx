@@ -28,8 +28,8 @@ const TONO_ESTADO: Record<string, string> = {
   PLANEADO: 'bg-atrato-50 text-atrato-700',
   DESPACHADO: 'bg-selva-50 text-selva-700',
   EN_RUTA: 'bg-selva-50 text-selva-700',
-  COMPLETADO: 'bg-barro-50 text-stone-600',
-  CANCELADO: 'bg-barro-50 text-stone-500',
+  COMPLETADO: 'bg-barro-50 text-barro-600',
+  CANCELADO: 'bg-barro-50 text-barro-500',
 }
 
 const CLASE_CAMPO = 'mt-1 w-full rounded border border-barro-200 bg-white px-2 py-1.5 text-sm'
@@ -116,14 +116,14 @@ export default async function Envios({
   return (
     <main>
       <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <h1 className="text-xl font-semibold text-stone-900">Envíos</h1>
-        <p className="text-sm text-stone-600">
+        <h1 className="text-xl font-semibold text-barro-900">Envíos</h1>
+        <p className="text-sm text-barro-600">
           {capacidades.length} transporte{capacidades.length === 1 ? '' : 's'} ofrecido
           {capacidades.length === 1 ? '' : 's'}
         </p>
       </div>
 
-      <p className="mt-2 max-w-3xl text-sm text-stone-700">
+      <p className="mt-2 max-w-3xl text-sm text-barro-700">
         El transporte es el lado flaco: existencias se consiguen y tramos se abren, pero que
         alguien vaya esa semana casi nunca. Por eso empieza por quién viaja.
       </p>
@@ -136,15 +136,15 @@ export default async function Envios({
 
       {puedeDespachar && (
         <section className="mt-6 rounded-lg border border-barro-200 bg-white px-4 py-4">
-          <h2 className="font-semibold text-stone-900">Anotar un transporte</h2>
-          <p className="mt-1 max-w-3xl text-sm text-stone-700">
+          <h2 className="font-semibold text-barro-900">Anotar un transporte</h2>
+          <p className="mt-1 max-w-3xl text-sm text-barro-700">
             Casi siempre llega por WhatsApp o por teléfono: alguien avisa que sube el jueves y
             que le caben cuarenta. Anótelo acá y aparece para planear.
           </p>
 
           <form action={registrar} className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <label className="block text-sm">
-              <span className="font-medium text-stone-800">Quién viaja</span>
+              <span className="font-medium text-barro-800">Quién viaja</span>
               <select name="contactoId" required className={CLASE_CAMPO}>
                 <option value="">…</option>
                 {opciones.transportistas.map((t) => (
@@ -154,7 +154,7 @@ export default async function Envios({
             </label>
 
             <label className="block text-sm">
-              <span className="font-medium text-stone-800">Modo</span>
+              <span className="font-medium text-barro-800">Modo</span>
               <select name="modo" defaultValue="lancha" className={CLASE_CAMPO}>
                 {MODOS.map((m) => (
                   <option key={m} value={m}>{m}</option>
@@ -163,7 +163,7 @@ export default async function Envios({
             </label>
 
             <label className="block text-sm">
-              <span className="font-medium text-stone-800">Carga desde</span>
+              <span className="font-medium text-barro-800">Carga desde</span>
               <select name="origenNodoId" required className={CLASE_CAMPO}>
                 <option value="">…</option>
                 {opciones.nodos.map((n) => (
@@ -173,7 +173,7 @@ export default async function Envios({
             </label>
 
             <label className="block text-sm">
-              <span className="font-medium text-stone-800">Hasta</span>
+              <span className="font-medium text-barro-800">Hasta</span>
               <select name="hastaComunidadId" required className={CLASE_CAMPO}>
                 <option value="">…</option>
                 {opciones.comunidades.map((c) => (
@@ -183,17 +183,17 @@ export default async function Envios({
             </label>
 
             <label className="block text-sm">
-              <span className="font-medium text-stone-800">Sale</span>
+              <span className="font-medium text-barro-800">Sale</span>
               <input type="datetime-local" name="saleEn" required className={CLASE_CAMPO} />
             </label>
 
             <label className="block text-sm">
-              <span className="font-medium text-stone-800">Cupo (familias)</span>
+              <span className="font-medium text-barro-800">Cupo (familias)</span>
               <input name="cupoFamilias" inputMode="numeric" required className={CLASE_CAMPO} />
             </label>
 
             <label className="block text-sm sm:col-span-2 lg:col-span-3">
-              <span className="font-medium text-stone-800">Notas</span>
+              <span className="font-medium text-barro-800">Notas</span>
               <input
                 name="notas"
                 placeholder="Va con carga de la alcaldía, lleva lo que quepa."
@@ -214,30 +214,30 @@ export default async function Envios({
       )}
 
       <section className="mt-6">
-        <h2 className="font-semibold text-stone-900">Quién viaja</h2>
+        <h2 className="font-semibold text-barro-900">Quién viaja</h2>
         {capacidades.length === 0 ? (
-          <p className="mt-3 text-sm text-stone-600">
+          <p className="mt-3 text-sm text-barro-600">
             Nadie ha ofrecido transporte. Mientras tanto, todo lo que tiene ruta y existencia
             se queda esperando.
           </p>
         ) : (
-          <ul className="mt-3 divide-y divide-stone-200 rounded-lg border border-barro-200 bg-white">
+          <ul className="mt-3 divide-y divide-barro-200 rounded-lg border border-barro-200 bg-white">
             {capacidades.map((c) => (
               <li key={c.id} className="flex flex-wrap items-baseline gap-x-2 px-4 py-3 text-sm">
-                <Ship className="size-4 text-stone-500" aria-hidden />
-                <span className="font-medium text-stone-900">{c.transportista}</span>
-                <span className="text-stone-700">
+                <Ship className="size-4 text-barro-500" aria-hidden />
+                <span className="font-medium text-barro-900">{c.transportista}</span>
+                <span className="text-barro-700">
                   {c.modo} · {c.origenNodo} → {c.hastaComunidad}
                 </span>
-                <span className="text-stone-600">
+                <span className="text-barro-600">
                   sale {c.saleEn.toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' })}
                 </span>
-                <span className="text-stone-600">cupo {c.cupoFamilias}</span>
+                <span className="text-barro-600">cupo {c.cupoFamilias}</span>
 
                 {puedeDespachar && (
                   <span className="ml-auto">
                     {c.envioId ? (
-                      <Link href={`/envios/${c.envioId}`} className="text-stone-700 underline">
+                      <Link href={`/envios/${c.envioId}`} className="text-barro-700 underline">
                         Ver el plan
                       </Link>
                     ) : (
@@ -260,14 +260,14 @@ export default async function Envios({
       </section>
 
       <section className="mt-8">
-        <h2 className="font-semibold text-stone-900">Envíos</h2>
+        <h2 className="font-semibold text-barro-900">Envíos</h2>
         {envios.length === 0 ? (
-          <p className="mt-3 text-sm text-stone-600">Todavía no se ha planeado ninguno.</p>
+          <p className="mt-3 text-sm text-barro-600">Todavía no se ha planeado ninguno.</p>
         ) : (
-          <ul className="mt-3 divide-y divide-stone-200 rounded-lg border border-barro-200 bg-white">
+          <ul className="mt-3 divide-y divide-barro-200 rounded-lg border border-barro-200 bg-white">
             {envios.map((e) => (
               <li key={e.id} className="flex flex-wrap items-baseline gap-x-2 px-4 py-3 text-sm">
-                <Link href={`/envios/${e.id}`} className="font-mono font-medium text-stone-900 underline">
+                <Link href={`/envios/${e.id}`} className="font-mono font-medium text-barro-900 underline">
                   {e.codigo}
                 </Link>
                 <span
@@ -275,20 +275,20 @@ export default async function Envios({
                 >
                   {e.estado.toLowerCase()}
                 </span>
-                <span className="text-stone-700">
+                <span className="text-barro-700">
                   {e.modo} · {e.transportista}
                 </span>
-                <span className="text-stone-600">
+                <span className="text-barro-600">
                   {e.paradas} parada{e.paradas === 1 ? '' : 's'} · {e.asignadas}/{e.cupo_familias}{' '}
                   familias
                 </span>
                 {e.estado === 'PLANEADO' && e.paradas === 0 && (
-                  <span className="flex items-center gap-1 text-stone-500">
+                  <span className="flex items-center gap-1 text-barro-500">
                     <TriangleAlert className="size-3.5" aria-hidden />
                     sin paradas
                   </span>
                 )}
-                <span className="ml-auto text-stone-500">
+                <span className="ml-auto text-barro-500">
                   {e.salida_programada?.toLocaleDateString('es-CO') ?? 'sin fecha'}
                 </span>
               </li>

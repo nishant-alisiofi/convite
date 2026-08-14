@@ -62,10 +62,10 @@ export default function Tarjeta({
   return (
     <li className="rounded-lg border border-barro-200 bg-white px-4 py-4">
       <div className="flex flex-wrap items-baseline gap-x-2 text-sm">
-        <span className="font-mono text-stone-500">#{r.folio}</span>
-        <span className="font-medium text-stone-900">{r.comunidad ?? 'Sin comunidad'}</span>
-        {r.municipio && <span className="text-stone-500">{r.municipio}</span>}
-        <span className="flex items-center gap-1 text-stone-600">
+        <span className="font-mono text-barro-500">#{r.folio}</span>
+        <span className="font-medium text-barro-900">{r.comunidad ?? 'Sin comunidad'}</span>
+        {r.municipio && <span className="text-barro-500">{r.municipio}</span>}
+        <span className="flex items-center gap-1 text-barro-600">
           <IconoCanal className="size-3.5" aria-hidden />
           {r.canal}
         </span>
@@ -74,20 +74,20 @@ export default function Tarjeta({
             urgente
           </span>
         )}
-        <span className="ml-auto text-stone-500">
+        <span className="ml-auto text-barro-500">
           {r.dias === 0 ? 'hoy' : `hace ${r.dias} d`}
         </span>
       </div>
 
       {/* Their words, first and verbatim. Never rewritten, never summarised (2.12). */}
-      <p className="mt-2 text-stone-900">
+      <p className="mt-2 text-barro-900">
         {r.textoOriginal ? `«${r.textoOriginal}»` : 'Sin texto.'}
       </p>
       {r.descripcion && r.detalleLibre && (
-        <p className="mt-1 text-sm text-stone-700">{r.descripcion}</p>
+        <p className="mt-1 text-sm text-barro-700">{r.descripcion}</p>
       )}
 
-      <p className="mt-1 text-sm text-stone-600">
+      <p className="mt-1 text-sm text-barro-600">
         {r.item ?? 'sin ítem'}
         {r.familias !== null && ` · ${r.familias} familia${r.familias === 1 ? '' : 's'}`}
         {r.contacto && ` · ${r.contacto}`}
@@ -95,15 +95,15 @@ export default function Tarjeta({
 
       {r.motivos.length > 0 && (
         <details className="mt-2 text-sm">
-          <summary className="cursor-pointer text-stone-600">
+          <summary className="cursor-pointer text-barro-600">
             Por qué el clasificador lo lee así
           </summary>
-          <ul className="mt-1 list-disc pl-5 text-stone-700">
+          <ul className="mt-1 list-disc pl-5 text-barro-700">
             {r.motivos.map((m, i) => (
               <li key={i}>{m}</li>
             ))}
           </ul>
-          <p className="mt-1 text-xs text-stone-500">
+          <p className="mt-1 text-xs text-barro-500">
             Léxico {r.versionLexico}. Es cómo lee el clasificador este texto hoy, no lo que
             concluyó el día que entró.
           </p>
@@ -111,7 +111,7 @@ export default function Tarjeta({
       )}
 
       {faltaDetalle && (
-        <p className="mt-2 flex items-start gap-2 rounded border border-atrato-100 bg-atrato-50 px-3 py-2 text-sm text-stone-800">
+        <p className="mt-2 flex items-start gap-2 rounded border border-atrato-100 bg-atrato-50 px-3 py-2 text-sm text-barro-800">
           <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
           <span>
             Este ítem pide detalle y no lo trae. Falta preguntar antes de que entre a la cola.
@@ -123,11 +123,11 @@ export default function Tarjeta({
         .filter((a) => a.tipo === 'audio')
         .map((a) => (
           <div key={a.id} className="mt-3 rounded border border-barro-200 bg-barro-50 px-3 py-3">
-            <p className="flex items-center gap-2 text-sm font-medium text-stone-800">
+            <p className="flex items-center gap-2 text-sm font-medium text-barro-800">
               <Mic className="size-4" aria-hidden />
               Nota de voz
               {a.duracionSeg !== null && (
-                <span className="font-normal text-stone-600">{a.duracionSeg}s</span>
+                <span className="font-normal text-barro-600">{a.duracionSeg}s</span>
               )}
             </p>
 
@@ -137,19 +137,19 @@ export default function Tarjeta({
               Su navegador no puede reproducir esta nota.
             </audio>
 
-            <p className="mt-2 text-sm text-stone-700">
-              <span className="text-stone-500">Transcripción: </span>
+            <p className="mt-2 text-sm text-barro-700">
+              <span className="text-barro-500">Transcripción: </span>
               {a.transcripcion ?? 'sin transcribir'}
               {a.transcripcionConfianza !== null && (
-                <span className="ml-1 text-stone-500">
+                <span className="ml-1 text-barro-500">
                   ({Math.round(a.transcripcionConfianza * 100)}%)
                 </span>
               )}
             </p>
 
             {a.transcripcionCorregida && (
-              <p className="mt-1 text-sm text-stone-900">
-                <span className="text-stone-500">Corregido: </span>
+              <p className="mt-1 text-sm text-barro-900">
+                <span className="text-barro-500">Corregido: </span>
                 {a.transcripcionCorregida}
               </p>
             )}
@@ -160,7 +160,7 @@ export default function Tarjeta({
                 <input type="hidden" name="reporteId" value={r.id} />
                 <input type="hidden" name="adjuntoId" value={a.id} />
                 <label className="flex-1 text-sm">
-                  <span className="text-stone-700">¿Qué dice en realidad?</span>
+                  <span className="text-barro-700">¿Qué dice en realidad?</span>
                   <input
                     name="texto"
                     defaultValue={a.transcripcionCorregida ?? a.transcripcion ?? ''}
@@ -169,13 +169,13 @@ export default function Tarjeta({
                 </label>
                 <button
                   type="submit"
-                  className="rounded border border-barro-200 bg-white px-3 py-1.5 text-sm text-stone-800"
+                  className="rounded border border-barro-200 bg-white px-3 py-1.5 text-sm text-barro-800"
                 >
                   Guardar corrección
                 </button>
               </form>
             )}
-            <p className="mt-1 text-xs text-stone-500">
+            <p className="mt-1 text-xs text-barro-500">
               Lo que oyó la máquina se conserva aparte; la corrección no lo borra.
             </p>
           </div>
@@ -183,17 +183,17 @@ export default function Tarjeta({
 
       {rutasAfectadas.length > 0 && (
         <div className="mt-3 rounded border border-atrato-100 bg-atrato-50 px-3 py-3">
-          <p className="flex items-center gap-2 text-sm font-medium text-stone-900">
+          <p className="flex items-center gap-2 text-sm font-medium text-barro-900">
             <Route className="size-4" aria-hidden />
             Tramos que este daño podría haber cerrado
           </p>
           <ul className="mt-2 space-y-1 text-sm">
             {rutasAfectadas.map((r) => (
               <li key={r.id} className="flex flex-wrap items-baseline gap-x-2">
-                <span className="text-stone-900">
+                <span className="text-barro-900">
                   {r.origen} → {r.destino}
                 </span>
-                <span className="text-stone-600">
+                <span className="text-barro-600">
                   {r.modo}
                   {r.minutos !== null && ` · ${r.minutos} min`}
                 </span>
@@ -205,7 +205,7 @@ export default function Tarjeta({
                 {puedeVerificar && (
                   <Link
                     href={`/rutas?cerrar=${r.id}`}
-                    className="ml-auto text-stone-700 underline"
+                    className="ml-auto text-barro-700 underline"
                   >
                     Cerrar este tramo
                   </Link>
@@ -213,7 +213,7 @@ export default function Tarjeta({
               </li>
             ))}
           </ul>
-          <p className="mt-2 text-xs text-stone-600">
+          <p className="mt-2 text-xs text-barro-600">
             Un reporte no cierra un tramo. Lo cierra una persona, después de verificarlo, y
             queda su nombre — un solo reporte exagerado no puede incomunicar una cuenca.
           </p>
@@ -221,13 +221,13 @@ export default function Tarjeta({
       )}
 
       {puedeVerificar && (
-        <div className="mt-3 border-t border-stone-200 pt-3">
+        <div className="mt-3 border-t border-barro-200 pt-3">
           {sinClasificar ? (
             <form action={accion} className="flex flex-wrap items-end gap-2">
               <input type="hidden" name="accion" value="clasificar" />
               <input type="hidden" name="reporteId" value={r.id} />
               <label className="text-sm">
-                <span className="text-stone-700">Nadie pudo clasificarlo. ¿Qué es?</span>
+                <span className="text-barro-700">Nadie pudo clasificarlo. ¿Qué es?</span>
                 <select
                   name="codigoItem"
                   required
@@ -255,7 +255,7 @@ export default function Tarjeta({
                   <input type="hidden" name="accion" value="promover" />
                   <input type="hidden" name="reporteId" value={r.id} />
                   <label className="text-sm">
-                    <span className="text-stone-700">Familias</span>
+                    <span className="text-barro-700">Familias</span>
                     <input
                       name="familias"
                       inputMode="numeric"
@@ -279,7 +279,7 @@ export default function Tarjeta({
                 <input type="hidden" name="reporteId" value={r.id} />
                 <button
                   type="submit"
-                  className="rounded border border-barro-200 bg-white px-3 py-1.5 text-sm text-stone-800"
+                  className="rounded border border-barro-200 bg-white px-3 py-1.5 text-sm text-barro-800"
                 >
                   Solo verificar
                 </button>
@@ -287,7 +287,7 @@ export default function Tarjeta({
 
               <Link
                 href={`/verificacion?tipo=${filtro}&duplicado=${r.id}`}
-                className="flex items-center gap-1 px-1 py-1.5 text-sm text-stone-700 underline"
+                className="flex items-center gap-1 px-1 py-1.5 text-sm text-barro-700 underline"
               >
                 <Copy className="size-3.5" aria-hidden />
                 Marcar duplicado
@@ -297,9 +297,9 @@ export default function Tarjeta({
 
           {abriendoDuplicado && (
             <div className="mt-3 rounded border border-barro-200 bg-barro-50 px-3 py-3">
-              <p className="text-sm font-medium text-stone-900">¿De cuál reporte es duplicado?</p>
+              <p className="text-sm font-medium text-barro-900">¿De cuál reporte es duplicado?</p>
               {candidatos.length === 0 ? (
-                <p className="mt-1 text-sm text-stone-700">
+                <p className="mt-1 text-sm text-barro-700">
                   No hay otro reporte parecido de esa comunidad en tres días. Dos familias
                   reportando la misma creciente siguen siendo dos familias.
                 </p>
@@ -323,11 +323,11 @@ export default function Tarjeta({
                   </label>
                   <button
                     type="submit"
-                    className="rounded border border-barro-200 bg-white px-3 py-1.5 text-sm text-stone-800"
+                    className="rounded border border-barro-200 bg-white px-3 py-1.5 text-sm text-barro-800"
                   >
                     Marcar duplicado
                   </button>
-                  <Link href={`/verificacion?tipo=${filtro}`} className="text-sm text-stone-700 underline">
+                  <Link href={`/verificacion?tipo=${filtro}`} className="text-sm text-barro-700 underline">
                     Cancelar
                   </Link>
                 </form>
