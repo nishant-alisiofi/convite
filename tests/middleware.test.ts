@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { esRutaPublica, middleware, PUBLICAS } from '@/middleware'
+import { esRutaPublica, middleware, PUBLICAS, SIEMPRE_PUBLICAS } from '@/middleware'
 
 /**
  * What the middleware does when identity is not configured.
@@ -39,6 +39,59 @@ describe('la lista de rutas públicas', () => {
     expect(esRutaPublica('/api/webhooks/whatsapp')).toBe(true)
     expect(esRutaPublica('/tablero')).toBe(false)
     expect(esRutaPublica('/verificacion')).toBe(false)
+  })
+})
+
+describe('los archivos que la web pide sin permiso', () => {
+  it('no pasan por la puerta de autenticación', async () => {
+    // Found on live staging: /robots.txt answered 503 «Autenticación no configurada». That
+    // is two lies in one status — «this exists but the server is unwell» when the truth is
+    // «there is nothing here» — and a 503 tells the caller to come back and try again
+    // forever. Passing them through lets Next answer 404, which ends it honestly.
+    sinAutenticacionConfigurada()
+
+    for (const ruta of ['/robots.txt', '/sitemap.xml', '/.well-known/acme-challenge/xyz']) {
+      const respuesta = await middleware(pedir(ruta))
+      expect(respuesta.status, ruta).not.toBe(503)
+      expect(esRutaPublica(ruta), ruta).toBe(true)
+    }
+  })
+
+  it('la lista es exactamente la convención, no una puerta trasera', () => {
+    // It would be an easy place to quietly park a route that should need a session.
+    expect(SIEMPRE_PUBLICAS).toEqual([
+      '/robots.txt',
+      '/sitemap.xml',
+      '/favicon.ico',
+      '/.well-known',
+    ])
+    // A path that merely starts with the same letters is not one of them.
+    expect(esRutaPublica('/robots.txt.bak')).toBe(false)
+    expect(esRutaPublica('/sitemap.xml/../tablero')).toBe(false)
+  })
+})
+
+describe('no indexable cuando se le dice', () => {
+  it('pone x-robots-tag solo si CONVITE_NOINDEX=1', async () => {
+    // Explicit flag, never inferred from the hostname — the lesson the database connection
+    // taught tonight, where guessing from the host worked until it silently did not.
+    vi.stubEnv('CONVITE_NOINDEX', '1')
+    sinAutenticacionConfigurada()
+    const conBandera = await middleware(pedir('/'))
+    expect(conBandera.headers.get('x-robots-tag')).toBe('noindex, nofollow')
+
+    vi.stubEnv('CONVITE_NOINDEX', '')
+    const sinBandera = await middleware(pedir('/'))
+    expect(sinBandera.headers.get('x-robots-tag')).toBeNull()
+  })
+
+  it('también marca la página de «sin autenticación»', async () => {
+    // The 503 page is served on every protected path; it should not be indexable either.
+    vi.stubEnv('CONVITE_NOINDEX', '1')
+    sinAutenticacionConfigurada()
+    const respuesta = await middleware(pedir('/tablero'))
+    expect(respuesta.status).toBe(503)
+    expect(respuesta.headers.get('x-robots-tag')).toBe('noindex, nofollow')
   })
 })
 

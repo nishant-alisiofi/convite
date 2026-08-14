@@ -19,8 +19,47 @@ import { NextResponse, type NextRequest } from 'next/server'
  */
 export const PUBLICAS = ['/entrar', '/auth', '/api/webhooks', '/api/jobs', '/api/salud']
 
+/**
+ * Files the web expects to fetch without asking anybody's permission.
+ *
+ * Separate from PUBLICAS because they are not our routes — they are conventions crawlers,
+ * browsers and certificate authorities reach for unprompted. Gating them produced a 503 for
+ * `/robots.txt` on staging, which lies twice: it says «this exists but the server is
+ * unwell» when the truth is «there is nothing here», and a 503 invites the caller back
+ * forever. A 404 ends the conversation honestly.
+ */
+export const SIEMPRE_PUBLICAS = ['/robots.txt', '/sitemap.xml', '/favicon.ico', '/.well-known']
+
+/** The only one with children. The rest are single files and match exactly. */
+const CON_HIJOS = ['/.well-known']
+
+function esArchivoConvencional(ruta: string): boolean {
+  // A list of always-public paths is an inviting place to smuggle something through, so it
+  // matches exactly rather than by prefix: `/sitemap.xml/../tablero` starts with
+  // `/sitemap.xml/` and is not a sitemap. Next normalises paths before middleware sees
+  // them, but a public-route list should not be depending on that to stay closed.
+  if (ruta.includes('..')) return false
+  return SIEMPRE_PUBLICAS.some(
+    (p) => ruta === p || (CON_HIJOS.includes(p) && ruta.startsWith(`${p}/`)),
+  )
+}
+
 export function esRutaPublica(ruta: string): boolean {
-  return PUBLICAS.some((p) => ruta.startsWith(p)) || ruta === '/'
+  return esArchivoConvencional(ruta) || PUBLICAS.some((p) => ruta.startsWith(p)) || ruta === '/'
+}
+
+/**
+ * Keeps an environment out of search indexes when it is told to.
+ *
+ * Explicitly flagged, never inferred from the hostname — the same lesson the database
+ * connection taught us tonight, where guessing from the host worked until it silently did
+ * not. Staging sets CONVITE_NOINDEX=1; production simply does not.
+ */
+function marcarNoIndexable(respuesta: NextResponse): NextResponse {
+  if (process.env.CONVITE_NOINDEX === '1') {
+    respuesta.headers.set('x-robots-tag', 'noindex, nofollow')
+  }
+  return respuesta
 }
 
 /**
@@ -114,7 +153,7 @@ export async function middleware(request: NextRequest) {
   // why. This is what makes a database-only staging deploy possible — intake, the queue and
   // the health check all work while sign-in waits for a Supabase project.
   if (!autenticacionConfigurada()) {
-    return esPublica ? NextResponse.next({ request }) : sinAutenticacion()
+    return marcarNoIndexable(esPublica ? NextResponse.next({ request }) : sinAutenticacion())
   }
 
   // ── Configured: exactly as before ───────────────────────────────────────────────────────

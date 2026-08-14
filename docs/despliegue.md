@@ -188,6 +188,7 @@ que proteger.
   {"nombre":"CRON_SECRET","servicio":"app","secreto":true,"obligatoria":true,"nota":"Protege /api/jobs/correr y el detalle de /api/salud. En producción esas rutas fallan cerradas si falta."},
   {"nombre":"APP_BASE_URL","servicio":"app","secreto":false,"obligatoria":true,"nota":"Origen público; entra en los enlaces mágicos."},
   {"nombre":"PORT","servicio":"app","secreto":false,"obligatoria":false,"nota":"La pone la plataforma. next start la respeta sola."},
+  {"nombre":"CONVITE_NOINDEX","servicio":"app","secreto":false,"obligatoria":false,"nota":"Poner en 1 SOLO en staging: agrega x-robots-tag noindex. Produccion no la define. Explicita a proposito, nunca deducida del hostname."},
   {"nombre":"WHATSAPP_APP_SECRET","servicio":"app","secreto":true,"obligatoria":false,"nota":"Verificación de firma. Sin esto el webhook rechaza todo, que es el fallo correcto. D3."},
   {"nombre":"WHATSAPP_WEBHOOK_VERIFY_TOKEN","servicio":"app","secreto":true,"obligatoria":false,"nota":"hub.verify_token de la suscripción. D3."},
   {"nombre":"WHATSAPP_ACCESS_TOKEN","servicio":"ambos","secreto":true,"obligatoria":false,"nota":"El worker lo necesita para bajar media. D3."},
