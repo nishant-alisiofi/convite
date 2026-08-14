@@ -28,6 +28,11 @@ sin drift de esquema.** Staging desplegado en Railway.
 - **Modo solo-base-de-datos**: sin proyecto Supabase, el panel devuelve 503 honesto; webhook, salud
   y vista pública funcionan. **El inicio de sesión de staff es la única brecha** — decisión de
   Nishant/founder (claves de su proyecto Supabase, o uno nuevo).
+- **Worker:** vivo y conectado a la base en el deploy actual (log de arranque «5 tipos de job
+  registrados», sin crash-loop). El procesamiento de jobs de punta a punta **no es observable con
+  cola vacía** — sin credenciales de WhatsApp no entran webhooks, así que `alertas:0` es consistente
+  con un worker sano *y* con uno muerto. Se probará solo con el primer webhook real; hasta entonces
+  «worker arriba» descansa en el log de arranque, no en el endpoint de salud.
 - Datos de prueba marcados `[DATO DE PRUEBA]` donde una persona los ve.
 - `/robots.txt` → 404 (no 503), `x-robots-tag: noindex, nofollow` en `/` y en la página 503 —
   staging fuera de índices, verificado en vivo.
