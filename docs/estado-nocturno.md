@@ -57,6 +57,31 @@ dice «no hay solicitudes» las pasa todas. Corregidos en `778c5fe`, verificados
 «Quibdó»/«Otras zonas». El resto del producto (panel autenticado) sigue sin caminarse — bloqueado
 por Supabase, ver arriba.
 
+## Qué se puede demostrar hoy (para hablar con organizaciones)
+
+Superficie pública, en vivo, sin login — segura para mostrar a cualquiera:
+- **Landing `/acerca`** — qué es Convite, el modelo multicanal (nadie paga por pedir ayuda), la
+  postura de privacidad como rasgo de confianza, para quién es. Mobile-first, sin JS de cliente.
+- **Página pública `/`** — el tamaño real de la respuesta en conteos agregados, con la explicación
+  de por qué no muestra más. k-anonimato verificado (solo «Quibdó»/«Otras zonas», sin veredas).
+- **`robots.txt`** — indexa lo público, mantiene a los crawlers fuera del panel.
+
+**NO demostrable aún** (hay que decirlo antes de agendar un recorrido):
+- **Todo el panel del coordinador** (tablero, verificación, despacho, mapas) — 503 sin auth
+  Supabase. Es la decisión que desbloquea el recorrido completo del producto.
+- **Ningún mensaje real fluye todavía** — WhatsApp/SMS/IVR probados contra payloads grabados,
+  no contra un teléfono vivo (falta WABA + proveedores).
+
+Traducción: hoy se demuestra la visión y el modelo de confianza público; el bucle operativo
+completo del coordinador espera la decisión de Supabase.
+
+**Buenaventura (2026-08-14):** el founder lo agregó al PRD; la arquitectura es agnóstica de
+territorio por diseño (el tier es la única variable geográfica, el catálogo es configuración,
+el esquema se escopa por `organizacion_id`), así que un segundo territorio es la extensión
+prevista. Dos cosas a revisar por-territorio: el pliegue k-anónimo de 0027 (afinado a los
+tamaños de municipio del Atrato — Buenaventura necesita su propia verificación para no
+re-identificar una vereda) y el seed + grafo de rutas (hoy específicos del Atrato).
+
 ## Validación
 
 - **488 tests** verde tras un rebuild limpio; primer all-green de la noche (una falsa alarma de
