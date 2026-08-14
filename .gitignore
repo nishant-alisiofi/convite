@@ -27,3 +27,6 @@ drizzle/
 
 # TypeScript incremental build cache
 *.tsbuildinfo
+
+# Supabase CLI local state
+supabase/.temp/
