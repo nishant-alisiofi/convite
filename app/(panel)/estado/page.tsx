@@ -7,6 +7,7 @@ import {
   type AgrupacionDanos,
   type ComunidadEnSilencio,
 } from '@/lib/observabilidad/silencio'
+import { confirmacionesAmbiguas, type ConfirmacionAmbigua } from '@/lib/verificacion/danos'
 import { conSesion, sesionActual } from '@/lib/sesion'
 
 export const dynamic = 'force-dynamic'
@@ -41,10 +42,11 @@ export default async function Estado() {
     )
   }
 
-  const { salud, silencio, danos } = await conSesion(sesion, async (client) => ({
+  const { salud, silencio, danos, ambiguas } = await conSesion(sesion, async (client) => ({
     salud: await estadoSistema(client),
     silencio: await comunidadesEnSilencio(client),
     danos: await agrupacionesDeDanos(client),
+    ambiguas: await confirmacionesAmbiguas(client),
   }))
 
   return (
@@ -83,6 +85,7 @@ export default async function Estado() {
         </ul>
       )}
 
+      <Ambiguas confirmaciones={ambiguas} />
       <Silencio comunidades={silencio} nuncaVistas={salud.silencio.nuncaVistas} />
       <Danos agrupaciones={danos} />
 
@@ -156,6 +159,36 @@ function Dato({
       <dd className="mt-0.5 font-medium text-stone-900">{valor}</dd>
       <dd className="text-sm text-stone-600">{detalle}</dd>
     </div>
+  )
+}
+
+function Ambiguas({ confirmaciones }: { confirmaciones: ConfirmacionAmbigua[] }) {
+  if (confirmaciones.length === 0) return null
+
+  return (
+    <section className="mt-10">
+      <h2 className="flex items-center gap-2 font-semibold text-stone-900">
+        <TriangleAlert className="size-4" aria-hidden />
+        Códigos que no se pueden resolver
+        <span className="font-normal text-stone-600">{confirmaciones.length}</span>
+      </h2>
+      <p className="mt-1 max-w-3xl text-sm text-stone-700">
+        Dos entregas abiertas en la misma comunidad con el mismo código. Si alguien lo lee de
+        vuelta, no hay forma de saber cuál llegó — y desde el tablero eso se ve idéntico a una
+        comunidad que nunca confirmó. Hay que llamar y cerrar una a mano.
+      </p>
+      <ul className="mt-3 divide-y divide-stone-200 rounded-lg border border-rose-300 bg-rose-50">
+        {confirmaciones.map((c) => (
+          <li key={`${c.comunidad}-${c.codigo}`} className="flex flex-wrap items-baseline gap-x-2 px-4 py-3 text-sm">
+            <span className="font-medium text-stone-900">{c.comunidad}</span>
+            <span className="font-mono text-stone-900">{c.codigo}</span>
+            <span className="text-stone-800">
+              {c.entregas} entregas abiertas · envíos {c.envios.join(', ')}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }
 

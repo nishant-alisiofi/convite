@@ -517,18 +517,48 @@ export async function despachar(
  * next community's code and close a delivery they never made.
  */
 async function crearEntregas(client: PoolClient, envioId: string): Promise<void> {
-  const { rows: paradas } = await client.query<{ pedido_id: string }>(
-    `select pedido_id from envio_items where envio_id = $1 order by orden_parada`,
+  const { rows: paradas } = await client.query<{ pedido_id: string; comunidad_id: string }>(
+    `select ei.pedido_id, p.comunidad_id
+       from envio_items ei join pedidos p on p.id = ei.pedido_id
+      where ei.envio_id = $1 order by ei.orden_parada`,
     [envioId],
   )
 
+  /*
+   * Uniqueness has to be per COMMUNITY, not just per shipment.
+   *
+   * The database constraint is `entregas_envio_codigo_key` — unique within a shipment — but
+   * `confirmarConCodigo` resolves a code against the deliveries *this person's community* is
+   * waiting for, because four digits dictated over the phone do not identify a shipment. So
+   * two boats going to Tagachí in the same week can each draw 4139, and the second time
+   * somebody reads it back the system cannot tell which delivery arrived and gives up
+   * (`ambigua`). Nobody is at fault and nothing is logged: the delivery just stays open.
+   *
+   * So the codes already outstanding in each destination are excluded up front. Cheaper than
+   * detecting the collision afterwards, and it means a community never holds two live codes
+   * that sound the same.
+   */
+  const { rows: abiertos } = await client.query<{ comunidad_id: string; codigo: string }>(
+    `select p.comunidad_id, e.codigo_confirmacion as codigo
+       from entregas e join pedidos p on p.id = e.pedido_id
+      where not e.confirmado`,
+  )
+  const enUso = new Map<string, Set<string>>()
+  for (const fila of abiertos) {
+    const set = enUso.get(fila.comunidad_id) ?? new Set<string>()
+    set.add(fila.codigo)
+    enUso.set(fila.comunidad_id, set)
+  }
+
   const usados = new Set<string>()
   for (const parada of paradas) {
-    let codigo = ''
-    do {
-      codigo = String(Math.floor(Math.random() * 10_000)).padStart(4, '0')
-    } while (usados.has(codigo))
+    const ocupados = enUso.get(parada.comunidad_id) ?? new Set<string>()
+
+    const codigo = escogerCodigo(new Set([...usados, ...ocupados]))
+
     usados.add(codigo)
+    ocupados.add(codigo)
+    enUso.set(parada.comunidad_id, ocupados)
 
     await client.query(
       `insert into entregas (envio_id, pedido_id, codigo_confirmacion)
@@ -537,6 +567,32 @@ async function crearEntregas(client: PoolClient, envioId: string): Promise<void>
       [envioId, parada.pedido_id, codigo],
     )
   }
+}
+
+/**
+ * Draws four digits nobody in this community is already waiting on.
+ *
+ * Exported and given its randomness so the exclusion can be tested for real. Sampling cannot
+ * prove this: with one code taken out of ten thousand, an implementation that ignores the
+ * occupied set passes a random draw 99.99% of the time. A deterministic source is the only
+ * honest way to assert it.
+ *
+ * Falls back to a linear scan when the space is nearly exhausted, so it terminates instead of
+ * spinning — ten thousand outstanding deliveries in one community is not a real situation,
+ * but an infinite loop in a dispatch path is a real outage.
+ */
+export function escogerCodigo(ocupados: ReadonlySet<string>, aleatorio = Math.random): string {
+  for (let intento = 0; intento < 50; intento += 1) {
+    const codigo = String(Math.floor(aleatorio() * 10_000)).padStart(4, '0')
+    if (!ocupados.has(codigo)) return codigo
+  }
+
+  for (let n = 0; n < 10_000; n += 1) {
+    const codigo = String(n).padStart(4, '0')
+    if (!ocupados.has(codigo)) return codigo
+  }
+
+  throw new Error('No quedan códigos de confirmación libres en esa comunidad.')
 }
 
 async function auditar(

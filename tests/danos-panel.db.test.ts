@@ -1,7 +1,8 @@
 import type { PoolClient } from 'pg'
 import { Pool } from 'pg'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
-import { rutasAfectadasPor } from '@/lib/verificacion/danos'
+import { confirmacionesAmbiguas, rutasAfectadasPor } from '@/lib/verificacion/danos'
+import { crearEnvio, despachar, ponerParada } from '@/lib/despacho/plan'
 
 /**
  * M11, panel side: a damage report points at the legs it might be about, and never closes
@@ -16,6 +17,14 @@ const url = process.env.DATABASE_URL
 const conBase = describe.skipIf(!url)
 
 const COORDINADOR = '00000000-0000-4000-8000-000000000001'
+const DESPACHADOR = '00000000-0000-4000-8000-000000000003'
+
+async function laCapacidad(): Promise<string> {
+  const { rows } = await client.query<{ id: string }>(
+    `select id from capacidades where estado = 'OFRECIDA' order by sale_en limit 1`,
+  )
+  return rows[0]!.id
+}
 
 let pool: Pool
 let client: PoolClient
@@ -152,4 +161,44 @@ conBase('el daño y los tramos', () => {
     const despues = await como(COORDINADOR, () => rutasAfectadasPor(client, dano, 'lluvias'))
     expect(despues.map((r) => r.id)).not.toContain(uno.id)
   })
+})
+
+conBase('códigos de confirmación que nadie podría resolver', () => {
+  it('detecta dos entregas abiertas con el mismo código en una comunidad', async () => {
+    await client.query('savepoint caso')
+
+    // Se fabrica a mano la colisión que el despacho ahora evita, para comprobar que si
+    // llegara a existir —fila vieja, inserción manual— alguien la ve.
+    const { rows: pedidos } = await client.query<{ id: string; comunidad_id: string }>(
+      `select p.id, p.comunidad_id from pedidos p join comunidades c on c.id = p.comunidad_id
+        where c.codigo = 'TAG' limit 1`,
+    )
+    const { rows: envios } = await client.query<{ id: string }>(
+      `insert into envios (codigo, modo, responsable_id, origen_nodo_id, cupo_familias, estado)
+       select 'E-PRUEBA-' || g, 'lancha', ct.id, n.id, 10, 'PLANEADO'
+         from generate_series(1, 2) g,
+              (select id from contactos where telefono = '+573000000004') ct,
+              (select id from nodos where nombre = 'Bodega Central Quibdó') n
+       returning id`,
+    )
+
+    for (const envio of envios) {
+      await client.query(
+        `insert into entregas (envio_id, pedido_id, codigo_confirmacion) values ($1, $2, '4139')`,
+        [envio.id, pedidos[0]!.id],
+      )
+    }
+
+    const ambiguas = await como(COORDINADOR, () => confirmacionesAmbiguas(client))
+    const tagachi = ambiguas.find((a) => a.codigo === '4139')
+    expect(tagachi).toBeDefined()
+    expect(tagachi!.entregas).toBe(2)
+    expect(tagachi!.comunidad).toBe('Tagachí')
+  })
+
+  it('no hay ninguna en la cuenca sembrada', async () => {
+    await client.query('savepoint caso')
+    expect(await como(COORDINADOR, () => confirmacionesAmbiguas(client))).toEqual([])
+  })
+
 })

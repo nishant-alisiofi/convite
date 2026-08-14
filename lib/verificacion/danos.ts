@@ -78,3 +78,52 @@ export async function rutasAfectadasPor(
     dejaSinPaso: perdidas(cuenca, antes, alcanzables(cuenca, temporada, { sinRuta: r.id })),
   }))
 }
+
+export type ConfirmacionAmbigua = {
+  comunidad: string
+  codigo: string
+  entregas: number
+  envios: string[]
+}
+
+/**
+ * Codes that cannot be resolved, found before somebody tries to use one.
+ *
+ * `confirmarConCodigo` matches four digits against the deliveries the caller's community is
+ * waiting for. Two open deliveries in one community sharing a code makes that unanswerable —
+ * the channel replies that it could not tell which one, and then nothing happens: no row
+ * changes, no job fails, no alert fires. From the board it looks exactly like a community
+ * that never confirmed, which is the failure this whole screen exists to catch.
+ *
+ * Dispatch now avoids codes already outstanding in a destination, so this should stay empty.
+ * It is checked anyway, because it also covers rows written before that and rows written by
+ * hand — and because a guarantee nobody verifies is a guarantee that quietly stops holding.
+ */
+export async function confirmacionesAmbiguas(
+  client: PoolClient,
+): Promise<ConfirmacionAmbigua[]> {
+  const { rows } = await client.query<{
+    comunidad: string
+    codigo: string
+    entregas: string
+    envios: string[]
+  }>(
+    `select c.nombre as comunidad, e.codigo_confirmacion as codigo,
+            count(*)::text as entregas, array_agg(en.codigo order by en.codigo) as envios
+       from entregas e
+       join pedidos p on p.id = e.pedido_id
+       join comunidades c on c.id = p.comunidad_id
+       join envios en on en.id = e.envio_id
+      where not e.confirmado
+      group by c.nombre, e.codigo_confirmacion
+     having count(*) > 1
+      order by count(*) desc, c.nombre`,
+  )
+
+  return rows.map((r) => ({
+    comunidad: r.comunidad,
+    codigo: r.codigo,
+    entregas: Number(r.entregas),
+    envios: r.envios,
+  }))
+}
