@@ -1,0 +1,7 @@
+{
+  "// nota": "Next compila el JSX de la app y por eso el tsconfig principal lo deja en 'preserve'. Los scripts de vista renderizan componentes fuera de Next, así que necesitan un runtime de JSX de verdad.",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "jsx": "react-jsx"
+  }
+}

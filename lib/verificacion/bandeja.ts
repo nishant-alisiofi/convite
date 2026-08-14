@@ -1,5 +1,6 @@
 import type { PoolClient } from 'pg'
 import type { Canal, TipoReporteRegistrado } from '@/db/schema/vocabulario'
+import { cargarCatalogo, extraer, type Catalogo } from '@/lib/normalizador'
 
 /**
  * The verification inbox — the daily work of this system.
@@ -36,6 +37,26 @@ export type FilaBandeja = {
   estado: string
   descripcion: string | null
   detalleLibre: string | null
+  /**
+   * What the person actually wrote or dictated, whichever column holds it.
+   *
+   * Intake stores the inbound text in `detalle_libre` and leaves `descripcion` null; the
+   * seed does the opposite. Both are "their words" and the screen shows them as such rather
+   * than making a verifier learn which column a row came from.
+   */
+  textoOriginal: string | null
+  /**
+   * Why the classifier landed where it did — «ninguna palabra del léxico coincidió»,
+   * «marcador vago: "de todo"», «indicio débil para 31 (0.32 < 0.5)».
+   *
+   * Re-derived at read time rather than read from a column, because intake computes these
+   * and discards them. `extraer` is pure and offline, so the same text yields the same
+   * reasoning; what it reflects is how the classifier reads this message *now*, which is
+   * the more useful thing for somebody deciding what to do with it. `versionLexico` says
+   * which lexicon produced it.
+   */
+  motivos: string[]
+  versionLexico: string | null
   familias: number | null
   urgencia: number | null
   severidad: number | null
@@ -78,7 +99,23 @@ const SELECCION = `
 
 type FilaCruda = Record<string, never>
 
-function aFila(r: Record<string, unknown>, adjuntos: AdjuntoBandeja[]): FilaBandeja {
+function aFila(
+  r: Record<string, unknown>,
+  adjuntos: AdjuntoBandeja[],
+  catalogo: Catalogo | null,
+  ahora: Date,
+): FilaBandeja {
+  const textoOriginal =
+    ((r.detalle_libre as string) ?? null) || ((r.descripcion as string) ?? null)
+
+  // The transcript a person corrected outranks the machine's, and both outrank nothing:
+  // a voice note's words are what the classifier should be explaining.
+  const audio = adjuntos.find((a) => a.tipo === 'audio')
+  const texto =
+    audio?.transcripcionCorregida ?? audio?.transcripcion ?? textoOriginal
+
+  const propuesta = catalogo ? extraer(texto, { catalogo, ahora }) : null
+
   return {
     id: r.id as string,
     folio: r.folio as number,
@@ -87,6 +124,9 @@ function aFila(r: Record<string, unknown>, adjuntos: AdjuntoBandeja[]): FilaBand
     estado: r.estado as string,
     descripcion: (r.descripcion as string) ?? null,
     detalleLibre: (r.detalle_libre as string) ?? null,
+    textoOriginal,
+    motivos: propuesta?.motivos ?? [],
+    versionLexico: propuesta?.versionLexico ?? null,
     familias: (r.familias as number) ?? null,
     urgencia: (r.urgencia as number) ?? null,
     severidad: (r.severidad as number) ?? null,
@@ -175,9 +215,11 @@ export async function cargarBandeja(
     todas.map((r) => r.id as string),
   )
 
+  const catalogo = await cargarCatalogo(client)
+  const ahora = new Date()
   const mapear = (filas: unknown[]) =>
     (filas as Record<string, unknown>[]).map((r) =>
-      aFila(r, adjuntos.get(r.id as string) ?? []),
+      aFila(r, adjuntos.get(r.id as string) ?? [], catalogo, ahora),
     )
 
   return {
@@ -195,7 +237,7 @@ export async function reportePorId(
   if (!fila) return null
 
   const adjuntos = await adjuntosDe(client, [id])
-  return aFila(fila, adjuntos.get(id) ?? [])
+  return aFila(fila, adjuntos.get(id) ?? [], await cargarCatalogo(client), new Date())
 }
 
 /**
@@ -220,7 +262,8 @@ export async function posiblesDuplicados(
       order by r.creado_en`,
     [reporteId],
   )
-  return (rows as unknown as Record<string, unknown>[]).map((r) => aFila(r, []))
+  // Candidates are shown as one-liners, so the classifier's reasoning is not needed here.
+  return (rows as unknown as Record<string, unknown>[]).map((r) => aFila(r, [], null, new Date()))
 }
 
 export type Resultado = { ok: true } | { ok: false; error: string }

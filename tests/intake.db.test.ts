@@ -502,7 +502,12 @@ conBase('la nota de voz y su media', () => {
       mime: string
       exif_removido: boolean
       transcripcion: string | null
-    }>('select storage_key, mime, exif_removido, transcripcion from adjuntos')
+      // Scoped to the report this flow created: the seed now carries a voice note of its
+      // own so the audio inbox can be looked at, and an unscoped count would be asserting
+      // about the seed rather than about this webhook.
+    }>('select storage_key, mime, exif_removido, transcripcion from adjuntos where reporte_id = $1', [
+      pendientes[0]!.payload.reporteId,
+    ])
 
     expect(rows).toHaveLength(1)
     const adjunto = rows[0]!

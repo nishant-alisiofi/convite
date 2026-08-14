@@ -102,6 +102,24 @@ more consequential direction, because it makes a need disappear rather than appe
 constraint required a verifier only for `VERIFICADO`; `reportes_disposicion_check` now covers
 both.
 
+**The classifier shows its work.** Each row can expand to «por qué el clasificador lo lee
+así» — «varios ítems nombrados: 11 (0.85) y 13 (0.70)», «marcador vago: "de todo"». The
+normalizer builds these `motivos` for this screen and intake discards them, so they are
+re-derived at read time from the same pure function over the same text. That means they
+describe how the classifier reads the message *now*, which the screen says out loud.
+
+```bash
+pnpm build && pnpm vista:bandeja   # renders the real inbox to .data/vista-bandeja/
+```
+
+Like `vista:mapa`, this exists because `/verificacion` sits behind a Supabase session a local
+clone does not have. It renders the real `Tarjeta` component with real rows and the
+stylesheet Next compiled, so it is the screen rather than a mock-up of it.
+
+⚠️ **Set `DATA_DIR` to an absolute path outside the repo.** `.env.example` ships it empty,
+and an empty string is not an unset one — media would be written into the working tree. The
+seed refuses rather than pollute; the media pipeline does not check.
+
 Playback is a plain `<audio controls>` element — the browser's own player, no JavaScript.
 Audio is served from our own storage behind a session, and the query reads the key *through*
 `reportes` so it inherits that table's community scoping: a verifier for the Atrato medio

@@ -1,6 +1,9 @@
 import 'dotenv/config'
+import { createHash } from 'node:crypto'
 import type { PoolClient } from 'pg'
 import { closeDb, getPool } from '@/db/client'
+import { resolve } from 'node:path'
+import { almacenamientoLocal, raizDatos } from '@/lib/canales/almacenamiento'
 import { CATALOGO_SEMILLA, UNIDADES_SEMILLA } from '@/db/seed/catalogo'
 import { COMUNIDADES_SEMILLA } from '@/db/seed/comunidades'
 import {
@@ -10,6 +13,7 @@ import {
   NECESIDADES_VERIFICADAS,
   NODOS_SEMILLA,
   OFERTAS_SEMILLA,
+  NOTA_DE_VOZ_SEMILLA,
   REPORTES_SIN_VERIFICAR,
   USUARIOS_SEMILLA,
   VOLUNTARIOS_SEMILLA,
@@ -424,6 +428,89 @@ async function sembrarReportes(
       ],
     )
   }
+
+  await sembrarNotaDeVoz(client)
+}
+
+/**
+ * Attaches one playable voice note, so the audio inbox can actually be looked at.
+ *
+ * The bytes are a generated tone written into DATA_DIR — operational data, never the repo
+ * (2.6 wants our own key, and a seeded provider URL would be a guaranteed 404). A WAV
+ * because it can be synthesised here without pulling in an encoder, and every browser plays
+ * one.
+ */
+async function sembrarNotaDeVoz(client: PoolClient): Promise<void> {
+  const { rows } = await client.query<{ id: string }>(
+    `select id from reportes where payload_crudo->>'semilla' = $1`,
+    [NOTA_DE_VOZ_SEMILLA.semillaReporte],
+  )
+  const reporteId = rows[0]?.id
+  if (!reporteId) return
+
+  const { rowCount } = await client.query(
+    `select 1 from adjuntos where reporte_id = $1 and tipo = 'audio'`,
+    [reporteId],
+  )
+  if (rowCount) return
+
+  // `raizDatos()` reads DATA_DIR with `??`, and `.env.example` ships `DATA_DIR=` empty — an
+  // empty string is not nullish, so it resolves to the repo root and media lands in the
+  // working tree. Operational data belongs outside the repo, so refuse rather than pollute.
+  const raiz = raizDatos()
+  if (!raiz || resolve(raiz) === resolve(process.cwd())) {
+    console.warn(
+      '\n  ⚠️  Nota de voz omitida: DATA_DIR está vacío, y el audio caería dentro del repo.\n' +
+        '     Póngale una ruta absoluta fuera del proyecto y vuelva a sembrar.\n',
+    )
+    return
+  }
+
+  const bytes = tonoWav(NOTA_DE_VOZ_SEMILLA.segundos)
+  const hash = createHash('sha256').update(bytes).digest('hex')
+  const clave = `audio/${hash.slice(0, 2)}/${hash}.wav`
+  await almacenamientoLocal(raiz).guardar(clave, bytes)
+
+  await client.query(
+    `insert into adjuntos (reporte_id, tipo, storage_key, mime, bytes, duracion_seg,
+                           hash_sha256, transcripcion, transcripcion_confianza)
+     values ($1, 'audio', $2, 'audio/wav', $3, $4, $5, $6, $7)`,
+    [
+      reporteId,
+      clave,
+      bytes.byteLength,
+      NOTA_DE_VOZ_SEMILLA.segundos,
+      hash,
+      NOTA_DE_VOZ_SEMILLA.transcripcion,
+      NOTA_DE_VOZ_SEMILLA.confianza,
+    ],
+  )
+}
+
+/** A quiet sine tone as a 16-bit mono WAV. Placeholder audio, never a person's voice. */
+function tonoWav(segundos: number, hz = 220, muestreo = 8000): Buffer {
+  const muestras = segundos * muestreo
+  const datos = Buffer.alloc(muestras * 2)
+  for (let i = 0; i < muestras; i += 1) {
+    // Fades in and out so it does not click, and stays quiet: nobody needs to be startled.
+    const sobre = Math.min(1, i / muestreo, (muestras - i) / muestreo)
+    datos.writeInt16LE(Math.round(Math.sin((2 * Math.PI * hz * i) / muestreo) * 6000 * sobre), i * 2)
+  }
+
+  const cabecera = Buffer.alloc(44)
+  cabecera.write('RIFF', 0)
+  cabecera.writeUInt32LE(36 + datos.length, 4)
+  cabecera.write('WAVEfmt ', 8)
+  cabecera.writeUInt32LE(16, 16)
+  cabecera.writeUInt16LE(1, 20)
+  cabecera.writeUInt16LE(1, 22)
+  cabecera.writeUInt32LE(muestreo, 24)
+  cabecera.writeUInt32LE(muestreo * 2, 28)
+  cabecera.writeUInt16LE(2, 32)
+  cabecera.writeUInt16LE(16, 34)
+  cabecera.write('data', 36)
+  cabecera.writeUInt32LE(datos.length, 40)
+  return Buffer.concat([cabecera, datos])
 }
 
 async function sembrarCapacidades(

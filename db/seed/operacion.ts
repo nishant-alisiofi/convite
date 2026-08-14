@@ -519,6 +519,26 @@ export const REPORTES_SIN_VERIFICAR: ReporteSinVerificarSemilla[] = [
   },
 ]
 
+/**
+ * A voice note on one of the unverified reports.
+ *
+ * Without this the audio inbox — «este es el trabajo diario real» (Section 4.5) — cannot be
+ * seen working by anybody, which is how a screen ships with its player broken. The audio
+ * itself is a generated tone, not a recording of a person: synthetic phone numbers and
+ * synthetic voices, for the same reason.
+ *
+ * The transcript is the realistic part, and it is deliberately imperfect. «pelaos» is what
+ * people say; a transcriber trained on neutral Spanish tends to produce something else, and
+ * the correction flow exists for exactly that.
+ */
+export const NOTA_DE_VOZ_SEMILLA = {
+  /** Matches REPORTES_SIN_VERIFICAR[0] — Bellavista, alimentación infantil. */
+  semillaReporte: 'sinver-BLL-13-0',
+  segundos: 6,
+  transcripcion: 'falta leche para los pelados y la creciente se llevo el mercado',
+  confianza: 0.58,
+}
+
 /** One boat actually going somewhere — the thin side, seeded thin on purpose. */
 export const CAPACIDADES_SEMILLA = [
   {

@@ -23,7 +23,8 @@
     "db:check": "drizzle-kit generate --name drift_check",
     "invitar": "tsx scripts/invitar.ts",
     "drill:respaldo": "bash scripts/drill-respaldo.sh",
-    "vista:mapa": "tsx scripts/vista-mapa.ts"
+    "vista:mapa": "tsx scripts/vista-mapa.ts",
+    "vista:bandeja": "tsx --tsconfig tsconfig.scripts.json scripts/vista-bandeja.tsx"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",

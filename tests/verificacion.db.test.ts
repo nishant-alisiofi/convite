@@ -448,3 +448,48 @@ conBase('un ítem que pide detalle y no lo trae está incompleto', () => {
     })
   })
 })
+
+conBase('el razonamiento del clasificador, en pantalla', () => {
+  it('la bandeja explica por qué un mensaje quedó sin clasificar', async () => {
+    await client.query('savepoint caso')
+
+    const { rows } = await client.query<{ id: string }>(
+      `insert into reportes (organizacion_id, tipo, canal, comunidad_id, detalle_libre, estado)
+       select o.id, 'sin_clasificar', 'whatsapp', c.id, 'Muchas cosas!! De todo!!!', 'RECIBIDO'
+         from organizaciones o, comunidades c where c.codigo = 'BLL' limit 1
+       returning id`,
+    )
+    const id = rows[0]!.id
+
+    const bandeja = await como(COORDINADOR, () => cargarBandeja(client))
+    const fila = bandeja.pendientes.find((f) => f.id === id)!
+
+    // `motivos` lo construyó el normalizador para esta pantalla, y el intake lo descarta:
+    // se vuelve a derivar acá con la misma función pura, sobre el mismo texto.
+    expect(fila.motivos.length).toBeGreaterThan(0)
+    expect(fila.motivos.join(' · ')).toMatch(/vago|léxico|lexico/i)
+    expect(fila.versionLexico).toBeTruthy()
+    // Y las palabras de la persona salen tal cual, vengan de la columna que vengan.
+    expect(fila.textoOriginal).toBe('Muchas cosas!! De todo!!!')
+  })
+
+  it('explica sobre la transcripción corregida cuando existe', async () => {
+    await client.query('savepoint caso')
+    const reporte = await reporteEnCola()
+    const { rows } = await client.query<{ id: string }>(
+      `insert into adjuntos (reporte_id, tipo, storage_key, transcripcion)
+       values ($1, 'audio', 'audio/ef/nota.ogg', 'muchas cosas de todo')
+       returning id`,
+      [reporte.id],
+    )
+
+    await como(VERIFICADORA, () =>
+      corregirTranscripcion(client, rows[0]!.id, 'necesitamos veinte mercados', VERIFICADORA),
+    )
+
+    const bandeja = await como(COORDINADOR, () => cargarBandeja(client))
+    const fila = bandeja.pendientes.find((f) => f.id === reporte.id)!
+    // Lo que una persona corrigió manda sobre lo que oyó la máquina.
+    expect(fila.motivos.join(' · ')).not.toMatch(/vago/i)
+  })
+})
