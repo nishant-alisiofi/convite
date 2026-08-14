@@ -385,7 +385,7 @@ async function sembrarReportes(
         n.familias,
         n.urgencia,
         n.detalleLibre ?? null,
-        n.descripcion,
+        marcado(n.descripcion),
         n.verificadoPor,
         n.diasAtras,
         JSON.stringify({ semilla }),
@@ -422,7 +422,7 @@ async function sembrarReportes(
         r.familias ?? null,
         r.urgencia ?? null,
         r.severidad ?? null,
-        r.descripcion,
+        marcado(r.descripcion),
         JSON.stringify({ semilla }),
         r.diasAtras,
       ],
@@ -622,6 +622,21 @@ async function sembrarVoluntarios(
       [contactoId, nodoId, v.tipoLabor, v.desdeEnDias, v.hastaEnDias],
     )
   }
+}
+
+/**
+ * The seed is realistic on purpose — real community names, real Chocoano phrasing — which is
+ * exactly what makes it dangerous once it is sitting on a staging URL somebody from the
+ * partner organisation might open. «Rosa Palacios, Tagachí, necesita mercados» reads as a
+ * family waiting for food, and nobody looking at a screen can tell it is furniture.
+ *
+ * `payload_crudo.semilla` already marks these rows for machines. This marks them for people,
+ * in the one field the verification inbox actually prints.
+ */
+export const MARCA_PRUEBA = '[DATO DE PRUEBA]'
+
+function marcado(descripcion: string | null): string {
+  return descripcion ? `${MARCA_PRUEBA} ${descripcion}` : MARCA_PRUEBA
 }
 
 async function yaSembrado(client: PoolClient, semilla: string): Promise<boolean> {
