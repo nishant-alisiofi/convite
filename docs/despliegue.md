@@ -71,19 +71,32 @@ necesita `PORT` ni las claves de Supabase: no atiende tráfico.
 
 ---
 
-### ⚠️ Sin Supabase la aplicación no levanta — ni siquiera a medias
+### Sin Supabase: se despliega igual, sin inicio de sesión
 
-Comprobado en el ensayo, no deducido: **si faltan `NEXT_PUBLIC_SUPABASE_URL` y
-`NEXT_PUBLIC_SUPABASE_ANON_KEY`, TODAS las rutas devuelven 500.** El middleware corre en cada
-petición y construye el cliente de Supabase antes de mirar si la ruta es pública, así que se
-cae también `/api/salud` y también el webhook de WhatsApp. No existe un despliegue «solo base
-de datos, autenticación después»: sin esas dos variables no hay nada en pie, el monitor no
-puede ni preguntar, y Meta reintenta contra un 500.
+**Sí se puede desplegar solo con base de datos.** Si faltan `NEXT_PUBLIC_SUPABASE_URL` y
+`NEXT_PUBLIC_SUPABASE_ANON_KEY`:
+
+| Superficie | Qué pasa |
+|---|---|
+| `/api/webhooks/whatsapp`, `/api/jobs/correr`, `/api/salud`, `/`, `/entrar` | Funcionan normal |
+| El worker | Funciona normal: no usa Supabase para nada |
+| El panel (`/tablero`, `/verificacion`, …) | **503** con una página que dice exactamente qué falta |
+
+Comprobado en el ensayo: `/api/salud` responde 200 con su JSON, el webhook responde 401 a una
+firma inválida (que es el fallo correcto), y `/tablero` responde 503 diciendo «Autenticación no
+configurada». Así se puede levantar staging esta noche y dejar el inicio de sesión pendiente de
+que exista un proyecto de Supabase.
+
+No es un bypass: con las variables puestas el comportamiento es idéntico al de siempre, y sin
+ellas el panel sigue negándose — solo que ahora explica por qué en vez de reventar.
+
+**Antes fallaba de la peor manera posible:** el middleware construía el cliente antes de mirar
+si la ruta era pública, así que sin esas variables TODAS las rutas devolvían 500 — incluidos el
+webhook (Meta reintentando contra un 500) y `/api/salud` (el monitor sin poder ni preguntar).
 
 Y ojo con el nombre: el código lee **`NEXT_PUBLIC_SUPABASE_URL`**, mientras que `.env.example`
 y `lib/env.ts` hablaban de `SUPABASE_URL`. Poner las variables documentadas y no las que el
-código lee deja exactamente el mismo 500, sin ninguna pista de por qué. Es la trampa más cara
-de esta lista.
+código lee es indistinguible de no poner ninguna.
 
 ## Supabase: la configuración que hay que hacer a mano
 
@@ -169,8 +182,8 @@ que proteger.
 [
   {"nombre":"DATABASE_URL","servicio":"ambos","secreto":true,"obligatoria":true,"nota":"Postgres con PostGIS. Sin PostGIS las migraciones fallan en 0000."},
   {"nombre":"DATA_DIR","servicio":"ambos","secreto":false,"obligatoria":true,"nota":"Volumen persistente. En un contenedor efímero las notas de voz desaparecen en cada despliegue."},
-  {"nombre":"NEXT_PUBLIC_SUPABASE_URL","servicio":"app","secreto":false,"obligatoria":true,"nota":"BLOQUEANTE: sin esto TODAS las rutas dan 500, incluido /api/salud."},
-  {"nombre":"NEXT_PUBLIC_SUPABASE_ANON_KEY","servicio":"app","secreto":false,"obligatoria":true,"nota":"BLOQUEANTE, igual que la anterior. La clave anon es pública por diseño."},
+  {"nombre":"NEXT_PUBLIC_SUPABASE_URL","servicio":"app","secreto":false,"obligatoria":true,"nota":"Sin esto el panel da 503 y no hay inicio de sesion; el webhook, la cola y /api/salud siguen funcionando."},
+  {"nombre":"NEXT_PUBLIC_SUPABASE_ANON_KEY","servicio":"app","secreto":false,"obligatoria":true,"nota":"Igual que la anterior. La clave anon es publica por diseno."},
   {"nombre":"SUPABASE_SERVICE_ROLE_KEY","servicio":"app","secreto":true,"obligatoria":false,"nota":"Alta de staff desde el servidor."},
   {"nombre":"CRON_SECRET","servicio":"app","secreto":true,"obligatoria":true,"nota":"Protege /api/jobs/correr y el detalle de /api/salud. En producción esas rutas fallan cerradas si falta."},
   {"nombre":"APP_BASE_URL","servicio":"app","secreto":false,"obligatoria":true,"nota":"Origen público; entra en los enlaces mágicos."},
