@@ -17,7 +17,7 @@ import { NextResponse, type NextRequest } from 'next/server'
  * not fail loudly — it 307s to the sign-in page, and the caller sees a redirect it has no
  * idea what to do with.
  */
-export const PUBLICAS = ['/entrar', '/auth', '/api/webhooks', '/api/jobs', '/api/salud']
+export const PUBLICAS = ['/entrar', '/auth', '/api/webhooks', '/api/jobs', '/api/salud', '/acerca']
 
 /**
  * Files the web expects to fetch without asking anybody's permission.

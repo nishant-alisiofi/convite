@@ -68,14 +68,22 @@ export default function VistaPublica({ filas }: { filas: FilaPublica[] }) {
 
   return (
     <main className="mx-auto max-w-4xl px-5 py-10 sm:px-6 sm:py-14">
-      <header>
-        <div className="flex items-center gap-2 text-barro-900">
-          <Waves className="h-6 w-6 text-selva-700" aria-hidden />
-          <span className="text-2xl font-semibold tracking-tight">Convite</span>
+      <header className="flex items-start justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2 text-barro-900">
+            <Waves className="h-6 w-6 text-selva-700" aria-hidden />
+            <span className="text-2xl font-semibold tracking-tight">Convite</span>
+          </div>
+          <p className="mt-2 max-w-prose text-barro-700">
+            Coordinación de ayuda humanitaria en la cuenca del Atrato, Chocó.
+          </p>
         </div>
-        <p className="mt-2 max-w-prose text-barro-700">
-          Coordinación de ayuda humanitaria en la cuenca del Atrato, Chocó.
-        </p>
+        <a
+          href="/acerca"
+          className="shrink-0 text-sm font-medium text-selva-700 underline underline-offset-2 hover:text-selva-900"
+        >
+          Qué es Convite
+        </a>
       </header>
 
       {hayDatos ? (

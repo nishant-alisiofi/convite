@@ -23,6 +23,9 @@ import { describe, expect, it } from 'vitest'
 const PERMITIDAS_ESTATICAS = new Set([
   // A 404 page that touches nothing. Prerendering it is free and correct.
   '/_not-found',
+  // The landing page: static marketing content, no database read. Prerendering is free and
+  // correct, and it must NOT become dynamic — that would open a DB connection at build.
+  '/acerca',
 ])
 
 describe('la construcción sobrevive sin base de datos', () => {

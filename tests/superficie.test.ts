@@ -32,6 +32,7 @@ const conBase = describe.skipIf(!url)
  */
 const POLITICA: Record<string, 'publica' | 'autenticada'> = {
   '/': 'publica',
+  '/acerca': 'publica',
   '/entrar': 'publica',
   '/auth/callback': 'publica',
   '/api/salud': 'publica',
