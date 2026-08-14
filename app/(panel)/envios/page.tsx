@@ -2,7 +2,14 @@ import { Ship, TriangleAlert } from 'lucide-react'
 import Link from 'next/link'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { capacidadesOfrecidas, crearEnvio } from '@/lib/despacho/plan'
+import {
+  capacidadesOfrecidas,
+  crearEnvio,
+  esquemaCapacidad,
+  opcionesDeCapacidad,
+  registrarCapacidad,
+} from '@/lib/despacho/plan'
+import { MODOS } from '@/db/schema/vocabulario'
 import { conSesion, sesionActual } from '@/lib/sesion'
 
 export const dynamic = 'force-dynamic'
@@ -25,6 +32,8 @@ const TONO_ESTADO: Record<string, string> = {
   CANCELADO: 'bg-barro-50 text-stone-500',
 }
 
+const CLASE_CAMPO = 'mt-1 w-full rounded border border-barro-200 bg-white px-2 py-1.5 text-sm'
+
 export default async function Envios({
   searchParams,
 }: {
@@ -36,7 +45,7 @@ export default async function Envios({
   const { error } = await searchParams
   const puedeDespachar = PUEDEN_DESPACHAR.includes(sesion.rolStaff)
 
-  const { capacidades, envios } = await conSesion(sesion, async (client) => {
+  const { capacidades, opciones, envios } = await conSesion(sesion, async (client) => {
     const { rows: envios } = await client.query<{
       id: string
       codigo: string
@@ -56,7 +65,11 @@ export default async function Envios({
          from envios e join contactos ct on ct.id = e.responsable_id
         order by e.estado <> 'PLANEADO', e.salida_programada nulls last`,
     )
-    return { capacidades: await capacidadesOfrecidas(client), envios }
+    return {
+      capacidades: await capacidadesOfrecidas(client),
+      opciones: await opcionesDeCapacidad(client),
+      envios,
+    }
   })
 
   async function planear(formData: FormData) {
@@ -75,6 +88,29 @@ export default async function Envios({
     if (!resultado.ok) redirect(`/envios?error=${encodeURIComponent(resultado.error)}`)
     revalidatePath('/envios')
     redirect(`/envios/${resultado.id}`)
+  }
+
+  async function registrar(formData: FormData) {
+    'use server'
+    const sesion = await sesionActual()
+    if (!sesion || !PUEDEN_DESPACHAR.includes(sesion.rolStaff)) {
+      redirect('/envios?error=Sin+permiso')
+    }
+
+    const analisis = esquemaCapacidad.safeParse(Object.fromEntries(formData))
+    if (!analisis.success) {
+      const primero = analisis.error.issues[0]
+      redirect(`/envios?error=${encodeURIComponent(primero?.message ?? 'Datos inválidos.')}`)
+    }
+
+    const resultado = await conSesion(
+      sesion,
+      (client) => registrarCapacidad(client, analisis.data, sesion.authId),
+      { escribe: true },
+    )
+    if (!resultado.ok) redirect(`/envios?error=${encodeURIComponent(resultado.error)}`)
+    revalidatePath('/envios')
+    redirect('/envios')
   }
 
   return (
@@ -96,6 +132,85 @@ export default async function Envios({
         <p className="mt-4 rounded-lg border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-900">
           {error}
         </p>
+      )}
+
+      {puedeDespachar && (
+        <section className="mt-6 rounded-lg border border-barro-200 bg-white px-4 py-4">
+          <h2 className="font-semibold text-stone-900">Anotar un transporte</h2>
+          <p className="mt-1 max-w-3xl text-sm text-stone-700">
+            Casi siempre llega por WhatsApp o por teléfono: alguien avisa que sube el jueves y
+            que le caben cuarenta. Anótelo acá y aparece para planear.
+          </p>
+
+          <form action={registrar} className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <label className="block text-sm">
+              <span className="font-medium text-stone-800">Quién viaja</span>
+              <select name="contactoId" required className={CLASE_CAMPO}>
+                <option value="">…</option>
+                {opciones.transportistas.map((t) => (
+                  <option key={t.id} value={t.id}>{t.nombre}</option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block text-sm">
+              <span className="font-medium text-stone-800">Modo</span>
+              <select name="modo" defaultValue="lancha" className={CLASE_CAMPO}>
+                {MODOS.map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block text-sm">
+              <span className="font-medium text-stone-800">Carga desde</span>
+              <select name="origenNodoId" required className={CLASE_CAMPO}>
+                <option value="">…</option>
+                {opciones.nodos.map((n) => (
+                  <option key={n.id} value={n.id}>{n.nombre}</option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block text-sm">
+              <span className="font-medium text-stone-800">Hasta</span>
+              <select name="hastaComunidadId" required className={CLASE_CAMPO}>
+                <option value="">…</option>
+                {opciones.comunidades.map((c) => (
+                  <option key={c.id} value={c.id}>{c.nombre}</option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block text-sm">
+              <span className="font-medium text-stone-800">Sale</span>
+              <input type="datetime-local" name="saleEn" required className={CLASE_CAMPO} />
+            </label>
+
+            <label className="block text-sm">
+              <span className="font-medium text-stone-800">Cupo (familias)</span>
+              <input name="cupoFamilias" inputMode="numeric" required className={CLASE_CAMPO} />
+            </label>
+
+            <label className="block text-sm sm:col-span-2 lg:col-span-3">
+              <span className="font-medium text-stone-800">Notas</span>
+              <input
+                name="notas"
+                placeholder="Va con carga de la alcaldía, lleva lo que quepa."
+                className={CLASE_CAMPO}
+              />
+            </label>
+
+            <div className="sm:col-span-2 lg:col-span-3">
+              <button
+                type="submit"
+                className="rounded bg-selva-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-selva-700"
+              >
+                Anotar el transporte
+              </button>
+            </div>
+          </form>
+        </section>
       )}
 
       <section className="mt-6">

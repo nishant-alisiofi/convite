@@ -1,4 +1,6 @@
 import type { PoolClient } from 'pg'
+import { z } from 'zod'
+import { MODOS } from '@/db/schema/vocabulario'
 import { alcanzables, cargarCuenca, grafoDe } from '@/lib/alcance'
 import type { TemporadaActual } from '@/lib/matching/tipos'
 
@@ -60,6 +62,85 @@ export async function capacidadesOfrecidas(client: PoolClient): Promise<Capacida
     notas: r.notas,
     envioId: r.envio_id,
   }))
+}
+
+export const esquemaCapacidad = z.object({
+  contactoId: z.string().uuid('Diga quién viaja.'),
+  modo: z.enum(MODOS),
+  origenNodoId: z.string().uuid('Diga desde qué centro sale la carga.'),
+  hastaComunidadId: z.string().uuid('Diga hasta dónde va.'),
+  saleEn: z
+    .string()
+    .trim()
+    .min(1, 'Diga cuándo sale.')
+    .transform((v) => new Date(v))
+    .refine((d) => !Number.isNaN(d.getTime()), 'Esa fecha no se entiende.'),
+  cupoFamilias: z
+    .string()
+    .trim()
+    .transform((v) => Number(v))
+    .refine((n) => Number.isInteger(n) && n > 0, 'El cupo es un número mayor que cero.'),
+  notas: z
+    .string()
+    .trim()
+    .transform((v) => (v === '' ? null : v)),
+})
+
+export type EntradaCapacidad = z.infer<typeof esquemaCapacidad>
+
+/**
+ * Records that somebody is travelling.
+ *
+ * Capacity mostly arrives the way everything else does — a transporter says so over
+ * WhatsApp — but the person who takes that call is at this screen, and until now there was
+ * no way to write it down. Without this the planner only ever sees the seeded boat.
+ */
+export async function registrarCapacidad(
+  client: PoolClient,
+  entrada: EntradaCapacidad,
+  usuarioId: string,
+): Promise<Resultado> {
+  try {
+    const { rows } = await client.query<{ id: string }>(
+      `insert into capacidades
+         (contacto_id, modo, origen_nodo_id, hasta_comunidad_id, sale_en, cupo_familias, notas)
+       values ($1, $2, $3, $4, $5, $6, $7)
+       returning id`,
+      [
+        entrada.contactoId,
+        entrada.modo,
+        entrada.origenNodoId,
+        entrada.hastaComunidadId,
+        entrada.saleEn,
+        entrada.cupoFamilias,
+        entrada.notas,
+      ],
+    )
+    if (!rows[0]) return { ok: false, error: 'No tiene permiso para registrar transporte.' }
+
+    await auditar(client, usuarioId, 'capacidad.registrada', rows[0].id, {
+      modo: entrada.modo,
+      cupoFamilias: entrada.cupoFamilias,
+    })
+    return { ok: true, id: rows[0].id }
+  } catch (error) {
+    return { ok: false, error: traducir(error) }
+  }
+}
+
+/** Who could be driving, where the cargo sits, and where a trip can end. */
+export async function opcionesDeCapacidad(client: PoolClient) {
+  const { rows: transportistas } = await client.query<{ id: string; nombre: string }>(
+    `select id, coalesce(nombre, telefono) as nombre from contactos
+      where activo and rol in ('transportista', 'coordinador') order by nombre`,
+  )
+  const { rows: nodos } = await client.query<{ id: string; nombre: string }>(
+    `select id, nombre from nodos where activo order by nombre`,
+  )
+  const { rows: comunidades } = await client.query<{ id: string; nombre: string }>(
+    `select id, nombre from comunidades where activa order by nombre`,
+  )
+  return { transportistas, nodos, comunidades }
 }
 
 export type Candidato = {

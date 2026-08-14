@@ -8,8 +8,10 @@ import {
   capacidadesOfrecidas,
   crearEnvio,
   despachar,
+  opcionesDeCapacidad,
   ordenarPorRecorrido,
   ponerParada,
+  registrarCapacidad,
   registrarDecision,
 } from '@/lib/despacho/plan'
 import { emparejar } from '@/lib/matching/persistencia'
@@ -543,5 +545,72 @@ conBase('el orden de las paradas', () => {
       // que nadie hace. La urgencia decide quién sube al bote; la geografía, en qué orden.
       expect(rows.map((r) => r.codigo)).toEqual(['MER', 'TAG'])
     })
+  })
+})
+
+conBase('anotar quién viaja', () => {
+  it('un despachador registra un transporte y queda listo para planear', async () => {
+    await client.query('savepoint caso')
+
+    const opciones = await como(DESPACHADOR, () => opcionesDeCapacidad(client))
+    expect(opciones.transportistas.length).toBeGreaterThan(0)
+
+    const enTresDias = new Date(Date.now() + 3 * 86_400_000)
+    const resultado = await como(DESPACHADOR, () =>
+      registrarCapacidad(
+        client,
+        {
+          contactoId: opciones.transportistas[0]!.id,
+          modo: 'chalupa',
+          origenNodoId: opciones.nodos[0]!.id,
+          hastaComunidadId: opciones.comunidades[0]!.id,
+          saleEn: enTresDias,
+          cupoFamilias: 25,
+          notas: 'Sube con carga propia, lleva lo que quepa.',
+        },
+        DESPACHADOR,
+      ),
+    )
+    expect(resultado.ok).toBe(true)
+
+    // Y aparece de inmediato entre lo que se puede planear.
+    const ofrecidas = await como(DESPACHADOR, () => capacidadesOfrecidas(client))
+    expect(ofrecidas.some((c) => c.modo === 'chalupa' && c.cupoFamilias === 25)).toBe(true)
+  })
+
+  it('una verificadora no anota transporte', async () => {
+    await client.query('savepoint caso')
+    const opciones = await como(COORDINADOR, () => opcionesDeCapacidad(client))
+
+    await como(VERIFICADORA, async () => {
+      const resultado = await registrarCapacidad(
+        client,
+        {
+          contactoId: opciones.transportistas[0]!.id,
+          modo: 'lancha',
+          origenNodoId: opciones.nodos[0]!.id,
+          hastaComunidadId: opciones.comunidades[0]!.id,
+          saleEn: new Date(Date.now() + 86_400_000),
+          cupoFamilias: 10,
+          notas: null,
+        },
+        VERIFICADORA,
+      )
+      expect(resultado.ok).toBe(false)
+    })
+  })
+
+  it('la base rechaza un cupo de cero', async () => {
+    await client.query('savepoint caso')
+    const opciones = await como(COORDINADOR, () => opcionesDeCapacidad(client))
+
+    await expect(
+      client.query(
+        `insert into capacidades (contacto_id, modo, origen_nodo_id, hasta_comunidad_id,
+                                  sale_en, cupo_familias)
+         values ($1, 'lancha', $2, $3, now() + interval '1 day', 0)`,
+        [opciones.transportistas[0]!.id, opciones.nodos[0]!.id, opciones.comunidades[0]!.id],
+      ),
+    ).rejects.toThrow(/capacidades_cupo_check/)
   })
 })
