@@ -22,6 +22,7 @@
     "db:studio": "drizzle-kit studio",
     "db:check": "drizzle-kit generate --name drift_check",
     "invitar": "tsx scripts/invitar.ts",
+    "drill:respaldo": "bash scripts/drill-respaldo.sh",
     "vista:mapa": "tsx scripts/vista-mapa.ts"
   },
   "dependencies": {
