@@ -21,7 +21,8 @@
     "emparejar": "tsx scripts/emparejar.ts",
     "db:studio": "drizzle-kit studio",
     "db:check": "drizzle-kit generate --name drift_check",
-    "invitar": "tsx scripts/invitar.ts"
+    "invitar": "tsx scripts/invitar.ts",
+    "vista:mapa": "tsx scripts/vista-mapa.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",

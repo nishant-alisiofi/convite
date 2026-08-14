@@ -23,6 +23,10 @@ at `POST /api/jobs/correr`. `pnpm emparejar` runs one sweep and prints the board
 **M3 — Auth and coordinator shell.** Supabase magic-link sign-in, an admin-managed staff
 allowlist, RLS policies for all five roles, and the Tablero reading real data through RLS.
 
+**M8 — Mapa, editor de rutas, recogidas.** Coordinator map with precision-aware rendering, the
+river-route editor, first-mile pickup clustering, and the season as an audited admin setting
+instead of an environment variable. See [El mapa](#el-mapa) and [Las recogidas](#las-recogidas).
+
 **Infra.** Live Supabase project `convite` (us-east-1, ref `kjwkvulmsjffzhuchwpy`). All 18
 migrations applied, basin seeded, 116 tests green against the real database.
 
@@ -72,6 +76,51 @@ that gets logged in `decisiones_asignacion` (2.9), not something the engine reso
 `motivo` is the product surface — «Hay 180 mercados en Bodega Central Quibdó, pero nadie va para
 Bellavista en los próximos 14 días» — and it names the stock's age whenever the count is old.
 
+## El mapa
+
+`/mapa` draws what the database knows about where things are, and nothing else.
+
+**Precision is the whole feature.** A location renders as the shape its accuracy radius earns:
+an exact fix is a point, a `centroide` is a dashed circle a kilometre across, a `referida` is a
+dotted circle twice that. All thirteen seeded communities are centroids, so the honest map of this
+basin today has **no pins on it at all**. The rule is driven by the stored radius rather than the
+source name, so a row claiming `gps` while carrying a 1000 m error still draws as an area — shape
+follows the number we actually hold. `lib/mapa/precision.ts`, asserted in `tests/mapa.test.ts`.
+
+**Route lines are schematic.** Dashed connectors between endpoints, labelled with mode and time.
+They do not trace the path, because we have no channel geometry: a `lancha` leg drawn straight
+across land invents a route exactly the way a bare coordinate invents a location.
+
+**There is no basemap, and that is deliberate for now.** The PRD's recommendation is MapLibre over
+a Protomaps extract of Chocó, which would also work offline. Producing that extract needs the
+`pmtiles` Go binary and a range-read against a global build; neither is set up here, so rather
+than borrow a tiled basemap — an API key, an outbound request per screen, and still no landing
+sites, since OSM has 13 ferry terminals in the entire basin — the map renders our own geography on
+an empty background. Sources are asserted to be `geojson` only, so a tile source cannot reappear
+unnoticed. Dropping an extract in later is a change to `fuentesYCapas()` in `lib/mapa/capas.ts`.
+
+```bash
+pnpm vista:mapa    # renders the map to .data/vista-mapa/index.html and prints the path
+```
+
+`/mapa` needs a Supabase session, which a local clone does not have. `vista:mapa` reads the same
+rows through the same query and builds the same layers, so it is how you check the map without a
+Supabase project. Serve the folder over http — ES modules and the MapLibre worker do not load from
+`file://`.
+
+## Las recogidas
+
+First-mile pickup is a different problem from delivery: many stops a few hundred metres apart, over
+roads, feeding one node. `recogidas_sugeridas()` (migration 0020) clusters offers by proximity with
+`ST_ClusterDBSCAN` and returns **one ordered run** — six donations across three neighbourhoods come
+back as six numbered stops, not six errands. Perishables lead, because cooked lunches set the
+departure time for the whole trip (2.15).
+
+It runs in Postgres rather than the browser because the coordinates never reach the browser: 0017
+revoked `ofertas.ubicacion` from `authenticated`, and 2.16 is why. The function returns no address
+and no coordinate — the address leaves the database only through `direccion_de_oferta()`, and only
+for the driver assigned to collect it.
+
 ## Requisitos
 
 - Node 22+ (`@supabase/supabase-js` 2.112 needs the native `WebSocket` that Node 20 lacks;
@@ -104,8 +153,9 @@ Against Supabase instead of docker: set `DATABASE_URL` to the pooler connection 
 db/schema/        Drizzle schema — the typed mirror used by application code
 db/migrations/    Hand-authored SQL — what actually runs
 db/seed/          Seed data: catalogue, communities, route graph, demo operation
-scripts/          migrate · seed · reset
+scripts/          migrate · seed · reset · emparejar · vista-mapa
 lib/              env validation (Zod)
+lib/mapa/         precision → shape, circle geometry, map layers
 tests/            pure seed-integrity tests + DB tests (skipped without DATABASE_URL)
 app/              Next.js 15 App Router (placeholder until M3)
 ```
