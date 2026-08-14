@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { conSesion, sesionActual } from '@/lib/sesion'
+import TableroVista, { type Fila } from './vista'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,51 +16,6 @@ export const dynamic = 'force-dynamic'
  * verificador scoped to the Atrato medio sees their communities and no others, because the
  * database says so and not because this file filtered anything.
  */
-
-type Fila = {
-  id: string
-  estado: string
-  motivo: string | null
-  familias: number
-  urgencia: number
-  comunidad: string
-  municipio: string
-  item: string
-  dias: number
-}
-
-const BUCKETS = [
-  {
-    estado: 'LISTO',
-    titulo: 'Listos para despachar',
-    ayuda: 'Hay ruta, hay con qué y hay quién lo lleve. Falta que alguien confirme.',
-    tono: 'border-selva-600 bg-selva-50',
-  },
-  {
-    estado: 'SIN_CAPACIDAD',
-    titulo: 'Esperan transporte',
-    ayuda: 'Hay con qué y se puede llegar, pero nadie va para allá.',
-    tono: 'border-atrato-700 bg-atrato-50',
-  },
-  {
-    estado: 'SIN_EXISTENCIA',
-    titulo: 'Esperan donación',
-    ayuda: 'No hay en bodega ni nadie lo está ofreciendo.',
-    tono: 'border-sky-400 bg-sky-50',
-  },
-  {
-    estado: 'SIN_RUTA',
-    titulo: 'Incomunicadas',
-    ayuda: 'No hay cómo llegar en esta temporada.',
-    tono: 'border-rose-400 bg-rose-50',
-  },
-  {
-    estado: 'EN_CAMINO',
-    titulo: 'En camino',
-    ayuda: 'Ya salieron.',
-    tono: 'border-barro-200 bg-barro-50',
-  },
-] as const
 
 export default async function Tablero() {
   const sesion = await sesionActual()
@@ -85,8 +41,8 @@ export default async function Tablero() {
   return (
     <main>
       <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <h1 className="text-xl font-semibold text-stone-900">Tablero</h1>
-        <p className="text-sm text-stone-600">
+        <h1 className="text-xl font-semibold text-barro-900">Tablero</h1>
+        <p className="text-sm text-barro-600">
           {total === 0
             ? 'No hay solicitudes abiertas.'
             : `${total} solicitud${total === 1 ? '' : 'es'} abierta${total === 1 ? '' : 's'}.`}
@@ -94,55 +50,12 @@ export default async function Tablero() {
       </div>
 
       {total === 0 && (
-        <p className="mt-8 text-stone-600">
+        <p className="mt-8 text-barro-600">
           Cuando entre una necesidad verificada, aparece acá clasificada por lo que le falta.
         </p>
       )}
 
-      <div className="mt-6 space-y-8">
-        {BUCKETS.map((bucket) => {
-          const delBucket = filas.filter((f) => f.estado === bucket.estado)
-          if (delBucket.length === 0) return null
-
-          return (
-            <section key={bucket.estado}>
-              <div className={`rounded-t-lg border-x border-t px-4 py-3 ${bucket.tono}`}>
-                <h2 className="font-semibold text-stone-900">
-                  {bucket.titulo}
-                  <span className="ml-2 font-normal text-stone-600">{delBucket.length}</span>
-                </h2>
-                <p className="text-sm text-stone-700">{bucket.ayuda}</p>
-              </div>
-
-              <ul className="divide-y divide-stone-200 rounded-b-lg border border-barro-200 bg-white">
-                {delBucket.map((fila) => (
-                  <li key={fila.id} className="px-4 py-3">
-                    <div className="flex flex-wrap items-baseline gap-x-2 text-sm text-stone-600">
-                      <span className="font-medium text-stone-900">{fila.comunidad}</span>
-                      <span>·</span>
-                      <span>{fila.item}</span>
-                      <span>·</span>
-                      <span>
-                        {fila.familias} familia{fila.familias === 1 ? '' : 's'}
-                      </span>
-                      {fila.urgencia === 3 && (
-                        <span className="rounded bg-rose-100 px-1.5 py-0.5 text-xs font-medium text-rose-900">
-                          urgente
-                        </span>
-                      )}
-                      <span className="ml-auto text-stone-500">
-                        {fila.dias === 0 ? 'hoy' : `hace ${fila.dias} d`}
-                      </span>
-                    </div>
-                    {/* The sentence the matcher wrote. This is the phone call. */}
-                    <p className="mt-1 text-stone-800">{fila.motivo}</p>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )
-        })}
-      </div>
+      <TableroVista filas={filas} />
     </main>
   )
 }
