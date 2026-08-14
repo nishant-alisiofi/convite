@@ -1,5 +1,5 @@
-import { spawn, type ChildProcess } from 'node:child_process'
-import { existsSync, readdirSync, statSync } from 'node:fs'
+import { execFileSync, spawn, type ChildProcess } from 'node:child_process'
+import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
 import { join as unir } from 'node:path'
 import { createServer } from 'node:net'
 import { join } from 'node:path'
@@ -131,25 +131,63 @@ function masReciente(dir: string): number {
   return ultimo
 }
 
+const FUENTES = ['app', 'lib', 'db', 'middleware.ts', 'next.config.ts']
+const HUELLA = '.next/convite-huella.json'
+
 /**
- * Whether the build on disk is older than the code it is supposed to be serving.
+ * What the bundle on disk was built FROM, not when.
  *
- * This is not housekeeping. The whole point of this file is that it tests the real HTTP
- * surface, and `next start` serves whatever is in `.next` — so a stale build means every
- * assertion here is about code that is no longer in the repository. It fails one way (a fix
- * that landed is reported broken, which is what happened to the rate limiter on main) and
- * passes the other (a regression that landed is reported fine), and the second is the one
- * that would matter.
+ * The first version of this guard compared source mtimes against `.next/BUILD_ID`, and that
+ * has a blind spot a rebase walks straight into: `git rebase` can leave a file whose content
+ * changed with an mtime older than a bundle built before that content existed. The guard then
+ * calls a stale bundle current — which is exactly the failure it was written to stop, wearing
+ * a different hat. It fired for real on lane 1's tree, on the rate limiter, twice.
+ *
+ * So the bundle records the commit it came from. A rebase moves HEAD even when it does not
+ * move a single mtime, and the mismatch is unambiguous. mtime stays as the second gate,
+ * because uncommitted edits do not move HEAD at all.
  */
+function identidadDelArbol(): { head: string; sucio: boolean } {
+  const git = (args: string[]) =>
+    execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+  try {
+    return { head: git(['rev-parse', 'HEAD']), sucio: git(['status', '--porcelain']).length > 0 }
+  } catch {
+    // No git (a tarball, a container). Fall back to mtime alone rather than never rebuilding.
+    return { head: 'sin-git', sucio: true }
+  }
+}
+
 function construccionVieja(): boolean {
   if (!existsSync('.next/BUILD_ID')) return true
+  if (!existsSync(HUELLA)) return true
 
-  const construida = statSync('.next/BUILD_ID').mtimeMs
-  const fuentes = ['app', 'lib', 'db', 'middleware.ts', 'next.config.ts']
-    .filter((f) => existsSync(f))
-    .map((f) => (statSync(f).isDirectory() ? masReciente(f) : statSync(f).mtimeMs))
+  const huella = JSON.parse(readFileSync(HUELLA, 'utf8')) as {
+    head: string
+    sucio: boolean
+    mtime: number
+  }
+  const ahora = identidadDelArbol()
 
-  return Math.max(...fuentes) > construida
+  // Different commit, or a tree that was clean at build and is not now: rebuild.
+  if (huella.head !== ahora.head) return true
+  if (huella.sucio !== ahora.sucio) return true
+
+  const mtimeActual = Math.max(
+    ...FUENTES.filter((f) => existsSync(f)).map((f) =>
+      statSync(f).isDirectory() ? masReciente(f) : statSync(f).mtimeMs,
+    ),
+  )
+  return mtimeActual > huella.mtime
+}
+
+function anotarHuella(): void {
+  const mtime = Math.max(
+    ...FUENTES.filter((f) => existsSync(f)).map((f) =>
+      statSync(f).isDirectory() ? masReciente(f) : statSync(f).mtimeMs,
+    ),
+  )
+  writeFileSync(HUELLA, JSON.stringify({ ...identidadDelArbol(), mtime }))
 }
 
 beforeAll(async () => {
@@ -160,6 +198,7 @@ beforeAll(async () => {
   // week's bundle — is worse than no security test.
   if (construccionVieja()) {
     await correr('npx', ['next', 'build'])
+    anotarHuella()
   }
 
   const puerto = await puertoLibre()
