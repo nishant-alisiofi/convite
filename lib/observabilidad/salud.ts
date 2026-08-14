@@ -1,5 +1,11 @@
 import type { Pool, PoolClient } from 'pg'
 import { presupuestoVoz } from '@/lib/canales/topes'
+import {
+  agrupacionesDeDanos,
+  comunidadesEnSilencio,
+  comunidadesNuncaVistas,
+  HORAS_AGRUPACION_DANOS,
+} from './silencio'
 
 /**
  * Is the system actually working, or is it just up?
@@ -56,6 +62,15 @@ export type EstadoSalud = {
     /** Age of the oldest report nobody has looked at yet. */
     masViejoHoras: number
   }
+  /** Communities past their own check-in interval. Silence is a signal (Section 9.8). */
+  silencio: {
+    comunidades: number
+    masLargoDias: number | null
+    /** Never heard from at all: onboarding, not an alarm. */
+    nuncaVistas: number
+  }
+  /** Verified damage clusters: one event, not N rows. */
+  danos: { agrupaciones: number; severidadMaxima: number | null }
   voz: { usadosMin: number; presupuestoMin: number; porcentaje: number; alerta: boolean; agotado: boolean }
   /** Plain Spanish, one line per problem. Empty means healthy. */
   alertas: string[]
@@ -131,6 +146,9 @@ export async function estadoSistema(
   )
 
   const voz = await presupuestoVoz(ejecutor, ahora)
+  const silenciosas = await comunidadesEnSilencio(ejecutor, ahora)
+  const agrupaciones = await agrupacionesDeDanos(ejecutor, ahora)
+  const nuncaVistas = await comunidadesNuncaVistas(ejecutor, ahora)
 
   const estado: EstadoSalud = {
     ok: true,
@@ -157,6 +175,21 @@ export async function estadoSistema(
           : Number((Number(verificacion[0]!.mediana_seg) / 3600).toFixed(1)),
       pendientes: Number(verificacion[0]!.pendientes),
       masViejoHoras: Number((Number(verificacion[0]!.mas_viejo_seg ?? 0) / 3600).toFixed(1)),
+    },
+    silencio: {
+      comunidades: silenciosas.length,
+      masLargoDias: silenciosas.reduce<number | null>(
+        (peor, c) => Math.max(peor ?? 0, c.diasEnSilencio),
+        null,
+      ),
+      nuncaVistas,
+    },
+    danos: {
+      agrupaciones: agrupaciones.length,
+      severidadMaxima: agrupaciones.reduce<number | null>(
+        (peor, a) => (a.severidadMaxima === null ? peor : Math.max(peor ?? 0, a.severidadMaxima)),
+        null,
+      ),
     },
     voz: {
       usadosMin: voz.usadosMin,
@@ -219,6 +252,26 @@ export async function estadoSistema(
   if (estado.verificacion.masViejoHoras > HORAS_MEDIANA_VERIFICACION * 2) {
     alertas.push(
       `hay un reporte sin verificar desde hace ${estado.verificacion.masViejoHoras} h`,
+    )
+  }
+  // Section 9.8. Not an outage — a list of phone calls somebody has to make, and the reason
+  // it is here rather than only on a screen is that nobody opens a screen to check whether
+  // anything is missing.
+  if (silenciosas.length > 0) {
+    const peor = silenciosas[0]!
+    alertas.push(
+      `${silenciosas.length} comunidad(es) pasaron su intervalo de chequeo; ` +
+        `la más callada es ${peor.nombre} (tier ${peor.tier}, ${peor.diasEnSilencio} días)`,
+    )
+  }
+  for (const grupo of agrupaciones) {
+    // One line per cluster, never one per report: three landslides along the same stretch of
+    // river in two days is one event, and reading it as three tickets is how a response
+    // arrives late and in the wrong shape.
+    alertas.push(
+      `${grupo.danos} daños verificados en ${grupo.agrupador ?? grupo.municipio} ` +
+        `en ${HORAS_AGRUPACION_DANOS} h` +
+        (grupo.severidadMaxima ? ` (severidad máx. ${grupo.severidadMaxima})` : ''),
     )
   }
   if (voz.agotado) {

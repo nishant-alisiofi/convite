@@ -6,6 +6,13 @@ export {
 } from './almacenamiento'
 export type { Almacenamiento } from './almacenamiento'
 export { registrarEntrante, registrarEstado } from './bitacora'
+export {
+  confirmarConCodigo,
+  COPIA_CONFIRMACION,
+  fallosRecientes,
+  pareceCodigo,
+} from './confirmacion'
+export type { ResultadoConfirmacion } from './confirmacion'
 export type { ResultadoRegistro } from './bitacora'
 export {
   FLUJO_INTAKE,

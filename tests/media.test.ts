@@ -1,8 +1,9 @@
+import { readFileSync } from 'node:fs'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import sharp from 'sharp'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import {
   almacenamientoLocal,
   claveMedia,
@@ -10,8 +11,13 @@ import {
   limpiarExif,
   procesarMedia,
   type ProveedorMedia,
+  raizDatos,
   validarClave,
 } from '@/lib/canales'
+
+afterEach(() => {
+  vi.unstubAllEnvs()
+})
 
 /**
  * The media pipeline: download, strip, store.
@@ -60,6 +66,30 @@ describe('2.5 — nada se guarda con EXIF', () => {
     // Still a usable image, not just bytes with the tags scraped off.
     expect(metadatos.width).toBe(32)
     expect(metadatos.height).toBe(24)
+  })
+})
+
+describe('la raíz de datos nunca es el repositorio', () => {
+  it('trata DATA_DIR vacío como no configurado', () => {
+    // Regression. `.env.example` ships `DATA_DIR=` empty and `??` only catches null and
+    // undefined, so an empty string resolved to the current working directory and media
+    // landed in the repo root — the operational-data rule broken by default, on a fresh
+    // clone, for anyone who copied the example file.
+    vi.stubEnv('DATA_DIR', '')
+    expect(raizDatos()).toBe(resolve(process.cwd(), '.data'))
+
+    vi.stubEnv('DATA_DIR', '   ')
+    expect(raizDatos()).toBe(resolve(process.cwd(), '.data'))
+
+    vi.stubEnv('DATA_DIR', '/tmp/convite-datos')
+    expect(raizDatos()).toBe('/tmp/convite-datos')
+  })
+
+  it('la raíz por defecto está fuera del control de versiones', () => {
+    vi.stubEnv('DATA_DIR', '')
+    const raiz = raizDatos()
+    expect(raiz.endsWith('/.data')).toBe(true)
+    expect(readFileSync('.gitignore', 'utf8')).toContain('.data/')
   })
 })
 

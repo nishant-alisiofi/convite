@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   COPIA,
+  COPIA_CONFIRMACION,
   PROVEEDOR_SMS_SIMULADOR,
   proveedorSmsSimulador,
   recibirSms,
@@ -76,6 +77,20 @@ describe('la copia de SMS cabe en un segmento', () => {
     // stripping accents to buy room. «Quedo con el numero» is worse Spanish sent to someone
     // already having a bad week.
     for (const cuerpo of [COPIA.aclaracionSms, COPIA.folioSms(472), COPIA.folioSms(99999)]) {
+      const medida = segmentar(cuerpo)
+      expect(medida.cabeEnUno, `${cuerpo} → ${medida.unidades} ${medida.alfabeto}`).toBe(true)
+    }
+  })
+
+  it('la copia de confirmación también cabe', () => {
+    // Caught by the despatcher's own guard while writing M11: the long «gracias» came to 79
+    // UCS-2 units and threw. That is the mechanism working — a copy bug at authoring time
+    // instead of a tripled bill nobody notices.
+    for (const cuerpo of [
+      COPIA_CONFIRMACION.graciasSms,
+      COPIA_CONFIRMACION.yaEstaba,
+      COPIA_CONFIRMACION.noCoincideSms,
+    ]) {
       const medida = segmentar(cuerpo)
       expect(medida.cabeEnUno, `${cuerpo} → ${medida.unidades} ${medida.alfabeto}`).toBe(true)
     }

@@ -2,6 +2,12 @@ import type { PoolClient } from 'pg'
 import { encolar } from '@/lib/jobs/cola'
 import { type Catalogo, cargarCatalogo } from '@/lib/normalizador'
 import { registrarEntrante } from './bitacora'
+import {
+  confirmarConCodigo,
+  COPIA_CONFIRMACION,
+  fallosRecientes,
+  pareceCodigo,
+} from './confirmacion'
 import { despachar, entregarPendientes } from './despachador'
 import { anotarActividad, recalcularEnlace } from './enlace'
 import {
@@ -76,7 +82,22 @@ type Fusionado = {
   entregadas: number
 }
 
-export type ResultadoIntake = { estado: 'duplicado' } | Registrado | Fusionado
+type Confirmacion = {
+  estado: 'confirmacion'
+  mensajeId: string
+  contactoId: string
+  /** What the code did: closed a delivery, repeated one, or matched nothing. */
+  resultado: 'confirmada' | 'ya_confirmada' | 'sin_coincidencia' | 'ambigua'
+  entregaId: string | null
+  /** Wrong codes from this person in the last day — a run of them is a phone call. */
+  fallosRecientes: number
+}
+
+export type ResultadoIntake =
+  | { estado: 'duplicado' }
+  | Registrado
+  | Fusionado
+  | Confirmacion
 
 /**
  * Which partner organisation a webhook belongs to.
@@ -227,6 +248,68 @@ export async function recibirSobre(
     : null
 
   const pendiente = contacto ? await aclaracionViva(client, contacto.id, ahora) : null
+
+  // ── Four digits: somebody confirming a delivery ────────────────────────────────────────
+  // Checked before anything else a message could be, because «4721» is not a need, an
+  // answer, or free text — it is the last step of a delivery, arriving from wherever this
+  // person found signal (Section 9.7).
+  const codigo = pareceCodigo(sobre.contenido.texto)
+  if (contacto && codigo) {
+    const confirmacion = await confirmarConCodigo(client, {
+      codigo,
+      contactoId: contacto.id,
+      canal: sobre.canal,
+      ahora,
+    })
+    const contextoVentana = { ultimoEntranteEn: sobre.recibidoEn, ahora }
+
+    await client.query('update mensajes set contacto_id = $2 where id = $1', [
+      registro.mensajeId,
+      contacto.id,
+    ])
+
+    const respuesta =
+      confirmacion.estado === 'confirmada'
+        ? COPIA_CONFIRMACION.gracias(confirmacion.folio)
+        : confirmacion.estado === 'ya_confirmada'
+          ? COPIA_CONFIRMACION.yaEstaba
+          : COPIA_CONFIRMACION.noCoincide
+
+    await despachar(
+      client,
+      {
+        contactoId: contacto.id,
+        cuerpo: respuesta,
+        cuerpoCorto:
+          confirmacion.estado === 'confirmada'
+            ? COPIA_CONFIRMACION.graciasSms
+            : confirmacion.estado === 'ya_confirmada'
+              ? COPIA_CONFIRMACION.yaEstaba
+              : COPIA_CONFIRMACION.noCoincideSms,
+        canalEntrada: sobre.canal,
+      },
+      contextoVentana,
+    )
+
+    const fallos =
+      confirmacion.estado === 'confirmada' || confirmacion.estado === 'ya_confirmada'
+        ? 0
+        : await fallosRecientes(client, contacto.id, ahora)
+
+    await alReaparecer(client, contacto.id, sobre.canal, sobre.recibidoEn, ahora)
+
+    return {
+      estado: 'confirmacion',
+      mensajeId: registro.mensajeId,
+      contactoId: contacto.id,
+      resultado: confirmacion.estado,
+      entregaId:
+        confirmacion.estado === 'confirmada' || confirmacion.estado === 'ya_confirmada'
+          ? confirmacion.entregaId
+          : null,
+      fallosRecientes: fallos,
+    }
+  }
 
   // ── The answer to a question we asked ──────────────────────────────────────────────────
   if (contacto && pendiente?.reporteId && sobre.contenido.texto) {

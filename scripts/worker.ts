@@ -2,6 +2,7 @@ import 'dotenv/config'
 import { closeDb, getPool } from '@/db/client'
 import { MANEJADORES_CANALES } from '@/lib/canales/trabajos'
 import { correrJobs, type ResultadoCorrida } from '@/lib/jobs/cola'
+import { rescatarJobsColgados } from '@/lib/jobs/reaper'
 import { MANEJADORES } from '@/lib/jobs/manejadores'
 
 /**
@@ -26,6 +27,8 @@ const ESPERA_VACIO_MS = 3_000
 const ESPERA_TRABAJO_MS = 250
 /** Backs off to here when the database is unreachable, so a dead DB is not a hot loop. */
 const ESPERA_ERROR_MS = 15_000
+/** A claim older than this belonged to a worker that is not coming back. */
+const MINUTOS_COLGADO = 15
 
 let corriendo = true
 let cicloActual: Promise<ResultadoCorrida | void> = Promise.resolve()
@@ -74,6 +77,19 @@ async function main(): Promise<void> {
     try {
       // Held so the shutdown handler can await the batch in flight, and awaited directly so
       // the result keeps its type.
+      // Before claiming anything new, take back what a dead worker was holding. Runs here
+      // rather than as a job because a queue cannot recover itself — the job that would do
+      // the recovering waits behind the same stall.
+      const rescate = await rescatarJobsColgados(getPool(), MINUTOS_COLGADO)
+      if (rescate.rescatados > 0) {
+        registrar(`${rescate.rescatados} job(s) reclamados de un worker muerto`)
+      }
+      if (rescate.dejados > 0) {
+        registrar(
+          `${rescate.dejados} job(s) colgados NO se reclaman: su tipo no se declaró idempotente`,
+        )
+      }
+
       const ciclo = correrJobs(getPool(), manejadores)
       cicloActual = ciclo
       const resultado = await ciclo

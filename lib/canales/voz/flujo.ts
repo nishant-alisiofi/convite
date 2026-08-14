@@ -176,6 +176,11 @@ export async function devolverLlamada(
   if (intake.estado === 'duplicado') {
     return { estado: 'bloqueada', llamadaId: llamada.llamadaId, motivo: 'llamada ya procesada' }
   }
+  // A recording cannot be a confirmation — that path needs typed digits, not audio — so
+  // anything else here is a report we now have to attach to the call.
+  if (intake.estado === 'confirmacion') {
+    return { estado: 'bloqueada', llamadaId: llamada.llamadaId, motivo: 'la grabación no abrió reporte' }
+  }
 
   const folio = intake.estado === 'registrado' ? intake.folio : 0
   const reporteId = intake.reporteId

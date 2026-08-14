@@ -52,7 +52,15 @@ export function claveMedia(tipo: string, bytes: Buffer, extension: string): stri
 }
 
 export function raizDatos(): string {
-  return process.env.DATA_DIR ?? resolve(process.cwd(), '.data')
+  // `??` is wrong here and it cost us: `.env.example` ships `DATA_DIR=` empty, an empty
+  // string is not nullish, and `resolve('')` is the current working directory — so a fresh
+  // clone wrote every voice note and photo into the REPO ROOT. It surfaced as an untracked
+  // `audio/` directory nobody put there.
+  //
+  // Empty means "not configured yet", exactly as lib/env.ts already treats placeholder
+  // values, so the gitignored ./.data fallback actually engages.
+  const configurado = process.env.DATA_DIR?.trim()
+  return configurado ? configurado : resolve(process.cwd(), '.data')
 }
 
 export function almacenamientoLocal(raiz: string = raizDatos()): Almacenamiento {
