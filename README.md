@@ -74,7 +74,8 @@ Bellavista en los próximos 14 días» — and it names the stock's age whenever
 
 ## Requisitos
 
-- Node 20.9+
+- Node 22+ (`@supabase/supabase-js` 2.112 needs the native `WebSocket` that Node 20 lacks;
+  Next.js polyfills it, so the app runs on 20 but plain scripts using the SDK crash)
 - pnpm 9 (`corepack enable pnpm`)
 - A container runtime for local Postgres+PostGIS (Docker Desktop, OrbStack or Colima), **or** a
   Supabase/Neon `DATABASE_URL` with PostGIS available
