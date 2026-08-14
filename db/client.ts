@@ -5,12 +5,31 @@ import * as schema from './schema'
 
 let pool: Pool | null = null
 
+/**
+ * Whether to negotiate TLS for a given connection string.
+ *
+ * Hostname-guessing got us as far as "Supabase yes, docker no" and no further. Railway's
+ * private network is the case that breaks it: `postgres.railway.internal` is not localhost,
+ * it does not offer TLS at all, and the connection dies on «The server does not support SSL
+ * connections» — during the release migration, before anything is up to report it.
+ *
+ * So an explicit `sslmode=disable` in the URL wins over any guess. Whoever wrote the
+ * connection string knows what is at the other end of it; this function does not.
+ *
+ * Everything else keeps `rejectUnauthorized: false`, which is what Supabase and Neon need
+ * and is not a decision this change is making.
+ */
+export function sslPara(url: string): false | { rejectUnauthorized: boolean } {
+  if (/[?&]sslmode=disable(&|$)/.test(url)) return false
+  if (/@(localhost|127\.0\.0\.1)[:/]/.test(url)) return false
+  return { rejectUnauthorized: false }
+}
+
 export function getPool(): Pool {
   if (!pool) {
     pool = new Pool({
       connectionString: env().DATABASE_URL,
-      // Supabase/Neon require TLS; local docker does not offer it.
-      ssl: env().DATABASE_URL.includes('localhost') ? false : { rejectUnauthorized: false },
+      ssl: sslPara(env().DATABASE_URL),
       max: 5,
     })
   }
