@@ -166,6 +166,31 @@ conBase('el webhook de WhatsApp', () => {
     expect(rows[0]!.urgencia).toBe(3)
   })
 
+  it('guarda la severidad de un daño reportado con la tarjeta', async () => {
+    // «91 2» from the printed card: vía bloqueada, severity 2. The number has to survive
+    // all the way to reportes.severidad, and it must not land in familias.
+    await manejadorWebhookWhatsApp()(
+      job({ webhook: otroMensaje(WEBHOOK_TEXTO, 'wamid.DANO', '91 2') }),
+      client,
+    )
+
+    const { rows } = await client.query<{
+      tipo: string
+      codigo_item: string
+      severidad: number | null
+      familias: number | null
+    }>(
+      `select r.tipo, r.codigo_item, r.severidad, r.familias from reportes r
+         join mensajes m on m.reporte_id = r.id
+        where m.proveedor_mensaje_id = $1`,
+      ['wamid.DANO'],
+    )
+    expect(rows[0]!.tipo).toBe('dano')
+    expect(rows[0]!.codigo_item.trim()).toBe('91')
+    expect(rows[0]!.severidad).toBe(2)
+    expect(rows[0]!.familias).toBeNull()
+  })
+
   it('el mismo payload dos veces deja una sola fila', async () => {
     // Providers retry. This is the M5 acceptance line.
     await manejadorWebhookWhatsApp()(job({ webhook: WEBHOOK_TEXTO }), client)

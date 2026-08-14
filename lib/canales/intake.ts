@@ -252,11 +252,11 @@ export async function recibirSobre(
   const { rows: filasReporte } = await client.query<{ id: string; folio: number }>(
     `insert into reportes
        (organizacion_id, tipo, canal, contacto_id, comunidad_id, codigo_item, familias, urgencia,
-        detalle_libre, ubicacion, ubicacion_fuente, ubicacion_precision_m, payload_crudo)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9,
-       case when $10::double precision is null then null
-            else st_setsrid(st_makepoint($11::double precision, $10::double precision), 4326) end,
-       $12, $13, $14)
+        severidad, detalle_libre, ubicacion, ubicacion_fuente, ubicacion_precision_m, payload_crudo)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+       case when $11::double precision is null then null
+            else st_setsrid(st_makepoint($12::double precision, $11::double precision), 4326) end,
+       $13, $14, $15)
      returning id, folio`,
     [
       organizacionId,
@@ -269,6 +269,8 @@ export async function recibirSobre(
       // understood which item they need.
       propuesta.familias,
       confiable ? urgenciaFinal(propuesta, catalogo) : propuesta.urgencia,
+      // Only ever set on a daño, and only from the printed card's second number.
+      confiable ? propuesta.severidad : null,
       // texto_original: written once, never overwritten (PRD §4 M4). Transcripts and
       // clarifications land elsewhere.
       sobre.contenido.texto,
@@ -411,7 +413,8 @@ async function fusionarAclaracion(
             codigo_item = case when $2 then $4 else codigo_item end,
             familias = coalesce($5, familias),
             urgencia = case when $2 then $6 else urgencia end,
-            descripcion = trim(both ' ' from coalesce(descripcion || ' ', '') || $7)
+            severidad = case when $2 then coalesce($7, severidad) else severidad end,
+            descripcion = trim(both ' ' from coalesce(descripcion || ' ', '') || $8)
       where id = $1`,
     [
       args.reporteId,
@@ -420,6 +423,7 @@ async function fusionarAclaracion(
       confiable ? propuesta.codigoItem : null,
       propuesta.familias,
       confiable ? urgenciaFinal(propuesta, args.catalogo) : null,
+      confiable ? propuesta.severidad : null,
       respuesta,
     ],
   )

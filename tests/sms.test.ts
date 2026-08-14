@@ -154,6 +154,23 @@ describe('la sintaxis de la tarjeta impresa', () => {
     expect(p.codigoItem).toBe('91')
     expect(p.tipo).toBe('dano')
     expect(p.familias).toBeNull()
+    expect(p.severidad).toBe(2)
+  })
+
+  it('descarta una severidad fuera de rango en vez de recortarla', () => {
+    // `reportes_severidad_check` allows 1–3. A «91 12» is somebody typing a quantity into
+    // the severity slot, and clamping it to 3 would invent an assessment nobody made.
+    expect(leer('91 12').severidad).toBeNull()
+    expect(leer('91 12').codigoItem).toBe('91')
+  })
+
+  it('una necesidad nunca lleva severidad', () => {
+    expect(leer('22 12 3').severidad).toBeNull()
+  })
+
+  it('el texto libre no propone severidad: eso lo juzga una persona', () => {
+    // How bad a landslide is, from prose, is a judgement someone makes after looking (2.12).
+    expect(leer('hubo un derrumbe muy grande, no pasa nadie').severidad).toBeNull()
   })
 
   it('acepta separadores flojos, porque la gente escribe como escribe', () => {

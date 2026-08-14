@@ -39,6 +39,12 @@ export type PropuestaExtractor = {
   familias: number | null
   /** Only from explicit words. The catalogue's `urgencia_min` is the core's to apply. */
   urgencia: number | null
+  /**
+   * 1–3, and only for a `dano`. Read from the printed card's second number and from
+   * nowhere else: how bad a landslide is, from prose, is a judgement a person makes after
+   * looking (2.12). Null is the normal answer.
+   */
+  severidad: number | null
   perecedero: boolean
   venceEn: Date | null
   /** Confidence in the category, 0..1. Below UMBRAL nothing is assigned. */
@@ -63,6 +69,7 @@ export const PROPUESTA_NULA: Omit<PropuestaExtractor, 'motivos' | 'versionLexico
   unidad: null,
   familias: null,
   urgencia: null,
+  severidad: null,
   perecedero: false,
   venceEn: null,
   confianza: 0,
@@ -131,7 +138,10 @@ const SINTAXIS_TARJETA = /^(\d{2})(?:[\s,.\-–]+(\d{1,4}))?(?:[\s,.\-–]+([1-3
 function leerTarjeta(
   t: string,
   contexto: ContextoExtractor,
-): Pick<PropuestaExtractor, 'tipo' | 'codigoItem' | 'familias' | 'urgencia' | 'confianza'> | null {
+): Pick<
+  PropuestaExtractor,
+  'tipo' | 'codigoItem' | 'familias' | 'urgencia' | 'severidad' | 'confianza'
+> | null {
   const m = SINTAXIS_TARJETA.exec(t.trim())
   if (!m) return null
 
@@ -145,9 +155,18 @@ function leerTarjeta(
   const tercero = m[3] ? Number(m[3]) : null
 
   if (item.tipo === 'dano') {
-    // Severity is not something `reportes.familias` can hold, and the extractor has no
-    // severidad field of its own yet — so it is deliberately not smuggled into families.
-    return { tipo: 'dano', codigoItem: codigo, familias: null, urgencia: null, confianza: 0.95 }
+    // «91 2» is severity 2, never two households. `reportes_severidad_check` allows 1–3, so
+    // anything else is somebody typing a quantity into the severity slot and is dropped
+    // rather than clamped into a number we made up.
+    const severidad = segundo !== null && segundo >= 1 && segundo <= 3 ? segundo : null
+    return {
+      tipo: 'dano',
+      codigoItem: codigo,
+      familias: null,
+      urgencia: null,
+      severidad,
+      confianza: 0.95,
+    }
   }
 
   return {
@@ -155,6 +174,7 @@ function leerTarjeta(
     codigoItem: codigo,
     familias: segundo !== null && segundo > 0 ? segundo : null,
     urgencia: tercero,
+    severidad: null,
     confianza: 0.95,
   }
 }
@@ -183,6 +203,7 @@ export function extraer(texto: string | null, contexto: ContextoExtractor): Prop
         codigoItem: tarjeta.confianza,
         familias: tarjeta.familias === null ? 0 : 0.95,
         urgencia: tarjeta.urgencia === null ? 0 : 0.95,
+        severidad: tarjeta.severidad === null ? 0 : 0.95,
       },
       motivos,
       versionLexico: VERSION_LEXICO,
@@ -325,6 +346,8 @@ export function extraer(texto: string | null, contexto: ContextoExtractor): Prop
     unidad,
     familias,
     urgencia,
+    // Free text never proposes severity — see the field's comment.
+    severidad: null,
     perecedero: perecederoDetectado,
     venceEn,
     confianza: codigoItem ? confianza : 0,
