@@ -20,4 +20,4 @@
 {"texto":"manden 20 mercados y 5 toldillos","espera":{"codigo":null},"nota":"dos ítems: los separa un humano"}
 {"texto":"estamos mal por acá","espera":{"codigo":null},"nota":"vago, va a aclaración"}
 {"texto":"buenos días","espera":{"codigo":null},"nota":"saludo, nada que extraer"}
-{"texto":"90 12 3","espera":{"codigo":null,"cantidad":null},"nota":"sintaxis codificada: 2.11 la prohíbe, no la interpretamos"}
+{"texto":"90 12 3","espera":{"codigo":null,"cantidad":null},"nota":"sí leemos la sintaxis de la tarjeta, pero 90 no es un código del catálogo: va a aclaración"}

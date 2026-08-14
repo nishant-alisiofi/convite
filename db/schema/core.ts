@@ -156,6 +156,12 @@ export const salidasPendientes = pgTable(
     cuerpo: text('cuerpo').notNull(),
     prioridad: smallint('prioridad').notNull().default(5),
     canalSugerido: text('canal_sugerido'),
+    /**
+     * Approved template to use if this goes out after the 24-hour window closed (0022).
+     * NULL means ordinary text, which is only legal inside the window. A name here records
+     * intent, not approval — D4 has cleared none of them.
+     */
+    plantilla: text('plantilla'),
     intentos: integer('intentos').notNull().default(0),
     enviarDespuesDe: timestamp('enviar_despues_de', { withTimezone: true, mode: 'date' })
       .notNull()

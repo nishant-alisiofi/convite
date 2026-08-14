@@ -113,6 +113,52 @@ function finDelDia(ahora: Date, dias: number): Date {
   return new Date(Date.UTC(y, m, d + 1, 4, 59, 59))
 }
 
+/**
+ * The printed card's syntax: `CÓDIGO FAMILIAS URGENCIA`, e.g. «22 12 3».
+ *
+ * Section 4.2 — the laminated card is part of the product, and people who carry one learn
+ * the codes by use. The whole message has to be the code, so a number inside a sentence
+ * cannot hijack it, and separators are loose because people write «22-12-3» and «22,12,3».
+ *
+ * A first digit of 9 means damage, and then the second number is SEVERITY, not families —
+ * getting that backwards files «vía bloqueada, severidad 2» as two households needing help.
+ *
+ * Read here rather than in the SMS driver on purpose: adapters do not classify (contract
+ * §4), and someone who learned the codes uses them on WhatsApp too.
+ */
+const SINTAXIS_TARJETA = /^(\d{2})(?:[\s,.\-–]+(\d{1,4}))?(?:[\s,.\-–]+([1-3]))?$/
+
+function leerTarjeta(
+  t: string,
+  contexto: ContextoExtractor,
+): Pick<PropuestaExtractor, 'tipo' | 'codigoItem' | 'familias' | 'urgencia' | 'confianza'> | null {
+  const m = SINTAXIS_TARJETA.exec(t.trim())
+  if (!m) return null
+
+  const codigo = m[1]!
+  const item = contexto.catalogo.get(codigo)
+  // An unknown code is somebody misremembering, or a number that happens to have two
+  // digits. Neither is a request for anything, so it falls through to the lexicon.
+  if (!item) return null
+
+  const segundo = m[2] ? Number(m[2]) : null
+  const tercero = m[3] ? Number(m[3]) : null
+
+  if (item.tipo === 'dano') {
+    // Severity is not something `reportes.familias` can hold, and the extractor has no
+    // severidad field of its own yet — so it is deliberately not smuggled into families.
+    return { tipo: 'dano', codigoItem: codigo, familias: null, urgencia: null, confianza: 0.95 }
+  }
+
+  return {
+    tipo: 'necesidad',
+    codigoItem: codigo,
+    familias: segundo !== null && segundo > 0 ? segundo : null,
+    urgencia: tercero,
+    confianza: 0.95,
+  }
+}
+
 export function extraer(texto: string | null, contexto: ContextoExtractor): PropuestaExtractor {
   const motivos: string[] = []
   const base = { ...PROPUESTA_NULA, motivos, versionLexico: VERSION_LEXICO }
@@ -123,6 +169,25 @@ export function extraer(texto: string | null, contexto: ContextoExtractor): Prop
   }
 
   const t = normalizar(texto)
+
+  const tarjeta = leerTarjeta(t, contexto)
+  if (tarjeta) {
+    const item = contexto.catalogo.get(tarjeta.codigoItem!)!
+    motivos.push(`sintaxis de la tarjeta: ${tarjeta.codigoItem} (${item.itemLabel})`)
+    if (item.tipo === 'dano') motivos.push('daño: el segundo número es severidad, no familias')
+    return {
+      ...PROPUESTA_NULA,
+      ...tarjeta,
+      requiereDetalle: item.pideDetalle ? ['detalle'] : [],
+      confianzaPorCampo: {
+        codigoItem: tarjeta.confianza,
+        familias: tarjeta.familias === null ? 0 : 0.95,
+        urgencia: tarjeta.urgencia === null ? 0 : 0.95,
+      },
+      motivos,
+      versionLexico: VERSION_LEXICO,
+    }
+  }
   const palabras = t.split(/[^\p{L}\p{N}]+/u).filter(Boolean)
 
   // ── Vagueness wins over everything ─────────────────────────────────────────────────────

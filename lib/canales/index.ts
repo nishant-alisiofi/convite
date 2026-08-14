@@ -29,8 +29,23 @@ export type {
   NormalizadorPort,
   PropuestaNormalizador,
 } from './normalizador'
-export { COPIA, encolarSalida } from './salidas'
-export type { ResultadoSalida, SalidaAEncolar } from './salidas'
+export { COPIA } from './salidas'
+export { cargarPerfil, despachar, entregarPendientes } from './despachador'
+export type { Digesto, ResultadoDespacho, SalidaSolicitada } from './despachador'
+export {
+  anotarActividad,
+  anotarMedia,
+  HORAS_PARA_DAR_POR_PERDIDO,
+  recalcularEnlace,
+  VENTANA_MEDICION,
+} from './enlace'
+export type { MedicionEnlace } from './enlace'
+export { CALIDAD_BUENA, CALIDAD_DEBIL, comoConfirmar, queSolicitar } from './politica'
+export type { PerfilContacto, PlanRespuesta, PlanSolicitud, Solicitud } from './politica'
+export { PROVEEDOR_SMS_SIMULADOR, proveedorSmsSimulador, recibirSms } from './sms/driver'
+export type { PayloadSms, ProveedorSms, SmsEnviado } from './sms/driver'
+export { limiteDeUnSegmento, recortarAUnSegmento, segmentar } from './sms/segmentos'
+export type { Alfabeto, Segmentacion } from './sms/segmentos'
 export { esquemaPayloadSimulado, PROVEEDOR_SIMULADOR, recibirSimulado } from './simulador'
 export type { PayloadSimulado } from './simulador'
 export * from './tipos'

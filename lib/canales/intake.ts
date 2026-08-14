@@ -2,13 +2,15 @@ import type { PoolClient } from 'pg'
 import { encolar } from '@/lib/jobs/cola'
 import { type Catalogo, cargarCatalogo } from '@/lib/normalizador'
 import { registrarEntrante } from './bitacora'
+import { despachar, entregarPendientes } from './despachador'
+import { anotarActividad, recalcularEnlace } from './enlace'
 import {
   esConfiable,
   type NormalizadorPort,
   normalizadorLexico,
   type PropuestaNormalizador,
 } from './normalizador'
-import { COPIA, encolarSalida } from './salidas'
+import { COPIA } from './salidas'
 import type { SobreEntrante } from './tipos'
 
 /**
@@ -56,6 +58,8 @@ type Registrado = {
   preguntoAclaracion: boolean
   confirmoFolio: boolean
   mediaEncolada: number
+  /** How many queued messages rode out on this inbound, as one digest (2.14). */
+  entregadas: number
 }
 
 type Fusionado = {
@@ -68,6 +72,8 @@ type Fusionado = {
   /** True when the merged text finally cleared the threshold. */
   resuelto: boolean
   mediaEncolada: number
+  /** How many queued messages rode out on this inbound, as one digest (2.14). */
+  entregadas: number
 }
 
 export type ResultadoIntake = { estado: 'duplicado' } | Registrado | Fusionado
@@ -178,6 +184,27 @@ async function encolarMedia(
 }
 
 /**
+ * Everything that happens because this person just proved they are reachable.
+ *
+ * An inbound message is the only reliable signal we get: it says the phone is on, there is
+ * signal right now, and at this hour. So it updates the telemetry (2.14 — link quality is
+ * measured, not declared) and then flushes whatever we owe them as ONE digest, which is the
+ * piggyback the queue exists for. Never five messages fired at once when somebody surfaces.
+ */
+async function alReaparecer(
+  client: PoolClient,
+  contactoId: string,
+  canalEntrada: SobreEntrante['canal'],
+  recibidoEn: Date,
+  ahora: Date,
+): Promise<number> {
+  await anotarActividad(client, contactoId, recibidoEn)
+  await recalcularEnlace(client, contactoId, ahora)
+  const digesto = await entregarPendientes(client, contactoId, canalEntrada, ahora)
+  return digesto?.incluidas ?? 0
+}
+
+/**
  * Runs one envelope all the way through. Caller supplies the transaction: a webhook that
  * half-committed is worse than one that returned 500 and got retried.
  */
@@ -277,13 +304,14 @@ export async function recibirSobre(
 
     if (confiable && propuesta.requiereDetalle.length === 0) {
       await cerrarAclaracion(client, contacto.id)
-      await encolarSalida(
+      await despachar(
         client,
         {
           contactoId: contacto.id,
           cuerpo: COPIA.folio(reporte.folio),
+          cuerpoCorto: COPIA.folioSms(reporte.folio),
           plantilla: 'reporte_recibido',
-          canalSugerido: sobre.canal,
+          canalEntrada: sobre.canal,
         },
         contextoVentana,
       )
@@ -294,14 +322,23 @@ export async function recibirSobre(
       // the first is unanswered adds to what a coordinator reads; it does not earn another
       // round trip, because every one costs this person battery and money (Section 6.5).
       await abrirAclaracion(client, contacto.id, reporte.id)
-      await encolarSalida(
+      await despachar(
         client,
-        { contactoId: contacto.id, cuerpo: COPIA.aclaracion, canalSugerido: sobre.canal },
+        {
+          contactoId: contacto.id,
+          cuerpo: COPIA.aclaracion,
+          cuerpoCorto: COPIA.aclaracionSms,
+          canalEntrada: sobre.canal,
+        },
         contextoVentana,
       )
       preguntoAclaracion = true
     }
   }
+
+  const entregadas = contacto
+    ? await alReaparecer(client, contacto.id, sobre.canal, sobre.recibidoEn, ahora)
+    : 0
 
   return {
     estado: 'registrado',
@@ -313,6 +350,7 @@ export async function recibirSobre(
     preguntoAclaracion,
     confirmoFolio,
     mediaEncolada,
+    entregadas,
   }
 }
 
@@ -400,19 +438,28 @@ async function fusionarAclaracion(
       'select folio from reportes where id = $1',
       [args.reporteId],
     )
-    await encolarSalida(
+    await despachar(
       client,
       {
         contactoId: args.contactoId,
         cuerpo: COPIA.folio(folios[0]!.folio),
+        cuerpoCorto: COPIA.folioSms(folios[0]!.folio),
         plantilla: 'reporte_recibido',
-        canalSugerido: args.sobre.canal,
+        canalEntrada: args.sobre.canal,
       },
       { ultimoEntranteEn: args.sobre.recibidoEn, ahora: args.ahora },
     )
   }
   // Still unclear after the answer: we do NOT ask again. It goes to a human, which is the
   // whole point of the clarification queue (Section 9.4).
+
+  const entregadas = await alReaparecer(
+    client,
+    args.contactoId,
+    args.sobre.canal,
+    args.sobre.recibidoEn,
+    args.ahora,
+  )
 
   return {
     estado: 'fusionado',
@@ -422,6 +469,7 @@ async function fusionarAclaracion(
     tipo: confiable ? (propuesta.tipo ?? 'sin_clasificar') : 'sin_clasificar',
     resuelto,
     mediaEncolada,
+    entregadas,
   }
 }
 

@@ -234,7 +234,10 @@ conBase('el webhook de WhatsApp', () => {
 
     expect(rows).toHaveLength(1)
     const cuerpo = rows[0]!.cuerpo
-    expect(cuerpo).toBe(COPIA.aclaracion)
+    // Rosa is in Tagachí, tier 3, and we have never measured her link — so M6's policy
+    // answers by SMS, which means the one-segment wording. It is the same question; it just
+    // does not offer a voice note her link may not carry (PRD §4 M6).
+    expect(cuerpo).toBe(COPIA.aclaracionSms)
     // 2.11 and PRD §2: no coded syntax, no numbered options. «Escriba así: 22 12 3» is
     // exactly what this replaced.
     expect(cuerpo).not.toMatch(/\b\d\s*[).]/)
@@ -306,7 +309,9 @@ conBase('el webhook de WhatsApp', () => {
       ['+573000000001'],
     )
     expect(salidas).toHaveLength(1)
-    expect(salidas[0]!.cuerpo).toBe(COPIA.folio(reporte.folio))
+    // Same reason: tier 3 and unmeasured, so the folio goes out as a one-segment SMS. The
+    // number — the only part she needs to quote back — survives the shorter wording.
+    expect(salidas[0]!.cuerpo).toBe(COPIA.folioSms(reporte.folio))
     expect(salidas[0]!.cuerpo).toContain(String(reporte.folio))
   })
 

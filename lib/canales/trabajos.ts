@@ -2,6 +2,7 @@ import type { ManejadorJob } from '@/lib/jobs/tipos'
 import type { TipoAdjunto } from '@/db/schema/vocabulario'
 import { almacenamientoLocal, type Almacenamiento } from './almacenamiento'
 import { registrarEstado } from './bitacora'
+import { anotarMedia, recalcularEnlace } from './enlace'
 import { type DepsIntake, recibirSobre, resolverOrganizacion } from './intake'
 import { procesarMedia, type ProveedorMedia, proveedorMediaWhatsApp } from './media'
 import { type TranscripcionPort, transcripcionPendiente } from './transcripcion'
@@ -74,6 +75,16 @@ export function manejadorDescargarMedia(deps: DepsMedia): ManejadorJob {
     )
     const adjuntoId = rows[0]!.id
 
+    // 0010: the single strongest predictor of whether to invite a voice note. Their file
+    // reaching us is a different fact from our messages reaching them, and only this
+    // measures it (2.14).
+    const { rows: duenos } = await client.query<{ contacto_id: string | null }>(
+      'select contacto_id from reportes where id = $1',
+      [reporteId],
+    )
+    const contactoId = duenos[0]?.contacto_id
+    if (contactoId) await anotarMedia(client, contactoId, true)
+
     if (tipo !== 'audio') return
 
     // Decision D8 is open, so this returns null and the note waits in the audio inbox (M7)
@@ -113,7 +124,16 @@ export function manejadorWebhookWhatsApp(deps: DepsIntake = {}): ManejadorJob {
     }
 
     for (const estado of lote.estados) {
-      await registrarEstado(client, PROVEEDOR_WHATSAPP, estado.idExterno, estado.estado)
+      const aplicado = await registrarEstado(client, PROVEEDOR_WHATSAPP, estado.idExterno, estado.estado)
+      if (!aplicado) continue
+      // Every receipt is a measurement. This is what eventually stops offering voice notes
+      // to somebody whose messages never arrive (2.14, PRD §4 M6).
+      const { rows } = await client.query<{ contacto_id: string | null }>(
+        'select contacto_id from mensajes where proveedor = $1 and proveedor_mensaje_id = $2',
+        [PROVEEDOR_WHATSAPP, estado.idExterno],
+      )
+      const contactoId = rows[0]?.contacto_id
+      if (contactoId) await recalcularEnlace(client, contactoId, estado.ocurridoEn)
     }
   }
 }
