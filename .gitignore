@@ -1,0 +1,29 @@
+node_modules/
+.next/
+out/
+build/
+dist/
+coverage/
+
+.env
+.env.local
+.env.*.local
+!.env.example
+
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Local Postgres volume
+.docker-data/
+
+# drizzle-kit drift-check output — migrations are hand-authored under db/migrations
+drizzle/
+
+# TypeScript incremental build cache
+*.tsbuildinfo

@@ -1,0 +1,49 @@
+{
+  "name": "convite",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@9.12.3",
+  "engines": {
+    "node": ">=20.9.0"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:up": "docker compose up -d && docker compose exec -T db bash -c 'until pg_isready -U convite -d convite; do sleep 1; done'",
+    "db:down": "docker compose down",
+    "db:migrate": "tsx scripts/migrate.ts",
+    "db:seed": "tsx scripts/seed.ts",
+    "db:reset": "tsx scripts/reset.ts && pnpm db:migrate && pnpm db:seed",
+    "emparejar": "tsx scripts/emparejar.ts",
+    "db:studio": "drizzle-kit studio",
+    "db:check": "drizzle-kit generate --name drift_check",
+    "invitar": "tsx scripts/invitar.ts"
+  },
+  "dependencies": {
+    "@supabase/ssr": "^0.12.4",
+    "@supabase/supabase-js": "^2.112.3",
+    "drizzle-orm": "^0.44.2",
+    "next": "^15.3.3",
+    "pg": "^8.16.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "zod": "^3.25.51"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.8",
+    "@types/node": "^20.17.50",
+    "@types/pg": "^8.15.2",
+    "@types/react": "^19.1.6",
+    "@types/react-dom": "^19.1.5",
+    "dotenv": "^16.5.0",
+    "drizzle-kit": "^0.31.1",
+    "tailwindcss": "^4.1.8",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3",
+    "vitest": "^3.1.4"
+  }
+}

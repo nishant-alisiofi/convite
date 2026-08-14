@@ -1,0 +1,18 @@
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: convite-db
+    environment:
+      POSTGRES_USER: convite
+      POSTGRES_PASSWORD: convite
+      POSTGRES_DB: convite
+    ports:
+      # 5433 on the host so a locally installed Postgres on 5432 does not clash.
+      - "5433:5432"
+    volumes:
+      - ./.docker-data/pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U convite -d convite"]
+      interval: 3s
+      timeout: 3s
+      retries: 20

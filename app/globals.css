@@ -1,0 +1,12 @@
+@import 'tailwindcss';
+
+/* Section 10: light, calm, readable at 14px+, no dashboard that needs a big screen. */
+:root {
+  color-scheme: light;
+}
+
+body {
+  @apply bg-stone-50 text-stone-900 antialiased;
+  font-size: 15px;
+  line-height: 1.55;
+}
