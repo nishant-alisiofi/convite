@@ -42,6 +42,19 @@ export const CANALES_PREFERIDOS = ['whatsapp', 'sms', 'ivr', 'radio', 'papel'] a
 export const TIPOS_REPORTE = ['necesidad', 'dano'] as const
 
 /**
+ * What a `reportes` row may be, which is one value wider than the catalogue.
+ *
+ * A record is created on receipt (2.13) and the driver never classifies, so intake has to
+ * write a row before anyone knows whether it is a need or a damage report. `sin_clasificar`
+ * is that state — the same first-class "we looked and cannot tell" that `ofertas.estado`
+ * already carries, rather than a guess 2.12 forbids. See 0021.
+ *
+ * `catalogo_items.tipo` deliberately stays on TIPOS_REPORTE: a catalogue entry that does not
+ * know what it is would be a different bug entirely.
+ */
+export const TIPOS_REPORTE_REGISTRADO = [...TIPOS_REPORTE, 'sin_clasificar'] as const
+
+/**
  * Non-negotiable 2.2 — never invent a coordinate. Every stored location declares where it
  * came from, and carries an accuracy radius in metres.
  *   gps       WhatsApp location pin           radius 0
@@ -161,6 +174,7 @@ export type RolStaff = (typeof ROLES_STAFF)[number]
 export type TipoComunidad = (typeof TIPOS_COMUNIDAD)[number]
 export type Canal = (typeof CANALES)[number]
 export type TipoReporte = (typeof TIPOS_REPORTE)[number]
+export type TipoReporteRegistrado = (typeof TIPOS_REPORTE_REGISTRADO)[number]
 export type FuenteUbicacion = (typeof FUENTES_UBICACION)[number]
 export type EstadoReporte = (typeof ESTADOS_REPORTE)[number]
 export type EstadoPedido = (typeof ESTADOS_PEDIDO)[number]
@@ -170,5 +184,7 @@ export type Temporada = (typeof TEMPORADAS)[number]
 export type FuenteRuta = (typeof FUENTES_RUTA)[number]
 export type EstadoCapacidad = (typeof ESTADOS_CAPACIDAD)[number]
 export type EstadoOferta = (typeof ESTADOS_OFERTA)[number]
+export type EstadoMensaje = (typeof ESTADOS_MENSAJE)[number]
+export type TipoAdjunto = (typeof TIPOS_ADJUNTO)[number]
 export type TipoLabor = (typeof TIPOS_LABOR)[number]
 export type EstadoEnvio = (typeof ESTADOS_ENVIO)[number]

@@ -14,12 +14,14 @@ export async function encolar(
   tipo: string,
   payload: Record<string, unknown> = {},
   correrEn?: Date,
+  /** Overrides the table default of 5. Media downloads need a 24-hour retry budget. */
+  maxIntentos?: number,
 ): Promise<string> {
   const { rows } = await ejecutor.query<{ id: string }>(
-    `insert into jobs (tipo, payload, correr_en)
-       values ($1, $2, coalesce($3, now()))
+    `insert into jobs (tipo, payload, correr_en, max_intentos)
+       values ($1, $2, coalesce($3, now()), coalesce($4, 5))
      returning id`,
-    [tipo, JSON.stringify(payload), correrEn ?? null],
+    [tipo, JSON.stringify(payload), correrEn ?? null, maxIntentos ?? null],
   )
   return rows[0]!.id
 }

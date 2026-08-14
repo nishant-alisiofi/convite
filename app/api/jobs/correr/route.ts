@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getPool } from '@/db/client'
+import { MANEJADORES_CANALES } from '@/lib/canales/trabajos'
 import { correrJobs } from '@/lib/jobs/cola'
 import { MANEJADORES } from '@/lib/jobs/manejadores'
 
@@ -23,6 +24,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: 'CRON_SECRET no configurado' }, { status: 503 })
   }
 
-  const resultado = await correrJobs(getPool(), MANEJADORES)
+  // The channel layer registers its own handlers rather than the job module importing the
+  // whole intake stack; the worker is where the two maps meet.
+  const resultado = await correrJobs(getPool(), { ...MANEJADORES, ...MANEJADORES_CANALES })
   return NextResponse.json(resultado)
 }

@@ -1,4 +1,5 @@
 import type { Pool, PoolClient } from 'pg'
+import type { EstadoMensaje } from '@/db/schema/vocabulario'
 import type { SobreEntrante } from './tipos'
 
 /**
@@ -53,4 +54,27 @@ export async function registrarEntrante(
   // No row back means the index refused it: we have seen this message before. The provider
   // gets a 200 either way — anything else buys us the same payload again in a minute.
   return id ? { estado: 'registrado', mensajeId: id } : { estado: 'duplicado' }
+}
+
+/**
+ * Applies a delivery callback to the OUTBOUND message it refers to.
+ *
+ * Meta reports sent/delivered/read/failed against the `wamid` we were given when we sent.
+ * This is the raw material for 2.14's link quality — a contact whose messages never reach
+ * `entregado` is a contact who should stop being offered voice notes (M6) — so it updates
+ * the existing row rather than creating one. A callback for a message we never sent is
+ * ignored: it is not ours, and inventing a row for it would pollute the signal.
+ */
+export async function registrarEstado(
+  ejecutor: Pool | PoolClient,
+  proveedor: string,
+  idExterno: string,
+  estado: EstadoMensaje,
+): Promise<boolean> {
+  const { rowCount } = await ejecutor.query(
+    `update mensajes set estado = $3
+      where proveedor = $1 and proveedor_mensaje_id = $2 and direccion = 'saliente'`,
+    [proveedor, idExterno, estado],
+  )
+  return (rowCount ?? 0) > 0
 }

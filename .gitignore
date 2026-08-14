@@ -33,3 +33,6 @@ supabase/.temp/
 
 # Operational data lives outside the repo
 /data/
+
+# Local media store fallback when DATA_DIR is unset
+.data/

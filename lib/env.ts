@@ -25,6 +25,9 @@ const schema = z.object({
 
   OPENAI_API_KEY: z.string().min(1).optional(),
 
+  /** Root for downloaded media. Falls back to ./.data; never inside the repo in production. */
+  DATA_DIR: z.string().min(1).optional(),
+
   APP_BASE_URL: z.string().url().default('http://localhost:3000'),
 })
 

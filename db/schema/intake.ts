@@ -26,7 +26,7 @@ import {
   ESTADOS_REPORTE,
   FUENTES_UBICACION,
   TIPOS_ADJUNTO,
-  TIPOS_REPORTE,
+  TIPOS_REPORTE_REGISTRADO,
 } from './vocabulario'
 
 /**
@@ -71,7 +71,12 @@ export const reportes = pgTable(
     index('reportes_estado_idx').on(t.estado),
     index('reportes_comunidad_idx').on(t.comunidadId),
     index('reportes_creado_idx').on(t.creadoEn),
-    check('reportes_tipo_check', enLista('tipo', TIPOS_REPORTE)),
+    check('reportes_tipo_check', enLista('tipo', TIPOS_REPORTE_REGISTRADO)),
+    // 0021: knowing the item is knowing the type, so the two cannot disagree.
+    check(
+      'reportes_sin_clasificar_sin_item_check',
+      sql`tipo <> 'sin_clasificar' or codigo_item is null`,
+    ),
     check('reportes_canal_check', enLista('canal', CANALES)),
     check('reportes_estado_check', enLista('estado', ESTADOS_REPORTE)),
     check(
