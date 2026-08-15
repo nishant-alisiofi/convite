@@ -39,11 +39,14 @@ export default async function PanelLayout({ children }: { children: React.ReactN
   return (
     <div className="min-h-dvh">
       <header className="border-b border-barro-200 bg-white">
-        <div className="mx-auto flex max-w-6xl items-center gap-6 px-6 py-3">
+        {/* Wraps at a phone's width: on a narrow screen the nav drops to its own full row
+            below the wordmark and the identity, and the (long) email truncates rather than
+            forcing the whole bar wider than the viewport. One row on sm and up. */}
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3 sm:px-6">
           <Link href="/tablero" className="font-semibold text-barro-900">
             Convite
           </Link>
-          <nav className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+          <nav className="order-last flex w-full flex-wrap gap-x-4 gap-y-1 text-sm sm:order-none sm:w-auto">
             {SECCIONES.map((s) => (
               <span key={s.href}>
                 {s.listo ? (
@@ -58,19 +61,22 @@ export default async function PanelLayout({ children }: { children: React.ReactN
               </span>
             ))}
           </nav>
-          <div className="ml-auto flex items-center gap-3 text-sm">
-            <span className="text-barro-500">
+          <div className="ml-auto flex min-w-0 items-center gap-3 text-sm">
+            <span className="truncate text-barro-500">
               {sesion.correo} · {sesion.rolStaff}
             </span>
             <form action={salir}>
-              <button type="submit" className="text-barro-600 underline hover:text-barro-900">
+              <button
+                type="submit"
+                className="shrink-0 text-barro-600 underline hover:text-barro-900"
+              >
                 Salir
               </button>
             </form>
           </div>
         </div>
       </header>
-      <div className="mx-auto max-w-6xl px-6 py-8">{children}</div>
+      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">{children}</div>
     </div>
   )
 }
