@@ -3,7 +3,7 @@ import './globals.css'
 
 export const metadata: Metadata = {
   title: 'Convite',
-  description: 'Coordinación de ayuda humanitaria en la cuenca del Atrato',
+  description: 'Coordinación de ayuda humanitaria para el Chocó y el Pacífico colombiano',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

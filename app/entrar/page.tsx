@@ -240,7 +240,7 @@ export default async function Entrar({
             <span className="text-2xl font-semibold tracking-tight">Convite</span>
           </div>
           <p className="mt-3 text-lg leading-snug text-barro-700">
-            Coordinación de ayuda en la cuenca del Atrato.
+            Coordinación de ayuda en el Chocó y el Pacífico colombiano.
           </p>
           <p className="mt-4 text-barro-600">
             Para cada solicitud abierta, Convite dice qué es lo que falta: si falta cómo
