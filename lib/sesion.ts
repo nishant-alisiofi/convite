@@ -1,6 +1,7 @@
+import { headers } from 'next/headers'
 import type { PoolClient } from 'pg'
 import { getPool } from '@/db/client'
-import { clienteServidor, type SesionStaff } from '@/lib/supabase/servidor'
+import { autenticacionConfigurada, getAuth } from '@/lib/auth'
 
 /**
  * Reading data as the signed-in person.
@@ -12,27 +13,59 @@ import { clienteServidor, type SesionStaff } from '@/lib/supabase/servidor'
  * wrong, the screen goes empty, which is the correct direction to fail.
  *
  * Section 11: `rol_staff` gates the UI, RLS gates the data. This is the second half.
+ *
+ * Identity comes from Better Auth on our own Postgres (lib/auth.ts). Only the first two
+ * lines of `sesionActual` know that; everything below — the claims, the role, the policies
+ * — is the same machinery it has always been.
  */
 
+/**
+ * A path we are willing to send somebody to after they sign in, or null.
+ *
+ * `desde` is carried across a sign-in — the middleware puts the page you were trying to
+ * reach into the redirect, and it comes back through the form. That makes it attacker-
+ * controlled, which is how «redirect back where you were» becomes an open redirect and
+ * then a convincing phishing link that genuinely starts at our domain.
+ *
+ * Leading-slash alone is not enough, and this is the whole reason this function exists:
+ * `//evil.example` starts with `/` and is a protocol-relative URL, so
+ * `new URL('//evil.example', 'https://convite…')` resolves to `https://evil.example`. A
+ * backslash does the same in some parsers. Only a single slash followed by something that
+ * is not a slash or a backslash is a path on this site.
+ */
+export function rutaInterna(valor: string): string | null {
+  if (!valor.startsWith('/')) return null
+  if (valor.startsWith('//') || valor.startsWith('/\\')) return null
+  return valor
+}
+
+/** Who is signed in, and what they are allowed to be. */
+export type SesionStaff = {
+  /** The Better Auth user id. A uuid, because `usuarios.id` is one — see lib/auth.ts. */
+  authId: string
+  correo: string
+  rolStaff: string
+  organizacionId: string
+}
+
 export async function sesionActual(): Promise<SesionStaff | null> {
-  const supabase = await clienteServidor()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return null
+  if (!autenticacionConfigurada()) return null
+
+  const sesion = await getAuth().api.getSession({ headers: await headers() })
+  if (!sesion?.user) return null
 
   // The staff record is read with the owner role: a session with no `usuarios` row has no
   // access to `usuarios` either, so it could never discover that it is not staff.
   const { rows } = await getPool().query<{ rol_staff: string; organizacion_id: string }>(
     'select rol_staff, organizacion_id from usuarios where id = $1 and activo',
-    [user.id],
+    [sesion.user.id],
   )
   const fila = rows[0]
   if (!fila) return null
 
   return {
-    authId: user.id,
-    correo: user.email ?? '',
+    authId: sesion.user.id,
+    correo: sesion.user.email,
     rolStaff: fila.rol_staff,
     organizacionId: fila.organizacion_id,
   }

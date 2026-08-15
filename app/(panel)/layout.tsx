@@ -1,7 +1,8 @@
 import Link from 'next/link'
+import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
+import { getAuth } from '@/lib/auth'
 import { sesionActual } from '@/lib/sesion'
-import { clienteServidor } from '@/lib/supabase/servidor'
 
 /**
  * The coordinator shell. Section 10: light, calm, readable, works on a laptop over a weak
@@ -24,8 +25,10 @@ const SECCIONES = [
 
 async function salir() {
   'use server'
-  const supabase = await clienteServidor()
-  await supabase.auth.signOut()
+  // Deletes the session row and clears the cookie. The cookie half only reaches the browser
+  // because of the `nextCookies()` plugin in lib/auth.ts — without it this would look like
+  // it worked and the next request would still be signed in.
+  await getAuth().api.signOut({ headers: await headers() })
   redirect('/entrar')
 }
 

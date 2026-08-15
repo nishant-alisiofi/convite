@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm'
 import { geometry, timestamp, uuid } from 'drizzle-orm/pg-core'
 
-/** Primary key used everywhere except `usuarios`, whose id is the Supabase auth uid. */
+/** Primary key used everywhere except `usuarios`, whose id is the signed-in `auth_user.id`. */
 export const pk = () => uuid('id').primaryKey().default(sql`gen_random_uuid()`)
 
 export const creadoEn = () =>

@@ -35,6 +35,10 @@ const POLITICA: Record<string, 'publica' | 'autenticada'> = {
   '/acerca': 'publica',
   '/entrar': 'publica',
   '/auth/callback': 'publica',
+  // Better Auth's own endpoints. Public by necessity — they are how somebody with no
+  // session gets one — and they answer about sessions and nothing else, so there is no
+  // basin data behind them to leak.
+  '/api/auth/[...all]': 'publica',
   '/api/salud': 'publica',
   '/api/webhooks/whatsapp': 'publica',
   '/api/jobs/correr': 'publica',
@@ -54,6 +58,9 @@ const POLITICA: Record<string, 'publica' | 'autenticada'> = {
 /** Concrete values for the dynamic segments, so a real request can be made. */
 const EJEMPLOS: Record<string, string> = {
   '[id]': '00000000-0000-4000-8000-000000000001',
+  // A real Better Auth endpoint rather than a made-up segment, so the request exercises the
+  // handler instead of bouncing off its 404.
+  '[...all]': 'get-session',
 }
 
 function rutasDeLaApp(dir = 'app', prefijo = ''): string[] {

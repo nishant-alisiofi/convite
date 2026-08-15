@@ -1,56 +1,49 @@
-import { type EmailOtpType } from '@supabase/supabase-js'
+import { headers } from 'next/headers'
 import { NextResponse, type NextRequest } from 'next/server'
-import { vincularStaff } from '@/lib/sesion'
-import { clienteServidor } from '@/lib/supabase/servidor'
+import { autenticacionConfigurada, getAuth } from '@/lib/auth'
+import { rutaInterna, vincularStaff } from '@/lib/sesion'
 
 /**
- * Where the magic link lands.
+ * Where a coordinator lands after clicking the link.
  *
- * Supabase can deliver a sign-in two ways and they are not interchangeable:
+ * The verification itself is no longer done here. Better Auth owns
+ * `/api/auth/magic-link/verify`: it consumes the one-time token, creates the session and
+ * sets the cookie, then sends the browser here. By the time this runs the person is signed
+ * in — so all that is left is the question this route existed to answer in the first place.
  *
- *   ?token_hash=…&type=magiclink   verified server-side with verifyOtp. This is what our
- *                                  email template sends, and the only form that works
- *                                  without JavaScript.
- *   ?code=…                        the PKCE exchange, used when the sign-in was started by
- *                                  a browser client that stored a verifier.
- *
- * There is a third form — `#access_token=…` in the URL fragment — which a browser never
- * sends to the server. Any route that only reads `?code=` silently bounces those links to
- * the sign-in page, which is exactly the bug this handler was written to fix.
- *
- * Verifying only proves the person owns that address. It does not make them staff:
- * `vincular_usuario_staff()` creates a `usuarios` row only if an admin put the address on
- * the allowlist first (2.10).
+ * Being signed in only proves you own that address. It does not make you staff.
+ * `vincular_usuario_staff()` creates the `usuarios` row only if an admin put the address on
+ * the allowlist first (2.10), and without that row every policy in 0017 returns nothing.
+ * Somebody who reaches this point uninvited is signed out again rather than left staring at
+ * a panel with no data in it, which would look like a bug instead of an answer.
  */
+
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  const url = new URL(request.url)
-  const tokenHash = url.searchParams.get('token_hash')
-  const tipo = url.searchParams.get('type') as EmailOtpType | null
-  const code = url.searchParams.get('code')
-  const desde = url.searchParams.get('desde')
+  if (!autenticacionConfigurada()) {
+    return NextResponse.redirect(new URL('/entrar?error=configuracion', request.url))
+  }
 
-  const supabase = await clienteServidor()
+  const sesion = await getAuth().api.getSession({ headers: await headers() })
 
-  const { data, error } = tokenHash
-    ? await supabase.auth.verifyOtp({ type: tipo ?? 'magiclink', token_hash: tokenHash })
-    : code
-      ? await supabase.auth.exchangeCodeForSession(code)
-      : { data: { user: null }, error: new Error('enlace sin token') }
-
-  if (error || !data.user) {
+  // No session at this point means the link was expired, already used, or tampered with.
+  // Better Auth normally redirects those to its own errorCallbackURL and they never arrive
+  // here; this covers somebody opening the bare URL.
+  if (!sesion?.user) {
     return NextResponse.redirect(new URL('/entrar?error=enlace', request.url))
   }
 
   const resultado = await vincularStaff({
-    authId: data.user.id,
-    correo: data.user.email ?? '',
+    authId: sesion.user.id,
+    correo: sesion.user.email,
   })
 
   if (resultado === 'sin_invitacion') {
-    await supabase.auth.signOut()
+    await getAuth().api.signOut({ headers: await headers() })
     return NextResponse.redirect(new URL('/entrar?motivo=sin_invitacion', request.url))
   }
 
-  const destino = desde && desde.startsWith('/') ? desde : '/tablero'
-  return NextResponse.redirect(new URL(destino, request.url))
+  const desde = rutaInterna(request.nextUrl.searchParams.get('desde') ?? '')
+  return NextResponse.redirect(new URL(desde ?? '/tablero', request.url))
 }

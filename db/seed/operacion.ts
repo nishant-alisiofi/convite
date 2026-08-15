@@ -4,8 +4,9 @@
  *
  * Two things to know before trusting anything here.
  *
- * 1. The `usuarios` uuids are placeholders. `usuarios.id` must equal the Supabase auth uid,
- *    so on a real deployment these rows are created when staff first sign in (M3). Locally
+ * 1. The `usuarios` uuids are placeholders. `usuarios.id` must equal the `auth_user.id` of
+ *    the person who signed in, so on a real deployment these rows are created when staff
+ *    first sign in — by `vincular_usuario_staff()`, and only for an invited address. Locally
  *    they exist because `existencias.contado_por` and `reportes.verificado_por` are NOT
  *    NULL by design — non-negotiable 2.1 means there is no way to record a count or a
  *    verification without a person, not even in seed data.

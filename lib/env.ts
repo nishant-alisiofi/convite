@@ -10,9 +10,32 @@ import { z } from 'zod'
 const schema = z.object({
   DATABASE_URL: z.string().url(),
 
-  SUPABASE_URL: z.string().url().optional(),
-  SUPABASE_ANON_KEY: z.string().min(1).optional(),
-  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
+  /**
+   * Signs the session cookie. Without it there is no sign-in — the middleware says so
+   * rather than letting requests through, and `lib/auth.ts` refuses to build a config.
+   * Generate with `openssl rand -hex 32`.
+   */
+  BETTER_AUTH_SECRET: z.string().min(32).optional(),
+  /**
+   * Public origin the auth routes answer on. Defaults to APP_BASE_URL because in this app
+   * they are the same server — the panel and `/api/auth/*` are one Next deployment, which
+   * is what spares us the cross-origin cookie problem entirely.
+   */
+  BETTER_AUTH_URL: z.string().url().optional(),
+
+  /** Sends the sign-in link. Absent locally: the link goes to the server console instead. */
+  RESEND_API_KEY: z.string().min(1).optional(),
+  /**
+   * Whom the sign-in link comes from. Has to be a domain *verified in Resend* — an
+   * unverified one is not a soft failure, it is a 422 on every single send, so a wrong
+   * value here looks exactly like «the email never arrived».
+   *
+   * The default is the shared internal domain, which is verified today and is what makes a
+   * staging demo work without waiting on DNS. Convite has no domain of its own yet; when it
+   * gets one, verify `mail.<dominio>` in Resend and set this. Never the apex — that is the
+   * one that is never verified by default.
+   */
+  EMAIL_FROM: z.string().min(1).default('Convite <no-responder@dev.downshiftit.com>'),
 
   WHATSAPP_PHONE_NUMBER_ID: z.string().min(1).optional(),
   WHATSAPP_BUSINESS_ACCOUNT_ID: z.string().min(1).optional(),

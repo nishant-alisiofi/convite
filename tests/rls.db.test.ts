@@ -9,8 +9,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
  * `mapa_publico`. Prove it with tests against the database.»
  *
  * Every case runs as the `authenticated` Postgres role with a JWT claim set, which is
- * exactly how a signed-in session reaches Postgres through Supabase. Proving it any other
- * way — say, by checking the UI hides a button — would prove nothing (Section 11).
+ * exactly how a signed-in session reaches Postgres through `conSesion()`. Proving it any
+ * other way — say, by checking the UI hides a button — would prove nothing (Section 11).
  *
  * Everything happens inside a transaction that is always rolled back.
  */

@@ -1,11 +1,19 @@
-import { createServerClient } from '@supabase/ssr'
+import { getSessionCookie } from 'better-auth/cookies'
 import { NextResponse, type NextRequest } from 'next/server'
 
 /**
- * Refreshes the Supabase session cookie and keeps the panel behind a sign-in.
+ * Keeps the panel behind a sign-in.
  *
  * This is a convenience, not a security boundary: the boundary is RLS. A request that got
  * past here with no staff record still reads nothing (db/migrations/0017).
+ *
+ * It checks that a session cookie is *present*, not that it is valid — `getSessionCookie`
+ * reads the cookie jar and nothing else. That is deliberate and is what Better Auth
+ * recommends for middleware: verifying properly means a database round trip, middleware
+ * runs on every request including the public map, and the answer would be thrown away
+ * anyway because the panel re-reads the session for real in `sesionActual()`. A forged
+ * cookie gets past this line and then gets nothing: no Better Auth session, no `usuarios`
+ * row, no rows from any policy.
  */
 
 /**
@@ -17,7 +25,17 @@ import { NextResponse, type NextRequest } from 'next/server'
  * not fail loudly — it 307s to the sign-in page, and the caller sees a redirect it has no
  * idea what to do with.
  */
-export const PUBLICAS = ['/entrar', '/auth', '/api/webhooks', '/api/jobs', '/api/salud', '/acerca']
+export const PUBLICAS = [
+  '/entrar',
+  '/auth',
+  // Better Auth's own endpoints. They are how a person who has no session gets one, so
+  // gating them behind a session is the deadlock it sounds like.
+  '/api/auth',
+  '/api/webhooks',
+  '/api/jobs',
+  '/api/salud',
+  '/acerca',
+]
 
 /**
  * Files the web expects to fetch without asking anybody's permission.
@@ -65,14 +83,18 @@ function marcarNoIndexable(respuesta: NextResponse): NextResponse {
 /**
  * Whether identity is configured at all.
  *
- * These are the names the client actually reads. `.env.example` and `lib/env.ts` also carry
- * `SUPABASE_URL`/`SUPABASE_ANON_KEY`, which nothing consumes — setting those and not these
- * looks identical to setting nothing.
+ * Both halves are needed and neither has a safe default: without `BETTER_AUTH_SECRET` there
+ * is nothing to sign a session with, and without `DATABASE_URL` there is nowhere to keep
+ * one. Read straight from `process.env` rather than through `lib/env.ts`, because this runs
+ * on the edge and during the build, where a missing value has to be a «no» and never a
+ * thrown exception.
+ *
+ * This should now be true in every real deployment — identity lives in the same database as
+ * everything else, so there is no second service to stand up. It stays because a deploy
+ * that forgot the secret should say so rather than crash.
  */
 function autenticacionConfigurada(): boolean {
-  return Boolean(
-    process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-  )
+  return Boolean(process.env.BETTER_AUTH_SECRET && process.env.DATABASE_URL)
 }
 
 /**
@@ -95,9 +117,8 @@ function sinAutenticacion(): NextResponse {
      <h1>Autenticación no configurada</h1>
      <p>Esta pantalla necesita un inicio de sesión y el servidor no tiene configurada la
      identidad, así que no hay forma de comprobar quién es usted.</p>
-     <p>Faltan <code>NEXT_PUBLIC_SUPABASE_URL</code> y
-     <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code>. El resto del sistema —el webhook, la cola y
-     <code>/api/salud</code>— sigue funcionando.</p>
+     <p>Faltan <code>BETTER_AUTH_SECRET</code> y <code>DATABASE_URL</code>. El resto del
+     sistema —el webhook, la cola y <code>/api/salud</code>— sigue funcionando.</p>
      </body></html>`,
     { status: 503, headers: { 'content-type': 'text/html; charset=utf-8' } },
   )
@@ -150,37 +171,18 @@ export async function middleware(request: NextRequest) {
   }
 
   // Identity missing: the public surface carries on, the private one fails closed and says
-  // why. This is what makes a database-only staging deploy possible — intake, the queue and
-  // the health check all work while sign-in waits for a Supabase project.
+  // why. Now that identity lives in our own database this should not happen in a real
+  // deployment — but a deploy that forgot the secret should say which one it forgot.
   if (!autenticacionConfigurada()) {
     return marcarNoIndexable(esPublica ? NextResponse.next({ request }) : sinAutenticacion())
   }
 
-  // ── Configured: exactly as before ───────────────────────────────────────────────────────
-  // The client is still built for every route, public ones included, because that is what
-  // refreshes the session cookie.
-  let respuesta = NextResponse.next({ request })
+  const respuesta = NextResponse.next({ request })
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll: () => request.cookies.getAll(),
-        setAll: (cookies) => {
-          for (const { name, value } of cookies) request.cookies.set(name, value)
-          respuesta = NextResponse.next({ request })
-          for (const { name, value, options } of cookies) respuesta.cookies.set(name, value, options)
-        },
-      },
-    },
-  )
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user && !esPublica) {
+  // Presence, not validity — see the note at the top of this file. Sending someone who has
+  // no cookie at all to /entrar saves them a round trip through a screen that would only
+  // redirect them anyway; anyone holding a cookie is checked properly further in.
+  if (!esPublica && !getSessionCookie(request)) {
     const destino = request.nextUrl.clone()
     destino.pathname = '/entrar'
     destino.searchParams.set('desde', ruta)

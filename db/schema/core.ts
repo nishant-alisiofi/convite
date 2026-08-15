@@ -182,8 +182,9 @@ export const salidasPendientes = pgTable(
 )
 
 /**
- * Staff only. `id` is the Supabase auth uid, so RLS policies can compare against auth.uid()
- * without a join. Section 11: rol_staff gates the UI, RLS gates the data.
+ * Staff only. `id` is the `auth_user.id` of the person who signed in, so RLS policies can
+ * compare against auth.uid() without a join. Section 11: rol_staff gates the UI, RLS gates
+ * the data.
  */
 export const usuarios = pgTable(
   'usuarios',

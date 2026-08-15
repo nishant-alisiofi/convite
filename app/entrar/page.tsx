@@ -1,8 +1,8 @@
 import { ArrowRight, CheckCircle2, Info, KeyRound, MailCheck, Waves } from 'lucide-react'
+import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { env } from '@/lib/env'
-import { sesionActual } from '@/lib/sesion'
-import { clienteServidor } from '@/lib/supabase/servidor'
+import { autenticacionConfigurada, correoInvitado, getAuth } from '@/lib/auth'
+import { rutaInterna, sesionActual } from '@/lib/sesion'
 
 /**
  * Sign-in. Magic link only — Section 3 says no passwords, and one fewer credential is one
@@ -20,11 +20,22 @@ async function enviarEnlace(formData: FormData) {
     .toLowerCase()
   if (!correo.includes('@')) redirect('/entrar?error=correo')
 
-  const supabase = await clienteServidor()
-  await supabase.auth.signInWithOtp({
-    email: correo,
-    options: { emailRedirectTo: `${env().APP_BASE_URL}/auth/callback` },
-  })
+  // Should not happen: the middleware says so loudly on every protected route. But this
+  // form is public, so without the guard a misconfigured deploy answers a coordinator's
+  // sign-in with a stack trace.
+  if (!autenticacionConfigurada()) redirect('/entrar?error=configuracion')
+
+  const desde = rutaInterna(String(formData.get('desde') ?? ''))
+  const destino = `/auth/callback${desde ? `?desde=${encodeURIComponent(desde)}` : ''}`
+
+  // The allowlist (2.10), checked before anything is sent. `lib/auth.ts` asks the same
+  // question again when the row would be written; see the note on `correoInvitado`.
+  if (await correoInvitado(correo)) {
+    await getAuth().api.signInMagicLink({
+      headers: await headers(),
+      body: { email: correo, callbackURL: destino, errorCallbackURL: '/entrar' },
+    })
+  }
 
   // The same outcome either way: whether an address belongs to staff is not something an
   // unauthenticated form gets to reveal.
@@ -34,10 +45,15 @@ async function enviarEnlace(formData: FormData) {
 export default async function Entrar({
   searchParams,
 }: {
-  searchParams: Promise<{ enviado?: string; error?: string; motivo?: string }>
+  searchParams: Promise<{ enviado?: string; error?: string; motivo?: string; desde?: string }>
 }) {
   if (await sesionActual()) redirect('/tablero')
-  const { enviado, error, motivo } = await searchParams
+  const { enviado, error, motivo, desde } = await searchParams
+
+  // Better Auth names its own failures (INVALID_TOKEN, failed_to_create_user…). A
+  // coordinator cannot act on any of them and they all mean the same thing, so everything
+  // that is not one of ours collapses into «that link is done, ask for another».
+  const errorEnlace = Boolean(error) && error !== 'correo' && error !== 'configuracion'
 
   return (
     <div className="min-h-dvh bg-barro-50">
@@ -103,6 +119,9 @@ export default async function Entrar({
                 </p>
 
                 <form action={enviarEnlace} className="mt-6 space-y-4">
+                  {/* Where they were headed before the middleware sent them here. Validated
+                      on the way out by `rutaInterna`, never trusted as given. */}
+                  <input type="hidden" name="desde" value={desde ?? ''} />
                   <div>
                     <label
                       htmlFor="correo"
@@ -149,7 +168,7 @@ export default async function Entrar({
             )}
           </div>
 
-          {error === 'enlace' && (
+          {errorEnlace && (
             <p className="mt-4 rounded-lg border border-barro-200 bg-white px-4 py-3 text-sm text-barro-700">
               Ese enlace ya no sirve. Pida uno nuevo y ábralo apenas llegue.
             </p>
@@ -158,6 +177,15 @@ export default async function Entrar({
             <p className="mt-4 rounded-lg border border-barro-200 bg-white px-4 py-3 text-sm text-barro-700">
               Escriba un correo válido para poder entrar.
             </p>
+          )}
+          {error === 'configuracion' && (
+            <div className="mt-4 rounded-lg border border-atrato-100 bg-atrato-50 px-4 py-3">
+              <p className="font-medium text-barro-900">El servidor no tiene configurada la identidad.</p>
+              <p className="mt-1 text-sm text-barro-700">
+                No es algo que usted pueda resolver desde aquí. Avísele a quien opera Convite:
+                faltan <code>BETTER_AUTH_SECRET</code> o <code>DATABASE_URL</code>.
+              </p>
+            </div>
           )}
           {motivo === 'sin_invitacion' && (
             <div className="mt-4 rounded-lg border border-atrato-100 bg-atrato-50 px-4 py-3">

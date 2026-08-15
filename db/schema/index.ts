@@ -1,4 +1,5 @@
 export * from './vocabulario'
+export * from './autenticacion'
 export * from './core'
 export * from './catalogo'
 export * from './intake'
