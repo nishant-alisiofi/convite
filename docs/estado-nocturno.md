@@ -6,7 +6,16 @@ Cambios desde la nota nocturna, todos en `origin/main` y desplegados en staging:
   Railway, correo por Resend. Supabase eliminado por completo. RLS intacto (0 políticas
   tocadas; `conSesion` fija `request.jwt.claims` igual que antes). Migración `0028` (tablas
   `auth_user/session/account/verification`). 507/507 tests.
-- **El panel del coordinador está VIVO y caminado en staging** — login por magic-link
+- **[CORRECCIÓN 17:05] El último salto del login estaba roto en staging** — el redirect de
+  `/auth/callback` se construía desde `request.url` (la dirección interna del contenedor detrás
+  del proxy de Railway), así que al hacer clic en el enlace real se terminaba en
+  `https://localhost:8080/tablero` (inalcanzable). El panel, la sesión, la cookie y RLS sí
+  funcionan; solo el salto final fallaba — y es el último paso del único camino de entrada. No
+  se detectó porque en local las dos URLs coinciden, y tanto la caminata con curl como los
+  tests pasaban. Arreglado en `fdb9889` (usa `nextUrl.clone()` como el middleware; 511/511;
+  guarda estructural contra construir redirects desde `request.url`). Pendiente de verificar en
+  vivo el clic completo del enlace emailed una vez desplegado.
+- **El panel del coordinador está vivo en staging** — login por magic-link
   (5 roles sembrados: coordinador/verificador/despachador/admin/lectura →
   `talos+convite-<rol>@downshiftit.com`, llegan al buzón talos). Tablero renderiza la salida
   real del emparejador (clasificación-como-llamada). RLS por comunidad verificado en vivo
