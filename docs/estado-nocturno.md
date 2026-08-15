@@ -1,5 +1,28 @@
 # Convite — ACTUALIZACIÓN 2026-08-15: demoable, en el estándar de la plataforma
 
+## Dominios propios + producción limpia (última tanda)
+
+- **`staging.convite.ai` EN VIVO (HTTPS 200).** Dominio propio de staging. `APP_BASE_URL` de
+  staging apuntado a `https://staging.convite.ai`. DNS en Cloudflare (CNAME + TXT de verificación
+  de Railway); cert emitido (~8.5 min tras healthy).
+- **`convite.ai` (producción) — stand-up LIMPIO, sin datos de prueba.** Producción estaba vacía
+  (sin DB, sin secrets, en crash-loop). Configurada correctamente: DATABASE_URL compuesta sobre
+  el `convite-db` de producción (su propia instancia, separada de staging), `BETTER_AUTH_SECRET`
+  y `CRON_SECRET` frescos, correo desde `mail.convite.ai`, `APP_BASE_URL=https://convite.ai`,
+  `CONVITE_NOINDEX=1` (no indexar hasta lanzar). App **SUCCESS/healthy**; el cert del ápice se
+  estaba emitiendo (Railway completa el reto ACME solo cuando el destino está sano — pasó a sano
+  21:54).
+- **Regla cumplida: NUNCA sembrar datos de prueba en producción.** El arranque de prod es
+  `db:migrate && start` — migraciones 0000–0033 aplicadas a la DB vacía, **sin `db:seed`** (nada
+  de comunidades/reportes «[DATO DE PRUEBA]»). El primer intento incluía `sembrar:staff`, que
+  **exige una organización previa** («No hay ninguna organización») → crash-loop; se quitó. El
+  staff real (admins de plataforma / Alisio, cross-org) se sembrará limpio cuando aterrice el RBAC
+  (los admins de plataforma no dependen de una organización). Ver `tipos-de-usuario-y-accesos.md`.
+- **En construcción (RBAC Fase 1):** admin de plataforma (Alisio, cross-org, vía `CORREOS_STAFF`)
+  + aprobación de centros + admin por-organización. Se construye en worktree aislado; luego a
+  staging, verificación en vivo, y **Codex valida el 0→1 completo** (registro, admin, admins
+  internos). Pendiente: bootstrap de staff en prod sin dependencia de organización.
+
 Cambios desde la nota nocturna, todos en `origin/main`, desplegados en staging y verificados
 en vivo:
 
