@@ -106,7 +106,23 @@ function construir() {
      * is the second half of this — if this line is ever removed, sign-up fails loudly at
      * the database instead of failing silently at the policies.
      */
-    advanced: { database: { generateId: () => randomUUID() } },
+    advanced: {
+      database: { generateId: () => randomUUID() },
+      /**
+       * Where the caller's address comes from, behind a proxy.
+       *
+       * Railway terminates TLS in front of us, so the socket address is always the proxy.
+       * Better Auth said so itself on the first staging boot: «Rate limiting could not
+       * determine a client IP and is falling back to a single shared per-path bucket». That
+       * is worse than it sounds on a sign-in endpoint — one shared bucket means one noisy
+       * caller can spend everybody's allowance, and the limit stops being per-attacker.
+       *
+       * `x-forwarded-for` is only trustworthy because Railway sets it; nothing reaches this
+       * process without passing through their proxy. It would be forgeable on a host that
+       * accepts direct connections.
+       */
+      ipAddress: { ipAddressHeaders: ['x-forwarded-for'] },
+    },
 
     /** No passwords anywhere (Section 3). The magic link below is the only door. */
     emailAndPassword: { enabled: false },

@@ -1,7 +1,20 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { NextRequest } from 'next/server'
 import { describe, expect, it } from 'vitest'
 import { rutaInterna } from '@/lib/sesion'
+
+/**
+ * Set before the route is imported: `lib/env.ts` memoises on first read, and the point of
+ * this file is that the redirect origin comes from configuration rather than the request.
+ * Empty secret so the handler takes its first branch and returns before it needs a database
+ * or a request context — that branch redirects, which is all we are measuring.
+ */
+const ORIGEN = 'https://origen-configurado.ejemplo'
+process.env.APP_BASE_URL = ORIGEN
+process.env.BETTER_AUTH_SECRET = ''
+
+const { GET } = await import('@/app/auth/callback/route')
 
 /**
  * Where we send people, and the two ways that goes wrong.
@@ -40,19 +53,23 @@ describe('rutaInterna: a dónde aceptamos mandar a alguien tras entrar', () => {
 
 describe('las redirecciones se construyen sobre el origen público', () => {
   /*
-   * Behind Railway's proxy `request.url` is the origin the *container* was reached on — the
-   * internal bind address — while `request.nextUrl` is the one Next rebuilds from the
-   * forwarded host. Build a redirect from the first and the browser is sent to
-   * `https://localhost:8080/tablero`, which resolves to nothing.
+   * Behind Railway's proxy, nothing on the incoming request knows the public origin.
+   * `request.url` is the address the container was reached on, so a redirect built from it
+   * sends the browser to `https://localhost:8080/tablero`, which resolves to nothing.
    *
-   * It shipped, and the only reason it was found is that somebody clicked a real link on
-   * deployed staging: sign-in ended one step short of the panel, on an unreachable URL. On a
-   * laptop the two values are identical, so a local walk passes and so does any unit test —
-   * `NextRequest` does not apply `x-forwarded-host` in its constructor, so the divergence
-   * cannot be reproduced in-process at all.
+   * `request.nextUrl` is NOT the fix, and this test exists partly to say so: it was the
+   * second attempt, it shipped, and it failed identically. Next rebuilds `nextUrl` from the
+   * forwarded host in **middleware** — which is why the middleware's redirect was correct
+   * all along — but a Node route handler gets neither. Reading `x-forwarded-host` by hand
+   * would work at the cost of trusting a client-settable header.
    *
-   * Which leaves the source as the honest place to assert it. Structural rather than
-   * behavioural, and deliberately across every route instead of just the one that broke.
+   * So redirects are built from `APP_BASE_URL` via `urlBase()`: configuration we already
+   * have, correct on every environment, and beyond the caller's influence. Better Auth uses
+   * the same value for its own `baseURL`, and its half of the chain was right the whole time.
+   *
+   * Asserted structurally because it cannot be asserted behaviourally: `NextRequest` never
+   * diverges in-process, so no unit test can tell a correct implementation from either of
+   * the two broken ones. Applied across every route, not just the one that broke twice.
    */
   const RUTAS = [
     'app/auth/callback/route.ts',
@@ -66,7 +83,7 @@ describe('las redirecciones se construyen sobre el origen público', () => {
   const sinComentarios = (fuente: string) =>
     fuente.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
 
-  it('ninguna ruta arma una redirección a partir de request.url', () => {
+  it('ninguna ruta arma una redirección desde la petición', () => {
     for (const ruta of RUTAS) {
       let fuente: string
       try {
@@ -76,22 +93,50 @@ describe('las redirecciones se construyen sobre el origen público', () => {
         continue
       }
 
-      // `new URL(<algo>, request.url)` — the shape that produced the bug. A single-argument
-      // `new URL(request.url)` is fine: that only parses it to read searchParams, which
-      // does not depend on the origin being right.
+      // Both shapes that shipped broken. A single-argument `new URL(request.url)` stays
+      // allowed: that only parses it to read searchParams, which does not depend on the
+      // origin being right.
       expect(
         /new URL\([^)]*,\s*(request|req)\.url\s*\)/.test(fuente),
         `${ruta} arma una URL sobre request.url; detrás del proxy eso apunta al bind ` +
-          `interno. Use request.nextUrl (así lo hace middleware.ts).`,
+          `interno del contenedor. Use urlBase().`,
+      ).toBe(false)
+
+      expect(
+        /NextResponse\.redirect\([^)]*nextUrl/.test(fuente) ||
+          /new URL\([^)]*,\s*(request|req)\.nextUrl/.test(fuente),
+        `${ruta} arma una redirección sobre request.nextUrl. Eso funciona en middleware.ts, ` +
+          `donde Next lo reconstruye desde el host reenviado, pero NO en un route handler: ` +
+          `ya se desplegó así una vez y falló igual. Use urlBase().`,
       ).toBe(false)
     }
   })
 
-  it('la callback sí usa nextUrl, que es el que trae el origen público', () => {
-    // The positive half: the assertion above passes trivially if the file stops redirecting
+  it('redirige al origen configurado aunque la petición llegue a otro', async () => {
+    /*
+     * The behavioural half, and the one that would have caught both broken attempts.
+     *
+     * It works only because the fix stopped depending on the request: the handler is asked
+     * from `http://localhost:8080` — the exact internal address Railway's container answers
+     * on — and has to answer with the configured public origin anyway. Against either
+     * earlier version it returns `http://localhost:8080/entrar…` and fails here, in the
+     * suite, instead of on a coordinator's screen.
+     */
+    const respuesta = await GET(new NextRequest('http://localhost:8080/auth/callback'))
+    const destino = new URL(respuesta.headers.get('location')!)
+
+    expect(destino.origin).toBe(ORIGEN)
+    expect(destino.origin).not.toContain('localhost')
+    expect(destino.pathname).toBe('/entrar')
+  })
+
+  it('la callback redirige sobre el origen configurado', () => {
+    // The positive half: the assertions above pass trivially if the file stops redirecting
     // at all, so this pins that it still does, the right way.
-    const fuente = readFileSync(join(process.cwd(), 'app/auth/callback/route.ts'), 'utf8')
-    expect(fuente).toMatch(/request\.nextUrl\.clone\(\)/)
+    const fuente = sinComentarios(
+      readFileSync(join(process.cwd(), 'app/auth/callback/route.ts'), 'utf8'),
+    )
+    expect(fuente).toMatch(/urlBase\(\)/)
     expect(fuente).toMatch(/NextResponse\.redirect\(/)
   })
 })

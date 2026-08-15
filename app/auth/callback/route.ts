@@ -1,6 +1,6 @@
 import { headers } from 'next/headers'
 import { NextResponse, type NextRequest } from 'next/server'
-import { autenticacionConfigurada, getAuth } from '@/lib/auth'
+import { autenticacionConfigurada, getAuth, urlBase } from '@/lib/auth'
 import { rutaInterna, vincularStaff } from '@/lib/sesion'
 
 /**
@@ -21,23 +21,31 @@ import { rutaInterna, vincularStaff } from '@/lib/sesion'
 export const dynamic = 'force-dynamic'
 
 /**
- * Builds a redirect to somewhere else on this site.
+ * Builds a redirect to somewhere else on this site, from the configured public origin.
  *
- * Deliberately `request.nextUrl`, never `new URL(ruta, request.url)`. Behind Railway's proxy
- * those two disagree: `request.url` is the origin the container was reached on — the internal
- * bind address — so every redirect out of this route pointed the browser at
- * `https://localhost:8080/tablero`, which resolves to nothing. `nextUrl` is the one Next
- * rebuilds from the forwarded host, so it carries the public origin.
+ * Not from the request. Behind Railway's proxy nothing on the incoming request knows the
+ * public origin: `request.url` is the address the *container* was reached on, so redirects
+ * came out as `https://localhost:8080/tablero`, which resolves to nothing and left sign-in
+ * dead one step short of the panel.
  *
- * That is the exact shape of bug a local walk cannot find: on a laptop the two are identical
- * and every redirect works. It took clicking a real link on deployed staging, where the
- * sign-in ended on an unreachable URL one step short of the panel. The middleware already
- * did this correctly (`nextUrl.clone()`); this route did not.
+ * `request.nextUrl` was the obvious fix and it is wrong here — that was the second attempt,
+ * and it shipped and failed in exactly the same way. Next rebuilds `nextUrl` from the
+ * forwarded host in **middleware**, which is why the middleware's own redirect always looked
+ * right; a Node route handler gets neither. Reading `x-forwarded-host` by hand would work
+ * and would mean trusting a header a client can set.
+ *
+ * So it comes from `APP_BASE_URL`, which is configuration we already have, is already correct
+ * on every environment, and cannot be influenced by the caller. It is also what Better Auth
+ * itself uses — its `baseURL` is this same value, and its half of the redirect chain was
+ * correct throughout while ours was not. That is the whole argument.
+ *
+ * The shape of bug worth remembering: a local walk cannot find it (on a laptop every origin
+ * agrees), the suite cannot find it (`NextRequest` never diverges in-process), and the first
+ * fix looked right and was not. It took clicking a real emailed link on deployed staging,
+ * twice.
  */
-function aRuta(request: NextRequest, ruta: string, parametros?: Record<string, string>): URL {
-  const destino = request.nextUrl.clone()
-  destino.pathname = ruta
-  destino.search = ''
+function aRuta(ruta: string, parametros?: Record<string, string>): URL {
+  const destino = new URL(ruta, urlBase())
   for (const [clave, valor] of Object.entries(parametros ?? {})) {
     destino.searchParams.set(clave, valor)
   }
@@ -46,7 +54,7 @@ function aRuta(request: NextRequest, ruta: string, parametros?: Record<string, s
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!autenticacionConfigurada()) {
-    return NextResponse.redirect(aRuta(request, '/entrar', { error: 'configuracion' }))
+    return NextResponse.redirect(aRuta('/entrar', { error: 'configuracion' }))
   }
 
   const sesion = await getAuth().api.getSession({ headers: await headers() })
@@ -55,7 +63,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   // Better Auth normally redirects those to its own errorCallbackURL and they never arrive
   // here; this covers somebody opening the bare URL.
   if (!sesion?.user) {
-    return NextResponse.redirect(aRuta(request, '/entrar', { error: 'enlace' }))
+    return NextResponse.redirect(aRuta('/entrar', { error: 'enlace' }))
   }
 
   const resultado = await vincularStaff({
@@ -65,9 +73,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   if (resultado === 'sin_invitacion') {
     await getAuth().api.signOut({ headers: await headers() })
-    return NextResponse.redirect(aRuta(request, '/entrar', { motivo: 'sin_invitacion' }))
+    return NextResponse.redirect(aRuta('/entrar', { motivo: 'sin_invitacion' }))
   }
 
   const desde = rutaInterna(request.nextUrl.searchParams.get('desde') ?? '')
-  return NextResponse.redirect(aRuta(request, desde ?? '/tablero'))
+  return NextResponse.redirect(aRuta(desde ?? '/tablero'))
 }
