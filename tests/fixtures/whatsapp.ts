@@ -15,23 +15,35 @@
 
 export const PHONE_NUMBER_ID = '109371665014416'
 
+/** A second partner's WABA number, for the day there is more than one (0008). */
+export const OTRO_PHONE_NUMBER_ID = '117482553901772'
+
 /** The number of the partner WABA these webhooks were addressed to. */
 const METADATA = {
   display_phone_number: '573001112233',
   phone_number_id: PHONE_NUMBER_ID,
 }
 
+function entrada(phoneNumberId: string, valor: Record<string, unknown>): Record<string, unknown> {
+  return {
+    id: '102290129340398',
+    changes: [
+      {
+        field: 'messages',
+        value: {
+          messaging_product: 'whatsapp',
+          metadata: { ...METADATA, phone_number_id: phoneNumberId },
+          ...valor,
+        },
+      },
+    ],
+  }
+}
+
 function webhook(valor: Record<string, unknown>): Record<string, unknown> {
   return {
     object: 'whatsapp_business_account',
-    entry: [
-      {
-        id: '102290129340398',
-        changes: [
-          { field: 'messages', value: { messaging_product: 'whatsapp', metadata: METADATA, ...valor } },
-        ],
-      },
-    ],
+    entry: [entrada(PHONE_NUMBER_ID, valor)],
   }
 }
 
@@ -172,6 +184,48 @@ export const WEBHOOK_RESPUESTA = webhook({
     },
   ],
 })
+
+/** The two messages of the two-WABA batch, one per partner. */
+export const WAMID_WABA_UNO = 'wamid.HBgMNTczMDAwMDAwMDAxFQIAEhggV0FCQVVOTzAwMDAwMDAwMDAx'
+export const WAMID_WABA_DOS = 'wamid.HBgMNTczMDAwMDAwMDA0FQIAEhggV0FCQURPUzAwMDAwMDAwMDAx'
+
+/**
+ * One POST, two partners.
+ *
+ * Meta batches across `entry[]` and each entry brings its own `metadata.phone_number_id`, so
+ * this is the shape the endpoint sees the day a second WABA is enabled — and the shape that
+ * used to file the second household's report under the first partner's organisation, because
+ * the parser kept only the first number it saw.
+ */
+export const WEBHOOK_DOS_WABAS = {
+  object: 'whatsapp_business_account',
+  entry: [
+    entrada(PHONE_NUMBER_ID, {
+      contacts: [{ profile: { name: 'Rosa Palacios' }, wa_id: '573000000001' }],
+      messages: [
+        {
+          from: '573000000001',
+          id: WAMID_WABA_UNO,
+          timestamp: '1786647731',
+          type: 'text',
+          text: { body: 'Necesitamos mercados en Tagachí, somos 12 familias.' },
+        },
+      ],
+    }),
+    entrada(OTRO_PHONE_NUMBER_ID, {
+      contacts: [{ profile: { name: 'Aníbal Córdoba' }, wa_id: '573000000004' }],
+      messages: [
+        {
+          from: '573000000004',
+          id: WAMID_WABA_DOS,
+          timestamp: '1786647999',
+          type: 'text',
+          text: { body: 'Necesitamos mercados en Bellavista, somos 8 familias.' },
+        },
+      ],
+    }),
+  ],
+}
 
 export const WAMID_VAGO = 'wamid.HBgMNTczMDAwMDAwMDAxFQIAEhggVkFHTzAwMDAwMDAwMDAwMDAx'
 export const WAMID_RESPUESTA = 'wamid.HBgMNTczMDAwMDAwMDAxFQIAEhggUkVTUFVFU1RBMDAwMDAwMDAx'

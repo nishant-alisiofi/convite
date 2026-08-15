@@ -7,9 +7,13 @@ import {
   verificarFirma,
 } from '@/lib/canales'
 import {
+  OTRO_PHONE_NUMBER_ID,
   PHONE_NUMBER_ID,
   WAMID_SALIENTE,
   WAMID_TEXTO,
+  WAMID_WABA_DOS,
+  WAMID_WABA_UNO,
+  WEBHOOK_DOS_WABAS,
   WEBHOOK_ESTADO,
   WEBHOOK_FOTO,
   WEBHOOK_NOTA_DE_VOZ,
@@ -26,6 +30,9 @@ import {
 const SECRETO = 'un-app-secret-de-prueba'
 
 const cuerpoDe = (webhook: unknown) => JSON.stringify(webhook)
+
+/** The envelopes alone, for the cases that do not care which number they came in on. */
+const sobresDe = (payload: unknown) => interpretarWebhook(payload).sobres.map((s) => s.sobre)
 
 describe('la firma del webhook', () => {
   it('acepta un cuerpo firmado con el secreto correcto', () => {
@@ -80,11 +87,23 @@ describe('la firma del webhook', () => {
 
 describe('interpretar el webhook', () => {
   it('saca el phone_number_id, que es como se enruta la organización', () => {
-    expect(interpretarWebhook(WEBHOOK_TEXTO).phoneNumberId).toBe(PHONE_NUMBER_ID)
+    expect(interpretarWebhook(WEBHOOK_TEXTO).sobres[0]!.phoneNumberId).toBe(PHONE_NUMBER_ID)
+  })
+
+  it('le deja a cada mensaje el número por el que llegó, no el del primer entry', () => {
+    // Meta batches across entries and each one carries its own metadata. Keeping only the
+    // first number files the second partner's households under the first partner (0008).
+    const { sobres } = interpretarWebhook(WEBHOOK_DOS_WABAS)
+
+    expect(sobres).toHaveLength(2)
+    expect(sobres.map((s) => [s.sobre.idExterno, s.phoneNumberId])).toEqual([
+      [WAMID_WABA_UNO, PHONE_NUMBER_ID],
+      [WAMID_WABA_DOS, OTRO_PHONE_NUMBER_ID],
+    ])
   })
 
   it('convierte el texto libre en un sobre sin clasificar', () => {
-    const { sobres } = interpretarWebhook(WEBHOOK_TEXTO)
+    const sobres = sobresDe(WEBHOOK_TEXTO)
 
     expect(sobres).toHaveLength(1)
     const sobre = sobres[0]!
@@ -99,17 +118,17 @@ describe('interpretar el webhook', () => {
   })
 
   it('le pone el + al número que Meta manda sin él', () => {
-    expect(interpretarWebhook(WEBHOOK_TEXTO).sobres[0]!.telefono).toBe('+573000000001')
+    expect(sobresDe(WEBHOOK_TEXTO)[0]!.telefono).toBe('+573000000001')
   })
 
   it('lee el timestamp de Meta, que viene en segundos', () => {
-    expect(interpretarWebhook(WEBHOOK_TEXTO).sobres[0]!.recibidoEn.toISOString()).toBe(
+    expect(sobresDe(WEBHOOK_TEXTO)[0]!.recibidoEn.toISOString()).toBe(
       '2026-08-13T19:02:11.000Z',
     )
   })
 
   it('trae la nota de voz como referencia del proveedor, sin los parámetros del mime', () => {
-    const sobre = interpretarWebhook(WEBHOOK_NOTA_DE_VOZ).sobres[0]!
+    const sobre = sobresDe(WEBHOOK_NOTA_DE_VOZ)[0]!
 
     expect(sobre.contenido.texto).toBeNull()
     expect(sobre.contenido.media).toEqual([
@@ -118,7 +137,7 @@ describe('interpretar el webhook', () => {
   })
 
   it('toma el pie de foto como texto: es lo que la persona escribió', () => {
-    const sobre = interpretarWebhook(WEBHOOK_FOTO).sobres[0]!
+    const sobre = sobresDe(WEBHOOK_FOTO)[0]!
 
     expect(sobre.contenido.texto).toBe('Esto es lo que ha llegado hasta ahora.')
     expect(sobre.contenido.media[0]).toMatchObject({ tipo: 'foto', refProveedor: '9982736451029384' })
@@ -126,7 +145,7 @@ describe('interpretar el webhook', () => {
 
   it('trata el pin como gps con radio 0', () => {
     // 2.2: the one coordinate we do not have to approximate.
-    expect(interpretarWebhook(WEBHOOK_UBICACION).sobres[0]!.ubicacion).toMatchObject({
+    expect(sobresDe(WEBHOOK_UBICACION)[0]!.ubicacion).toMatchObject({
       lat: 5.6444,
       lon: -76.6089,
       fuente: 'gps',
@@ -151,14 +170,14 @@ describe('interpretar el webhook', () => {
     // Most webhook traffic is statuses. A driver that assumes `messages` exists crashes on
     // the majority of what Meta sends.
     expect(() => interpretarWebhook({ entry: [] })).not.toThrow()
-    expect(interpretarWebhook({}).sobres).toEqual([])
+    expect(sobresDe({})).toEqual([])
   })
 
   it('registra un tipo que no sabemos manejar en vez de botarlo', () => {
     // A document has nowhere to live in `adjuntos` yet, but the message is still a person
     // trying to tell us something. It arrives with no media and the ref survives in the raw
     // payload, so nothing is lost.
-    const sobre = interpretarWebhook(WEBHOOK_TIPO_DESCONOCIDO).sobres[0]!
+    const sobre = sobresDe(WEBHOOK_TIPO_DESCONOCIDO)[0]!
 
     expect(sobre.contenido.media).toEqual([])
     expect(sobre.contenido.texto).toBeNull()

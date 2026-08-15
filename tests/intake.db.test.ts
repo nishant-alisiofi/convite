@@ -15,11 +15,15 @@ import {
 } from '@/lib/canales'
 import type { Job } from '@/lib/jobs/tipos'
 import {
+  OTRO_PHONE_NUMBER_ID,
   PHONE_NUMBER_ID,
   WAMID_RESPUESTA,
   WAMID_SALIENTE,
   WAMID_TEXTO,
   WAMID_VAGO,
+  WAMID_WABA_DOS,
+  WAMID_WABA_UNO,
+  WEBHOOK_DOS_WABAS,
   WEBHOOK_ESTADO,
   WEBHOOK_NOTA_DE_VOZ,
   WEBHOOK_RESPUESTA,
@@ -353,6 +357,50 @@ conBase('el webhook de WhatsApp', () => {
       [PHONE_NUMBER_ID],
     )
     expect(rows[0]!.organizacion_id).toBe(orgs[0]!.id)
+  })
+
+  it('enruta cada entry del lote por su propio número, no por el del primero', async () => {
+    // One POST, two partners — the shape Meta really sends once a second WABA exists. Aníbal
+    // wrote to WABA B; his household must not be filed under partner A just because Rosa's
+    // entry happened to come first. Getting this wrong is not a lost message, it is one
+    // partner reading another partner's community (0008).
+    const { rows: primeras } = await client.query<{ id: string }>(
+      'update organizaciones set waba_phone_number_id = $1 returning id',
+      [PHONE_NUMBER_ID],
+    )
+    const { rows: segundas } = await client.query<{ id: string }>(
+      `insert into organizaciones (nombre, waba_phone_number_id) values ($1, $2) returning id`,
+      ['Mesa Humanitaria de Bellavista', OTRO_PHONE_NUMBER_ID],
+    )
+    const orgUno = primeras[0]!.id
+    const orgDos = segundas[0]!.id
+    expect(orgUno).not.toBe(orgDos)
+
+    await manejadorWebhookWhatsApp()(job({ webhook: WEBHOOK_DOS_WABAS }), client)
+
+    const { rows } = await client.query<{
+      proveedor_mensaje_id: string
+      organizacion_id: string
+      reporte_organizacion_id: string
+    }>(
+      `select m.proveedor_mensaje_id, m.organizacion_id, r.organizacion_id as reporte_organizacion_id
+         from mensajes m
+         join reportes r on r.id = m.reporte_id
+        where m.proveedor_mensaje_id in ($1, $2)`,
+      [WAMID_WABA_UNO, WAMID_WABA_DOS],
+    )
+
+    // Both of them, not just the first: the bug this guards was invisible from one row.
+    expect(rows).toHaveLength(2)
+    const porMensaje = new Map(rows.map((f) => [f.proveedor_mensaje_id, f]))
+    expect(porMensaje.get(WAMID_WABA_UNO)).toMatchObject({
+      organizacion_id: orgUno,
+      reporte_organizacion_id: orgUno,
+    })
+    expect(porMensaje.get(WAMID_WABA_DOS)).toMatchObject({
+      organizacion_id: orgDos,
+      reporte_organizacion_id: orgDos,
+    })
   })
 
   it('la respuesta a la aclaración completa el reporte, no crea otro', async () => {

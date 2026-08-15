@@ -13,7 +13,8 @@ import { esquemaSobreEntrante, type MediaSobre, type SobreEntrante, VERSION_CONT
  *
  * One webhook can carry several messages across several entries. Meta batches, and a batch
  * arriving while the network was down is exactly when several are pending, so this returns
- * a list rather than assuming one.
+ * a list rather than assuming one. Each entry also carries its own `phone_number_id`, so a
+ * batch is not addressed to one partner either — see `SobreDirigido`.
  */
 
 export const PROVEEDOR_WHATSAPP = 'whatsapp_cloud'
@@ -97,10 +98,24 @@ export type EstadoEntrante = {
   ocurridoEn: Date
 }
 
-export type LoteWebhook = {
+/**
+ * An envelope together with the WABA number it actually arrived on.
+ *
+ * The two travel as one because a webhook is not addressed to a single partner. Meta batches
+ * across `entry[]`, and every `changes[].value.metadata` carries its own `phone_number_id`,
+ * so one POST can hold WABA A's messages followed by WABA B's. Reading the number off the
+ * batch instead of off the message is how every household in it ends up filed under the
+ * first partner — a confidentiality failure the day a second WABA is enabled, and one that
+ * would look like nothing at all in a log. Carrying it here makes that unrepresentable.
+ */
+export type SobreDirigido = {
   /** Routes to an organisation via `organizaciones.waba_phone_number_id` (0008). */
   phoneNumberId: string | null
-  sobres: SobreEntrante[]
+  sobre: SobreEntrante
+}
+
+export type LoteWebhook = {
+  sobres: SobreDirigido[]
   estados: EstadoEntrante[]
 }
 
@@ -160,19 +175,20 @@ function ubicacionDe(mensaje: z.infer<typeof esquemaMensajeMeta>) {
 export function interpretarWebhook(payload: unknown): LoteWebhook {
   const raiz = esquemaWebhook.parse(payload)
 
-  let phoneNumberId: string | null = null
-  const sobres: SobreEntrante[] = []
+  const sobres: SobreDirigido[] = []
   const estados: EstadoEntrante[] = []
 
   for (const entry of raiz.entry ?? []) {
     for (const cambio of entry.changes ?? []) {
       const valor = cambio.value
       if (!valor) continue
-      phoneNumberId ??= valor.metadata?.phone_number_id ?? null
+      // This change's own number, never the batch's first one.
+      const phoneNumberId = valor.metadata?.phone_number_id ?? null
 
       for (const mensaje of valor.messages ?? []) {
-        sobres.push(
-          esquemaSobreEntrante.parse({
+        sobres.push({
+          phoneNumberId,
+          sobre: esquemaSobreEntrante.parse({
             version: VERSION_CONTRATO,
             proveedor: PROVEEDOR_WHATSAPP,
             canal: 'whatsapp',
@@ -189,7 +205,7 @@ export function interpretarWebhook(payload: unknown): LoteWebhook {
             // metadata. A parser bug has to be recoverable from this alone.
             payloadCrudo: { metadata: valor.metadata ?? null, message: mensaje },
           }),
-        )
+        })
       }
 
       for (const estado of valor.statuses ?? []) {
@@ -207,5 +223,5 @@ export function interpretarWebhook(payload: unknown): LoteWebhook {
     }
   }
 
-  return { phoneNumberId, sobres, estados }
+  return { sobres, estados }
 }

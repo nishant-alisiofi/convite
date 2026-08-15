@@ -110,17 +110,27 @@ export function manejadorDescargarMedia(deps: DepsMedia): ManejadorJob {
  * retries a slow or non-200 response, so doing the work inline buys duplicate deliveries
  * during exactly the minutes the database is struggling. Idempotency still holds if one
  * arrives twice: `registrarEntrante` refuses the second copy per message id (2.7).
+ *
+ * The organisation is resolved **per envelope**, from the number that envelope arrived on.
+ * A batch is not one partner's (see `SobreDirigido`), and one unroutable number fails the
+ * whole job rather than filing its messages under somebody else: the handler runs in one
+ * transaction, so nothing is committed and the retry re-reads every envelope.
  */
 export function manejadorWebhookWhatsApp(deps: DepsIntake = {}): ManejadorJob {
   return async (job, client) => {
     const lote = interpretarWebhook(job.payload.webhook)
     if (lote.sobres.length === 0 && lote.estados.length === 0) return
 
-    if (lote.sobres.length > 0) {
-      const organizacionId = await resolverOrganizacion(client, lote.phoneNumberId)
-      for (const sobre of lote.sobres) {
-        await recibirSobre(client, sobre, organizacionId, deps)
+    // Memoised per number, not per message: fifty messages from one WABA are one lookup,
+    // and a batch spanning two WABAs is two.
+    const organizaciones = new Map<string | null, string>()
+    for (const { phoneNumberId, sobre } of lote.sobres) {
+      let organizacionId = organizaciones.get(phoneNumberId)
+      if (!organizacionId) {
+        organizacionId = await resolverOrganizacion(client, phoneNumberId)
+        organizaciones.set(phoneNumberId, organizacionId)
       }
+      await recibirSobre(client, sobre, organizacionId, deps)
     }
 
     for (const estado of lote.estados) {

@@ -103,4 +103,4 @@ export type { ContextoVentana, DecisionVentana, Plantilla, SalidaPropuesta } fro
 export { CABECERA_FIRMA, firmar, verificarFirma } from './whatsapp/firma'
 export type { ResultadoFirma } from './whatsapp/firma'
 export { interpretarWebhook, PROVEEDOR_WHATSAPP } from './whatsapp/payload'
-export type { EstadoEntrante, LoteWebhook } from './whatsapp/payload'
+export type { EstadoEntrante, LoteWebhook, SobreDirigido } from './whatsapp/payload'
