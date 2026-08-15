@@ -20,9 +20,33 @@ import { rutaInterna, vincularStaff } from '@/lib/sesion'
 
 export const dynamic = 'force-dynamic'
 
+/**
+ * Builds a redirect to somewhere else on this site.
+ *
+ * Deliberately `request.nextUrl`, never `new URL(ruta, request.url)`. Behind Railway's proxy
+ * those two disagree: `request.url` is the origin the container was reached on — the internal
+ * bind address — so every redirect out of this route pointed the browser at
+ * `https://localhost:8080/tablero`, which resolves to nothing. `nextUrl` is the one Next
+ * rebuilds from the forwarded host, so it carries the public origin.
+ *
+ * That is the exact shape of bug a local walk cannot find: on a laptop the two are identical
+ * and every redirect works. It took clicking a real link on deployed staging, where the
+ * sign-in ended on an unreachable URL one step short of the panel. The middleware already
+ * did this correctly (`nextUrl.clone()`); this route did not.
+ */
+function aRuta(request: NextRequest, ruta: string, parametros?: Record<string, string>): URL {
+  const destino = request.nextUrl.clone()
+  destino.pathname = ruta
+  destino.search = ''
+  for (const [clave, valor] of Object.entries(parametros ?? {})) {
+    destino.searchParams.set(clave, valor)
+  }
+  return destino
+}
+
 export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!autenticacionConfigurada()) {
-    return NextResponse.redirect(new URL('/entrar?error=configuracion', request.url))
+    return NextResponse.redirect(aRuta(request, '/entrar', { error: 'configuracion' }))
   }
 
   const sesion = await getAuth().api.getSession({ headers: await headers() })
@@ -31,7 +55,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   // Better Auth normally redirects those to its own errorCallbackURL and they never arrive
   // here; this covers somebody opening the bare URL.
   if (!sesion?.user) {
-    return NextResponse.redirect(new URL('/entrar?error=enlace', request.url))
+    return NextResponse.redirect(aRuta(request, '/entrar', { error: 'enlace' }))
   }
 
   const resultado = await vincularStaff({
@@ -41,9 +65,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   if (resultado === 'sin_invitacion') {
     await getAuth().api.signOut({ headers: await headers() })
-    return NextResponse.redirect(new URL('/entrar?motivo=sin_invitacion', request.url))
+    return NextResponse.redirect(aRuta(request, '/entrar', { motivo: 'sin_invitacion' }))
   }
 
   const desde = rutaInterna(request.nextUrl.searchParams.get('desde') ?? '')
-  return NextResponse.redirect(new URL(desde ?? '/tablero', request.url))
+  return NextResponse.redirect(aRuta(request, desde ?? '/tablero'))
 }
