@@ -18,10 +18,24 @@
   **exige una organización previa** («No hay ninguna organización») → crash-loop; se quitó. El
   staff real (admins de plataforma / Alisio, cross-org) se sembrará limpio cuando aterrice el RBAC
   (los admins de plataforma no dependen de una organización). Ver `tipos-de-usuario-y-accesos.md`.
-- **En construcción (RBAC Fase 1):** admin de plataforma (Alisio, cross-org, vía `CORREOS_STAFF`)
-  + aprobación de centros + admin por-organización. Se construye en worktree aislado; luego a
-  staging, verificación en vivo, y **Codex valida el 0→1 completo** (registro, admin, admins
-  internos). Pendiente: bootstrap de staff en prod sin dependencia de organización.
+- **RBAC Fase 1 DESPLEGADO Y VERIFICADO EN VIVO (staging).** Migración `0034`: admin de
+  plataforma como bandera aditiva (`es_plataforma`), aprobación de centros
+  (`estado_aprobacion` + `convite_decidir_centro`), admin por-organización, guarda restrictiva
+  anti-escalamiento. 581 tests en verde (el arnés de RLS prueba: la plataforma aprueba, el admin
+  de centro no; invita en su org pero no en otra; ve/​no-ve cross-org; no puede escalar al tier
+  de plataforma; el invariante invitación+posesión). **Verificado en vivo siguiendo el enlace
+  real del correo, de punta a punta:**
+  - Admin de plataforma (`talos+convite-plataforma@…`): enlace → `/auth/callback` (vinculación) →
+    `/centros` (200, con aprobar/rechazar centros) y `/equipo` (200, con invitar trabajadores).
+  - Coordinador (`talos+convite-coordinador@…`): entra a `/tablero` (200) pero `/centros` y
+    `/equipo` le muestran el mensaje de acceso restringido correcto (sin datos, sin acciones); la
+    RLS y `convite_decidir_centro` bloquean cualquier dato/acción cross-tier.
+- **Copia ampliada de «solo Chocó» a «Chocó y el Pacífico colombiano»** (landing, entrar,
+  respuesta, metadatos, correos, manifiesto). En vivo en ambos dominios.
+- **Producción bootstrap limpio:** `sembrar:plataforma` en el arranque de prod crea la org real
+  «Alisio» (aprobada) e invita al admin de plataforma real; sin roles demo, sin datos de basin.
+  Confirmado en el log de arranque de `convite.ai`.
+- **Recorrido para Codex:** `docs/validacion-codex-0a1.md` (recorrido de producto, no auditoría).
 
 Cambios desde la nota nocturna, todos en `origin/main`, desplegados en staging y verificados
 en vivo:
