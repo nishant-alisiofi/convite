@@ -1,7 +1,7 @@
 # Convite — ACTUALIZACIÓN 2026-08-15: demoable, en el estándar de la plataforma
 
-Cambios desde la nota nocturna, todos en `origin/main` y desplegados en staging — salvo
-`810ab80`, que está construyendo (ver abajo; no bloquea el demo):
+Cambios desde la nota nocturna, todos en `origin/main`, desplegados en staging y verificados
+en vivo:
 
 - **Auth movido de Supabase a nuestro estándar** — better-auth sobre nuestro Postgres de
   Railway, correo por Resend. Supabase eliminado por completo. RLS intacto (0 políticas
@@ -27,15 +27,18 @@ Cambios desde la nota nocturna, todos en `origin/main` y desplegados en staging 
   con la sesión de coordinador y datos reales. Prueba nueva que llama al handler desde
   `http://localhost:8080` y exige el origen configurado de vuelta: **las dos versiones rotas
   fallan esa prueba**. 512/512.
-  **[810ab80 — PENDIENTE, no verificado]** Rate-limit por IP en el sign-in. El intento previo
+  **[810ab80 — VERIFICADO EN VIVO]** Rate-limit por IP en el sign-in. El intento previo
   (`ipAddressHeaders`) era **no-op**: `x-forwarded-for` ya es el default de Better Auth. La
   negativa real está en `getIPFromHeader` —«without valid trusted proxies a multi-hop chain is
   unresolvable»—, así que cualquier cadena de más de un salto devuelve null; el proxy de Railway
   añade uno, luego nunca se resolvió. `trustedProxies` con rangos RFC1918 lo arregla sin abrir
   spoofing (se recorre de derecha a izquierda y se devuelve el primer salto NO confiable; lo que
-  inyecte un cliente queda a la izquierda de lo que añade el proxy). **Todavía construyendo.**
-  Hasta que despliegue, el rate-limit del sign-in sigue en **un solo bucket compartido**: la
-  verificación es que el WARN de Better Auth desaparezca del log de arranque.
+  inyecte un cliente queda a la izquierda de lo que añade el proxy). Confirmado en el
+  despliegue de las 17:51: una petición real a `/api/auth/*` ya **no** dispara el WARN de Better
+  Auth, que es exactamente la señal —se emite una vez por proceso en la primera petición—. Antes
+  de esto el rate-limit del sign-in era **un solo bucket compartido** para todos, así que
+  cualquier 429 visto durante las pruebas de hoy gastaba la cuota de todos, no la del que
+  probaba.
 - **El panel del coordinador está vivo en staging** — login por magic-link
   (5 roles sembrados: coordinador/verificador/despachador/admin/lectura →
   `talos+convite-<rol>@downshiftit.com`, llegan al buzón talos). Tablero renderiza la salida
