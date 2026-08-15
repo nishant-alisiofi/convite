@@ -109,19 +109,29 @@ function construir() {
     advanced: {
       database: { generateId: () => randomUUID() },
       /**
-       * Where the caller's address comes from, behind a proxy.
+       * Which hops in `x-forwarded-for` are infrastructure rather than the caller.
        *
-       * Railway terminates TLS in front of us, so the socket address is always the proxy.
-       * Better Auth said so itself on the first staging boot: «Rate limiting could not
-       * determine a client IP and is falling back to a single shared per-path bucket». That
-       * is worse than it sounds on a sign-in endpoint — one shared bucket means one noisy
-       * caller can spend everybody's allowance, and the limit stops being per-attacker.
+       * Better Auth said on the first staging boot that it «could not determine a client IP
+       * and is falling back to a single shared per-path bucket». On a sign-in endpoint that
+       * matters: one bucket for everybody means one noisy caller spends the whole allowance
+       * and the limit stops being per-attacker.
        *
-       * `x-forwarded-for` is only trustworthy because Railway sets it; nothing reaches this
-       * process without passing through their proxy. It would be forgeable on a host that
-       * accepts direct connections.
+       * Naming the header does nothing — `x-forwarded-for` is already Better Auth's default
+       * (`DEFAULT_IP_HEADERS` in @better-auth/core). The actual refusal is in
+       * `getIPFromHeader`: «without valid trusted proxies a multi-hop chain is
+       * unresolvable», so any chain with more than one entry returns null and fails closed.
+       * Railway's proxy adds a hop, so the chain is always longer than one.
+       *
+       * Trusting the RFC1918 ranges resolves it without opening a spoofing hole. The parser
+       * walks the chain from the right and returns the first hop that is NOT trusted: a
+       * private hop is infrastructure and gets skipped, and the first public address is the
+       * caller. A client that injects its own `x-forwarded-for` lands to the *left* of the
+       * address the proxy appends, so the forged value is never the one chosen. Private
+       * ranges only — never trust a public CIDR here, that is what would make it forgeable.
        */
-      ipAddress: { ipAddressHeaders: ['x-forwarded-for'] },
+      ipAddress: {
+        trustedProxies: ['10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16'],
+      },
     },
 
     /** No passwords anywhere (Section 3). The magic link below is the only door. */
