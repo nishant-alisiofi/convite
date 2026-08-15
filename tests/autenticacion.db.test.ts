@@ -93,7 +93,7 @@ beforeAll(async () => {
   await pool.query(
     `insert into invitaciones_staff (correo, rol_staff, organizacion_id)
        values ($1, 'coordinador', $2)
-     on conflict (correo) do update set rol_staff = excluded.rol_staff`,
+     on conflict (correo) where correo is not null do update set rol_staff = excluded.rol_staff`,
     [INVITADO, rows[0]!.id],
   )
 })
@@ -235,7 +235,7 @@ conBase('de enlace a permiso: la vinculación con el registro de staff', () => {
     const authId = (await idDeAuth(INVITADO))!
     await vincularStaff({ authId, correo: INVITADO })
 
-    const sesion = { authId, correo: INVITADO, rolStaff: 'coordinador', organizacionId: '' }
+    const sesion = { authId, correo: INVITADO, telefono: null, rolStaff: 'coordinador', organizacionId: '' }
 
     const visto = await conSesion(sesion, async (client) => {
       const { rows } = await client.query<{ uid: string; rol: string }>(

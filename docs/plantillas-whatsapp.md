@@ -4,9 +4,9 @@ Las cinco plantillas del *Plan de ejecución* §3.1, redactadas para enviar a ap
 exista la cuenta verificada (N2 → N3). La aprobación tarda días por plantilla y tiene rechazos
 frecuentes: conviene tener los textos listos y enviarlos todos el día uno.
 
-**Todas categoría `UTILITY`, idioma `es_CO`(o `es`).** Nunca `MARKETING` — cuesta un orden de
-magnitud más y estas plantillas son transaccionales por naturaleza. Revisar la categoría asignada
-tras la aprobación: Meta a veces reclasifica.
+**Categoría `UTILITY` salvo la §6, que es `AUTHENTICATION`. Idioma `es_CO` (o `es`).** Nunca
+`MARKETING` — cuesta un orden de magnitud más y estas plantillas son transaccionales por
+naturaleza. Revisar la categoría asignada tras la aprobación: Meta a veces reclasifica.
 
 Consejos para pasar la revisión: variables `{{n}}` siempre con ejemplo, texto concreto y
 transaccional, sin promoción, sin URL acortadas.
@@ -72,6 +72,44 @@ Si tiene información nueva sobre el estado del paso, respóndanos por aquí.
 
 Ejemplos: `{{1}}` = "el paso del río Munguidó", `{{2}}` = "bloqueado por derrumbe",
 `{{3}}` = "12 de agosto".
+
+---
+
+## 6. `codigo_ingreso` — categoría `AUTHENTICATION`
+
+> Código de un solo uso para que el equipo coordinador entre al panel. **No es del mismo tipo que
+> las cinco de arriba**: `AUTHENTICATION` es otra categoría de Meta, con su propia pista de
+> aprobación, su propio precio y un cuerpo de forma fija. No admite prosa: el código es el
+> mensaje. Se envía a personal invitado, nunca a una comunidad — quien reporta no entra al panel
+> (no-negociable 2.10).
+
+```
+{{1}} es su código para entrar a Convite.
+```
+
+Ejemplos: `{{1}}` = "462813".
+
+Configuración de la plantilla en Meta:
+
+| Campo | Valor |
+|---|---|
+| Categoría | `AUTHENTICATION` |
+| Idioma | `es_CO` (o `es`) |
+| Tipo de código | Copiar código (*copy code*) |
+| Caducidad en el cuerpo | No — la decimos en la pantalla, no en el mensaje |
+| Pie de seguridad | «Por su seguridad, no comparta este código.» (lo añade Meta) |
+
+Notas para quien la registre:
+
+- **Seis dígitos, no cuatro.** Cuatro chocan con los códigos de confirmación de entrega: la
+  bandeja de entrada trata cualquier mensaje de cuatro dígitos de un contacto conocido como una
+  confirmación de entrega (`pareceCodigo`, `lib/canales/confirmacion.ts`), así que un código de
+  ingreso de cuatro dígitos que alguien responda por WhatsApp se lo traga ese camino.
+- Es la única plantilla que **tiene** que poder llegar con la ventana de 24 h cerrada. Un ingreso
+  es por definición no solicitado; `AUTHENTICATION` existe justamente para eso.
+- El código no se guarda en `mensajes` ni en `salidas_pendientes`: va directo por
+  `lib/codigo-whatsapp.ts` y vive en `auth_verification` mientras dura. Un código de un solo uso
+  no debe quedar en la bitácora de conversación.
 
 ---
 

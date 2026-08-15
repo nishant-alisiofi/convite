@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { getAuth } from '@/lib/auth'
-import { sesionActual } from '@/lib/sesion'
+import { identidadVisible, sesionActual } from '@/lib/sesion'
 
 /**
  * The coordinator shell. Section 10: light, calm, readable, works on a laptop over a weak
@@ -63,7 +63,7 @@ export default async function PanelLayout({ children }: { children: React.ReactN
           </nav>
           <div className="ml-auto flex min-w-0 items-center gap-3 text-sm">
             <span className="truncate text-barro-500">
-              {sesion.correo} · {sesion.rolStaff}
+              {identidadVisible(sesion)} · {sesion.rolStaff}
             </span>
             <form action={salir}>
               <button

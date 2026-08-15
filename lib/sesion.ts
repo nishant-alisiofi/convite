@@ -44,8 +44,30 @@ export type SesionStaff = {
   /** The Better Auth user id. A uuid, because `usuarios.id` is one — see lib/auth.ts. */
   authId: string
   correo: string
+  /**
+   * E.164 when they came in over WhatsApp, null when they used the emailed link.
+   *
+   * Carried because `vincular_usuario_staff()` has to find the invitation by whichever
+   * identifier the person actually proved. A phone sign-in's `correo` is a placeholder that
+   * matches nothing on the allowlist by design, so without this the WhatsApp door would
+   * always answer «sin invitación».
+   */
+  telefono: string | null
   rolStaff: string
   organizacionId: string
+}
+
+/**
+ * What to call somebody on screen.
+ *
+ * A WhatsApp sign-in has no real address — `auth_user.correo` holds a placeholder ending in
+ * `.invalid`, because Better Auth requires an email on every user and this one never gave us
+ * one. Showing that to a coordinator would be showing them a made-up address as their own
+ * identity, which is both confusing and slightly alarming. They gave us a number; show the
+ * number.
+ */
+export function identidadVisible(sesion: SesionStaff): string {
+  return sesion.telefono ?? sesion.correo
 }
 
 export async function sesionActual(): Promise<SesionStaff | null> {
@@ -66,6 +88,7 @@ export async function sesionActual(): Promise<SesionStaff | null> {
   return {
     authId: sesion.user.id,
     correo: sesion.user.email,
+    telefono: (sesion.user as { phoneNumber?: string | null }).phoneNumber ?? null,
     rolStaff: fila.rol_staff,
     organizacionId: fila.organizacion_id,
   }
@@ -90,6 +113,10 @@ export async function conSesion<T>(
         sub: sesion.authId,
         role: 'authenticated',
         email: sesion.correo,
+        // Additive. No policy in 0017 reads it — they compare `auth.uid()` and
+        // `convite_rol()` — so the RLS contract is unchanged by its presence. Only
+        // `vincular_usuario_staff()` looks at it, and only to find the invitation.
+        ...(sesion.telefono ? { telefono: sesion.telefono } : {}),
       }),
     ])
     await client.query('set local role authenticated')
@@ -105,19 +132,30 @@ export async function conSesion<T>(
 }
 
 /**
- * Links a fresh magic-link sign-in to its staff record, if an admin invited that address.
- * Returns what happened so the callback can say something useful rather than dumping the
- * person on an empty screen.
+ * Links a fresh sign-in to its staff record, if an admin invited that address or that number.
+ * Returns what happened so the caller can say something useful rather than dumping the person
+ * on an empty screen.
+ *
+ * `ya_vinculada` is the one to know about: the invitation was already spent by the *other*
+ * door. One human invited with both an address and a number gets two different Better Auth
+ * identities if they use both, and letting the second one through would quietly write a second
+ * `usuarios` row — two staff records, two audit trails, one person. It refuses instead (0029).
  */
 export async function vincularStaff(sesion: {
   authId: string
   correo: string
-}): Promise<'creado' | 'ya_existe' | 'sin_invitacion' | 'sin_sesion'> {
+  telefono?: string | null
+}): Promise<'creado' | 'ya_existe' | 'sin_invitacion' | 'ya_vinculada' | 'sin_sesion'> {
   const client = await getPool().connect()
   try {
     await client.query('begin')
     await client.query(`select set_config('request.jwt.claims', $1, true)`, [
-      JSON.stringify({ sub: sesion.authId, role: 'authenticated', email: sesion.correo }),
+      JSON.stringify({
+        sub: sesion.authId,
+        role: 'authenticated',
+        email: sesion.correo,
+        ...(sesion.telefono ? { telefono: sesion.telefono } : {}),
+      }),
     ])
     await client.query('set local role authenticated')
     const { rows } = await client.query<{ vincular_usuario_staff: string }>(

@@ -40,6 +40,17 @@ function direccionPara(rol: RolStaff): string {
  */
 const COMUNIDADES_DEL_VERIFICADOR = ['TAG', 'MER', 'BET']
 
+/**
+ * One extra invitation, by number instead of address, so the WhatsApp door is demonstrable too.
+ *
+ * Deliberately a separate person rather than a phone added to one of the five above: an
+ * invitation links to exactly one staff record (0029), so giving a seeded role both identifiers
+ * would mean whichever door got used first won and the other answered «ya vinculada» — a
+ * confusing thing to hit in a demo. `WHATSAPP_DEMO` overrides it with a number you can actually
+ * receive on; the default is in Colombia's reserved test range and will never reach a handset.
+ */
+const TELEFONO_DEMO = process.env.WHATSAPP_DEMO ?? '+573000000100'
+
 async function main() {
   if (!CORREO_BASE.includes('@')) {
     throw new Error(`CORREO_BASE no parece un correo: ${CORREO_BASE}`)
@@ -63,7 +74,8 @@ async function main() {
     const { rows } = await pool.query<{ id: string }>(
       `insert into invitaciones_staff (correo, rol_staff, organizacion_id)
          values ($1, $2, $3)
-       on conflict (correo) do update set rol_staff = excluded.rol_staff
+       on conflict (correo) where correo is not null
+         do update set rol_staff = excluded.rol_staff
        returning id`,
       [correo, rol, org.id],
     )
@@ -83,14 +95,28 @@ async function main() {
     puestos.push({ rol, correo, comunidades })
   }
 
+  // The WhatsApp door, as a sixth invitation identified by number instead of address.
+  await pool.query(
+    `insert into invitaciones_staff (telefono, rol_staff, organizacion_id)
+       values ($1, 'coordinador', $2)
+     on conflict (telefono) where telefono is not null
+       do update set rol_staff = excluded.rol_staff`,
+    [TELEFONO_DEMO, org.id],
+  )
+
   console.log(`\nInvitaciones listas en «${org.nombre}»:\n`)
   for (const { rol, correo, comunidades } of puestos) {
     const alcance = comunidades > 0 ? `  (${comunidades} comunidades)` : ''
     console.log(`  ${rol.padEnd(12)} ${correo}${alcance}`)
   }
+  console.log(`  ${'coordinador'.padEnd(12)} ${TELEFONO_DEMO}  (WhatsApp)`)
+
   console.log(
-    `\nCada uno entra desde /entrar pidiendo su enlace. Todavía no existe ninguna cuenta:` +
-      `\nse crean al abrir el enlace, que es el mismo camino que sigue una coordinadora real.\n`,
+    `\nCada uno entra desde /entrar: los correos piden un enlace, el número pide un código.` +
+      `\nTodavía no existe ninguna cuenta — se crean al usar el enlace o el código, que es el` +
+      `\nmismo camino que sigue una coordinadora real.` +
+      `\n\nSin WABA (D3) el código NO se manda: sale en el log del servidor. Para un número que` +
+      `\nde verdad reciba, ponga WHATSAPP_DEMO y las credenciales de la WABA.\n`,
   )
 }
 

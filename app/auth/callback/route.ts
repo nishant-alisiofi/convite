@@ -69,11 +69,22 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const resultado = await vincularStaff({
     authId: sesion.user.id,
     correo: sesion.user.email,
+    // Null on the emailed-link path; the number they proved on the WhatsApp one. The
+    // allowlist is matched by whichever they actually used — a phone sign-in's address is a
+    // placeholder that is in nobody's list by design.
+    telefono: (sesion.user as { phoneNumber?: string | null }).phoneNumber ?? null,
   })
 
   if (resultado === 'sin_invitacion') {
     await getAuth().api.signOut({ headers: await headers() })
     return NextResponse.redirect(aRuta('/entrar', { motivo: 'sin_invitacion' }))
+  }
+
+  if (resultado === 'ya_vinculada') {
+    // Invited with both an address and a number, and the other door was used first. Letting
+    // this through would write a second staff record for one person (0029).
+    await getAuth().api.signOut({ headers: await headers() })
+    return NextResponse.redirect(aRuta('/entrar', { motivo: 'ya_vinculada' }))
   }
 
   const desde = rutaInterna(request.nextUrl.searchParams.get('desde') ?? '')

@@ -29,6 +29,16 @@ export const PLANTILLAS = [
   'entrega_pendiente',
   'chequeo_periodico',
   'dano_verificado',
+  /**
+   * The sign-in code. The only one of these that is not `UTILITY`.
+   *
+   * Meta files it under `AUTHENTICATION`, which is a different category with its own approval
+   * track, its own pricing, and a fixed body shape — the code is the whole message. It is on
+   * this list because it must be, not because it is like the others: a sign-in is by
+   * definition unsolicited, so the 24-hour window is always closed for it, and only a name on
+   * this list is allowed through `decidirSalida` when that is true.
+   */
+  'codigo_ingreso',
 ] as const
 
 export type Plantilla = (typeof PLANTILLAS)[number]

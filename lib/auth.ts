@@ -3,8 +3,10 @@ import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { nextCookies } from 'better-auth/next-js'
 import { magicLink } from 'better-auth/plugins/magic-link'
+import { phoneNumber } from 'better-auth/plugins/phone-number'
 import { getDb, getPool } from '@/db/client'
 import { autenticacion } from '@/db/schema/autenticacion'
+import { enviarCodigo } from '@/lib/codigo-whatsapp'
 import { enviarCorreo, plantillaEnlace } from '@/lib/correo'
 import { env } from '@/lib/env'
 
@@ -34,6 +36,42 @@ import { env } from '@/lib/env'
 
 /** How long a sign-in link is good for. Short: it is delivered instantly and used at once. */
 const MINUTOS_ENLACE = 15
+
+/**
+ * How long a WhatsApp code is good for, and how many guesses it takes.
+ *
+ * Shorter than the emailed link because it is six digits rather than a signed token: a
+ * million possibilities is not many if you are allowed to sit on them. Five minutes and three
+ * attempts is Better Auth's own default and is the right order of magnitude — a code that is
+ * read off a phone and typed into a laptop takes seconds.
+ */
+const MINUTOS_CODIGO = 5
+const INTENTOS_CODIGO = 3
+
+/**
+ * Six digits, and the length is load-bearing rather than cosmetic.
+ *
+ * `pareceCodigo` in lib/canales/confirmacion.ts treats **any** bare four-digit message from a
+ * known contact as a delivery confirmation, and it runs before everything else in the inbound
+ * pipeline (lib/canales/intake.ts). A four-digit sign-in code that somebody replied with on
+ * WhatsApp — which people will do — would be swallowed by that branch, answered with «no
+ * encontramos ese código», and counted against their failed-confirmation tally. Six digits
+ * cannot match `^\d{4}$`, so the two systems cannot be confused for each other. It is also
+ * what Meta's authentication templates are shaped for.
+ */
+const DIGITOS_CODIGO = 6
+
+/**
+ * The placeholder address a phone-only sign-in gets.
+ *
+ * Better Auth requires an email on every user and `auth_user.correo` is NOT NULL, so a
+ * coordinator who only has WhatsApp still needs one. `.invalid` is reserved by RFC 2606 and
+ * can never resolve, which is the point: it must be impossible to mistake this for somewhere
+ * mail could be sent, and impossible for it to collide with a real invited address.
+ */
+function correoMarcador(telefono: string): string {
+  return `${telefono.replace(/^\+/, '')}@wa.convite.invalid`
+}
 
 /**
  * Whether identity can work at all in this process.
@@ -68,6 +106,15 @@ export async function correoInvitado(correo: string): Promise<boolean> {
   const { rows } = await getPool().query(
     'select 1 from invitaciones_staff where correo = $1 limit 1',
     [correo.trim().toLowerCase()],
+  )
+  return rows.length > 0
+}
+
+/** The same question for the other door. E.164, exactly as the allowlist stores it. */
+export async function telefonoInvitado(telefono: string): Promise<boolean> {
+  const { rows } = await getPool().query(
+    'select 1 from invitaciones_staff where telefono = $1 limit 1',
+    [telefono.trim()],
   )
   return rows.length > 0
 }
@@ -172,6 +219,43 @@ function construir() {
         },
       }),
       /**
+       * The second door: a six-digit code over WhatsApp.
+       *
+       * Same allowlist, same `usuarios` row, same RLS. What changes is only how somebody
+       * proves they are reachable — and in the Atrato that matters, because a coordinator has
+       * WhatsApp working before they have email working. It is the channel the entire intake
+       * side of this product already runs on.
+       *
+       * The emailed link is untouched and stays the fallback: it is what an admin falls back
+       * to when a phone is lost or a number changes.
+       */
+      phoneNumber({
+        otpLength: DIGITOS_CODIGO,
+        expiresIn: 60 * MINUTOS_CODIGO,
+        allowedAttempts: INTENTOS_CODIGO,
+
+        /** E.164 only, the same shape `contactos` is constrained to and the allowlist stores. */
+        phoneNumberValidator: (telefono) => /^\+[1-9][0-9]{7,14}$/.test(telefono),
+
+        sendOTP: async ({ phoneNumber: telefono, code }) => {
+          await enviarCodigo(telefono, code)
+        },
+
+        /**
+         * A first sign-in creates the identity, exactly as the magic link does.
+         *
+         * The allowlist still decides who gets one — `databaseHooks.user.create.before` below
+         * runs on this path too, and Better Auth passes the phone number into `createUser`,
+         * so the hook can see it and refuse. Without that, this option would be an open
+         * signup door standing next to a closed one.
+         */
+        signUpOnVerification: {
+          getTempEmail: correoMarcador,
+          getTempName: (telefono) => telefono,
+        },
+      }),
+
+      /**
        * Lets `auth.api.*` set cookies from a Server Action.
        *
        * Both doors this app has — «mandarme el enlace» and «salir» — are Server Actions,
@@ -203,8 +287,19 @@ function construir() {
            * The sign-in page shows the same «we sent you a link» either way. Whether an
            * address belongs to staff is not something an unauthenticated form gets to tell
            * you.
+           *
+           * Both doors come through here. A WhatsApp sign-in arrives carrying a placeholder
+           * address (see `correoMarcador`) that is deliberately in nobody's allowlist, so the
+           * number is what has to be checked — and Better Auth does pass it into `createUser`
+           * on the phone path, which is the only reason this can be one hook instead of two.
            */
-          before: async (usuario) => correoInvitado(usuario.email),
+          before: async (usuario) => {
+            const telefono = (usuario as { phoneNumber?: unknown }).phoneNumber
+            if (typeof telefono === 'string' && telefono.length > 0) {
+              return telefonoInvitado(telefono)
+            }
+            return correoInvitado(usuario.email)
+          },
         },
       },
     },

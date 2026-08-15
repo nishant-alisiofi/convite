@@ -37,6 +37,16 @@ export const authUser = pgTable(
     name: text('nombre').notNull(),
     email: text('correo').notNull().unique(),
     emailVerified: boolean('correo_verificado').notNull().default(false),
+    /**
+     * E.164, proved by a one-time code over WhatsApp (0029).
+     *
+     * Not the same thing as `contactos.telefono`. That one belongs to a community member who
+     * never logs in and never will (2.10); this one belongs to staff. They are separate
+     * tables because they are separate kinds of person, and the same number appearing in both
+     * would mean a coordinator who also reports from their own village — not a contradiction.
+     */
+    phoneNumber: text('telefono').unique(),
+    phoneNumberVerified: boolean('telefono_verificado').notNull().default(false),
     image: text('imagen'),
     createdAt: creado(),
     updatedAt: actualizado(),

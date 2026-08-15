@@ -80,15 +80,29 @@ servicio que levantar**: con `DATABASE_URL` y `BETTER_AUTH_SECRET`, el inicio de
 funciona. Antes esto dependía de un proyecto de Supabase que nunca se creó, y por eso el
 panel llevaba semanas respondiendo 503 en staging.
 
+Hay **dos puertas** y las dos terminan en el mismo expediente de staff, la misma lista de
+invitaciones y las mismas políticas RLS:
+
+| Puerta | Cómo | Estado |
+|---|---|---|
+| Correo | Enlace mágico, vence en 15 min | **Funcionando en staging** |
+| WhatsApp | Código de 6 dígitos, vence en 5 min, 3 intentos | Flujo completo; **el envío real espera una WABA (D3)** |
+
 ### Habilitar a alguien
 
-Nadie entra por escribir su correo. Un admin tiene que ponerlo en la lista primero
-(no-negociable 2.10) y solo entonces el enlace sirve:
+Nadie entra por escribir su correo ni su número. Un admin tiene que ponerlo en la lista primero
+(no-negociable 2.10) y solo entonces sirve el enlace o el código:
 
 ```bash
-pnpm invitar rosa@organizacion.org coordinador
+pnpm invitar rosa@organizacion.org coordinador          # entra por correo
+pnpm invitar +573001112233 coordinador                  # entra por WhatsApp
 pnpm invitar nubia@organizacion.org verificador TAG,MER,BET
 ```
+
+Una invitación se gasta **una sola vez**. Si lleva correo y teléfono, quien entre primero se
+queda con el expediente y la otra puerta responde «ya entró por el otro camino» — a propósito:
+sin esa guarda, una persona terminaría con dos filas en `usuarios`, dos rastros de auditoría y
+un alcance por comunidad que hay que mantener por duplicado (0029).
 
 Para una demostración, uno de cada rol de una vez, a direcciones que controlamos:
 
@@ -120,6 +134,29 @@ bash ~/Github/Base/scripts/railway-api.sh convite logs staging deploy 100
 
 Es un recurso para diagnosticar, no la forma de operar. Un despliegue de verdad manda
 correos.
+
+### El código de WhatsApp, mientras no haya WABA
+
+**Sin `WHATSAPP_PHONE_NUMBER_ID` y `WHATSAPP_ACCESS_TOKEN` el código no se manda a ninguna
+parte**: sale en el log del servidor, igual que el enlace mágico sin `RESEND_API_KEY`. El resto
+del recorrido —pedir el código, verificarlo, crear la sesión, vincular el expediente, leer bajo
+RLS— es exactamente el que correrá con credenciales.
+
+```bash
+bash ~/Github/Base/scripts/railway-api.sh convite logs staging deploy 100 | grep "código"
+```
+
+Para que llegue de verdad hacen falta tres cosas, ninguna de ellas código (D3 + D4):
+
+1. **Número de la WABA** (`WHATSAPP_PHONE_NUMBER_ID`) — de la organización socia bajo cuya
+   cuenta operamos.
+2. **Token de System User** (`WHATSAPP_ACCESS_TOKEN`) — el mismo que ya usa la descarga de
+   media; uno permanente, no el de prueba de 24 h.
+3. **La plantilla `codigo_ingreso` aprobada**, categoría `AUTHENTICATION` (§6 de
+   `docs/plantillas-whatsapp.md`). Es una categoría distinta de las cinco de utilidad, con su
+   propia pista de aprobación. **Sin ella el envío falla aunque el token esté bien**: un
+   ingreso es no solicitado por definición, la ventana de 24 h está cerrada, y solo una
+   plantilla aprobada puede llegar así.
 
 ---
 
