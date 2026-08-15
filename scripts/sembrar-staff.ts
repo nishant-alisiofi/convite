@@ -1,6 +1,7 @@
 import 'dotenv/config'
 import { closeDb, getPool } from '@/db/client'
 import { ROLES_STAFF, type RolStaff } from '@/db/schema/vocabulario'
+import { administradores } from '@/scripts/lib/administradores'
 
 /**
  * Puts one invitation on the allowlist for every staff role, so a deployment can be shown
@@ -25,12 +26,17 @@ import { ROLES_STAFF, type RolStaff } from '@/db/schema/vocabulario'
  * distinct to Postgres, which is what lets one person hold five roles at once.
  */
 
-/** Gmail-style plus-addressing: all five land in the same inbox, all five are distinct. */
+/** Gmail-style plus-addressing: every rig lands in the same inbox, and every one is distinct. */
 const CORREO_BASE = process.env.CORREO_BASE ?? 'talos@downshiftit.com'
 
-function direccionPara(rol: RolStaff): string {
+/** talos+convite-<sufijo>@… — one address per rig, all reaching one inbox, CORREO_BASE overrides. */
+function direccionCon(sufijo: string): string {
   const [usuario, dominio] = CORREO_BASE.split('@')
-  return `${usuario}+convite-${rol}@${dominio}`.toLowerCase()
+  return `${usuario}+convite-${sufijo}@${dominio}`.toLowerCase()
+}
+
+function direccionPara(rol: RolStaff): string {
+  return direccionCon(rol)
 }
 
 /**
@@ -52,36 +58,12 @@ const COMUNIDADES_DEL_VERIFICADOR = ['TAG', 'MER', 'BET']
 const TELEFONO_DEMO = process.env.WHATSAPP_DEMO ?? '+573000000100'
 
 /**
- * Real people, as platform admins (§2.5).
- *
- * Different in kind from the five above: those are plus-addressed rigs that exist so a demo
- * can show each role, and they all land in one shared inbox. These are addresses somebody
- * actually reads, and they are here because staging only ever gets invitations through this
- * script — an address that is not on this list cannot sign in, however senior its owner.
- *
- * These are the Alisio team, so they are seeded as the platform tier: `es_plataforma = true`
- * on the invitation, which `vincular_usuario_staff()` carries onto the staff row. That is what
- * lets them approve centres and see across organisations — a level above any single centre's
- * admin.
- *
- * `CORREOS_STAFF` adds more without a deploy: a comma-separated list on the Railway variable,
- * each one invited as a platform admin. That is the knob to use when the rest of the Alisio
- * team needs in; editing this array should be reserved for people who should be invited on
- * every environment, forever.
+ * Real people, as platform admins (§2.5), live in scripts/lib/administradores.ts — the same set
+ * the production bootstrap (sembrar-plataforma.ts) invites. Different in kind from the rigs
+ * above: those are plus-addressed and exist so a demo can show each role, all landing in one
+ * shared inbox; these are addresses somebody actually reads. Staging only ever gets invitations
+ * through this script, so an address not on that list cannot sign in here, however senior.
  */
-const CORREOS_ADMIN = ['manuel.zamora.86@gmail.com']
-
-function correosDelEntorno(): string[] {
-  return (process.env.CORREOS_STAFF ?? '')
-    .split(',')
-    .map((c) => c.trim().toLowerCase())
-    .filter((c) => c.includes('@'))
-}
-
-/** Both sources, deduplicated — the same address in the array and the env var is one person. */
-function administradores(): string[] {
-  return [...new Set([...CORREOS_ADMIN.map((c) => c.toLowerCase()), ...correosDelEntorno()])]
-}
 
 async function main() {
   if (!CORREO_BASE.includes('@')) {
@@ -136,6 +118,20 @@ async function main() {
     [TELEFONO_DEMO, org.id],
   )
 
+  // A demo platform admin, so the platform tier (§2.5) is demonstrable from the talos inbox.
+  // The only real platform admin is a personal address whose inbox we cannot read, so without
+  // this the approve-centres flow cannot be shown from staging. Plus-addressed and idempotent
+  // like the rigs above, but carrying the platform tier: es_plataforma = true, which
+  // vincular_usuario_staff() copies onto the staff row. CORREO_BASE overrides it too.
+  const correoPlataformaDemo = direccionCon('plataforma')
+  await pool.query(
+    `insert into invitaciones_staff (correo, rol_staff, organizacion_id, es_plataforma)
+       values ($1, 'admin', $2, true)
+     on conflict (correo) where correo is not null
+       do update set rol_staff = excluded.rol_staff, es_plataforma = excluded.es_plataforma`,
+    [correoPlataformaDemo, org.id],
+  )
+
   // Real people. Same mechanism as everything above — an invitation, not an account. They
   // still have to ask for a link and open it, and re-running this leaves them exactly as
   // they were: `vincular_usuario_staff()` answers 'ya_existe' once they have signed in.
@@ -156,6 +152,7 @@ async function main() {
     console.log(`  ${rol.padEnd(12)} ${correo}${alcance}`)
   }
   console.log(`  ${'coordinador'.padEnd(12)} ${TELEFONO_DEMO}  (WhatsApp)`)
+  console.log(`  ${'plataforma'.padEnd(12)} ${correoPlataformaDemo}  (demo, admin de plataforma)`)
   for (const correo of admins) {
     console.log(`  ${'plataforma'.padEnd(12)} ${correo}  (persona real, admin de plataforma)`)
   }
