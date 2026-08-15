@@ -61,20 +61,24 @@ export default function Tarjeta({
 
   return (
     <li className="rounded-lg border border-barro-200 bg-white px-4 py-4">
-      <div className="flex flex-wrap items-baseline gap-x-2 text-sm">
-        <span className="font-mono text-barro-500">#{r.folio}</span>
-        <span className="font-medium text-barro-900">{r.comunidad ?? 'Sin comunidad'}</span>
-        {r.municipio && <span className="text-barro-500">{r.municipio}</span>}
-        <span className="flex items-center gap-1 text-barro-600">
-          <IconoCanal className="size-3.5" aria-hidden />
-          {r.canal}
-        </span>
-        {r.urgencia === 3 && (
-          <span className="rounded bg-rose-100 px-1.5 py-0.5 text-xs font-medium text-rose-900">
-            urgente
+      {/* The age is pinned to the right so it never wraps onto its own orphaned line; the rest
+          of the meta flows and wraps within its own group on the left. */}
+      <div className="flex items-baseline justify-between gap-2 text-sm">
+        <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
+          <span className="font-mono text-barro-500">#{r.folio}</span>
+          <span className="font-medium text-barro-900">{r.comunidad ?? 'Sin comunidad'}</span>
+          {r.municipio && <span className="text-barro-500">{r.municipio}</span>}
+          <span className="flex items-center gap-1 text-barro-600">
+            <IconoCanal className="size-3.5" aria-hidden />
+            {r.canal}
           </span>
-        )}
-        <span className="ml-auto text-barro-500">
+          {r.urgencia === 3 && (
+            <span className="rounded bg-rose-100 px-1.5 py-0.5 text-xs font-medium text-rose-900">
+              urgente
+            </span>
+          )}
+        </div>
+        <span className="shrink-0 text-xs tabular-nums text-barro-500">
           {r.dias === 0 ? 'hoy' : `hace ${r.dias} d`}
         </span>
       </div>

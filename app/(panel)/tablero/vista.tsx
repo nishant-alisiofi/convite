@@ -88,26 +88,31 @@ export default function TableroVista({ filas }: { filas: Fila[] }) {
             <ul className="divide-y divide-barro-100 bg-white">
               {delBucket.map((fila) => (
                 <li key={fila.id} className="px-4 py-3">
-                  <div className="flex flex-wrap items-baseline gap-x-2 text-sm text-barro-600">
-                    <span className="font-medium text-barro-900">{fila.comunidad}</span>
-                    <span className="text-barro-300">·</span>
-                    <span>{fila.item}</span>
-                    <span className="text-barro-300">·</span>
-                    <span>
-                      {fila.familias} familia{fila.familias === 1 ? '' : 's'}
-                    </span>
-                    {fila.urgencia === 3 && (
-                      <span className="flex items-center gap-1 rounded bg-rose-100 px-1.5 py-0.5 text-xs font-medium text-rose-900">
-                        <TriangleAlert className="size-3" aria-hidden />
-                        urgente
-                      </span>
-                    )}
-                    <span className="ml-auto shrink-0 text-barro-500">
+                  {/* Line 1: the community is the anchor, and urgency sits right beside it so a
+                      coordinator scanning down the pile catches it first. The age is pinned to
+                      the right and never wraps onto its own orphaned line. */}
+                  <div className="flex items-baseline justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="truncate font-medium text-barro-900">{fila.comunidad}</span>
+                      {fila.urgencia === 3 && (
+                        <span className="flex shrink-0 items-center gap-1 rounded bg-rose-100 px-1.5 py-0.5 text-xs font-medium text-rose-900">
+                          <TriangleAlert className="size-3" aria-hidden />
+                          urgente
+                        </span>
+                      )}
+                    </div>
+                    <span className="shrink-0 text-xs tabular-nums text-barro-500">
                       {fila.dias === 0 ? 'hoy' : `hace ${fila.dias} d`}
                     </span>
                   </div>
+                  {/* Line 2: what and how many, flowing and wrapping cleanly. */}
+                  <p className="mt-0.5 text-sm text-barro-600">
+                    {fila.item}
+                    <span className="text-barro-300"> · </span>
+                    {fila.familias} familia{fila.familias === 1 ? '' : 's'}
+                  </p>
                   {/* The sentence the matcher wrote. This is the phone call. */}
-                  <p className="mt-1 text-barro-800">{fila.motivo}</p>
+                  <p className="mt-1.5 text-barro-800">{fila.motivo}</p>
                 </li>
               ))}
             </ul>
