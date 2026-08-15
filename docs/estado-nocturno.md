@@ -13,8 +13,16 @@ Cambios desde la nota nocturna, todos en `origin/main` y desplegados en staging:
   funcionan; solo el salto final fallaba — y es el último paso del único camino de entrada. No
   se detectó porque en local las dos URLs coinciden, y tanto la caminata con curl como los
   tests pasaban. Arreglado en `fdb9889` (usa `nextUrl.clone()` como el middleware; 511/511;
-  guarda estructural contra construir redirects desde `request.url`). Pendiente de verificar en
-  vivo el clic completo del enlace emailed una vez desplegado.
+  guarda estructural contra construir redirects desde `request.url`).
+  **[VERIFICADO EN VIVO — d209b0a]** El arreglo real no lee el request en absoluto: construye el
+  redirect desde `APP_BASE_URL` (`urlBase()`), independiente del proxy. Confirmado siguiendo el
+  enlace real del buzón talos de punta a punta: verify → 302 `/auth/callback` (origen staging) →
+  307 `https://convite-app-staging.up.railway.app/tablero` (staging, NO localhost) → panel
+  renderiza con la sesión de coordinador. `fdb9889` (nextUrl.clone) no servía: un route handler
+  detrás del proxy no reconstruye `nextUrl` como sí lo hace el middleware.
+  **[810ab80]** Rate-limit por IP en el sign-in: `trustedProxies` con rangos privados para que
+  Better Auth resuelva el IP del llamante detrás del proxy de Railway (el intento previo con
+  `ipAddressHeaders` era no-op — ya es el default). Desplegándose.
 - **El panel del coordinador está vivo en staging** — login por magic-link
   (5 roles sembrados: coordinador/verificador/despachador/admin/lectura →
   `talos+convite-<rol>@downshiftit.com`, llegan al buzón talos). Tablero renderiza la salida
