@@ -1,6 +1,7 @@
 # Convite — ACTUALIZACIÓN 2026-08-15: demoable, en el estándar de la plataforma
 
-Cambios desde la nota nocturna, todos en `origin/main` y desplegados en staging:
+Cambios desde la nota nocturna, todos en `origin/main` y desplegados en staging — salvo
+`810ab80`, que está construyendo (ver abajo; no bloquea el demo):
 
 - **Auth movido de Supabase a nuestro estándar** — better-auth sobre nuestro Postgres de
   Railway, correo por Resend. Supabase eliminado por completo. RLS intacto (0 políticas
@@ -12,17 +13,29 @@ Cambios desde la nota nocturna, todos en `origin/main` y desplegados en staging:
   `https://localhost:8080/tablero` (inalcanzable). El panel, la sesión, la cookie y RLS sí
   funcionan; solo el salto final fallaba — y es el último paso del único camino de entrada. No
   se detectó porque en local las dos URLs coinciden, y tanto la caminata con curl como los
-  tests pasaban. Arreglado en `fdb9889` (usa `nextUrl.clone()` como el middleware; 511/511;
-  guarda estructural contra construir redirects desde `request.url`).
+  tests pasaban. **Hubo un primer intento fallido**: `fdb9889` cambió a `nextUrl.clone()` —el
+  middleware lo usa y su redirect siempre fue correcto— pero se desplegó y falló idéntico. Next
+  reconstruye `nextUrl` desde el host reenviado **solo en middleware**; un route handler no
+  recibe ni eso ni un `request.url` utilizable. Detrás del proxy, nada en el request conoce el
+  origen público, así que ninguna lectura del request iba a servir.
   **[VERIFICADO EN VIVO — d209b0a]** El arreglo real no lee el request en absoluto: construye el
-  redirect desde `APP_BASE_URL` (`urlBase()`), independiente del proxy. Confirmado siguiendo el
-  enlace real del buzón talos de punta a punta: verify → 302 `/auth/callback` (origen staging) →
-  307 `https://convite-app-staging.up.railway.app/tablero` (staging, NO localhost) → panel
-  renderiza con la sesión de coordinador. `fdb9889` (nextUrl.clone) no servía: un route handler
-  detrás del proxy no reconstruye `nextUrl` como sí lo hace el middleware.
-  **[810ab80]** Rate-limit por IP en el sign-in: `trustedProxies` con rangos privados para que
-  Better Auth resuelva el IP del llamante detrás del proxy de Railway (el intento previo con
-  `ipAddressHeaders` era no-op — ya es el default). Desplegándose.
+  redirect desde `APP_BASE_URL` (`urlBase()`), configuración que ya teníamos, correcta en cada
+  ambiente y fuera del alcance de quien llama —es también lo que Better Auth usa como su propio
+  `baseURL`, y su mitad de la cadena estuvo bien todo el tiempo. Confirmado siguiendo el enlace
+  real del buzón talos de punta a punta: verify → 302 `/auth/callback` (origen staging) → 307
+  `https://convite-app-staging.up.railway.app/tablero` (staging, NO localhost) → panel renderiza
+  con la sesión de coordinador y datos reales. Prueba nueva que llama al handler desde
+  `http://localhost:8080` y exige el origen configurado de vuelta: **las dos versiones rotas
+  fallan esa prueba**. 512/512.
+  **[810ab80 — PENDIENTE, no verificado]** Rate-limit por IP en el sign-in. El intento previo
+  (`ipAddressHeaders`) era **no-op**: `x-forwarded-for` ya es el default de Better Auth. La
+  negativa real está en `getIPFromHeader` —«without valid trusted proxies a multi-hop chain is
+  unresolvable»—, así que cualquier cadena de más de un salto devuelve null; el proxy de Railway
+  añade uno, luego nunca se resolvió. `trustedProxies` con rangos RFC1918 lo arregla sin abrir
+  spoofing (se recorre de derecha a izquierda y se devuelve el primer salto NO confiable; lo que
+  inyecte un cliente queda a la izquierda de lo que añade el proxy). **Todavía construyendo.**
+  Hasta que despliegue, el rate-limit del sign-in sigue en **un solo bucket compartido**: la
+  verificación es que el WARN de Better Auth desaparezca del log de arranque.
 - **El panel del coordinador está vivo en staging** — login por magic-link
   (5 roles sembrados: coordinador/verificador/despachador/admin/lectura →
   `talos+convite-<rol>@downshiftit.com`, llegan al buzón talos). Tablero renderiza la salida
