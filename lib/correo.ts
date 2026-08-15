@@ -84,32 +84,42 @@ export async function enviarCorreo(mensaje: {
  * Plain, short, and it says the two things a coordinator needs to know before clicking:
  * that the link dies quickly and that it works once. Inline styles because email clients
  * discard a stylesheet, and no images because the people using this are on bad connections.
+ *
+ * The colours are the exact Chocó tokens from `app/globals.css` — not approximations — so the
+ * first thing a new coordinator sees matches the app they are about to enter: paper `barro-50`,
+ * a `barro-200` hairline, `barro-900` text, and the one accent in `selva-700` (the app's
+ * primary button colour). Kept literal because an email cannot read the theme.
  */
 export function plantillaEnlace(url: string, minutos: number): { asunto: string; html: string } {
   return {
     asunto: 'Su enlace para entrar a Convite',
     html: `<!doctype html>
 <html lang="es">
-  <body style="margin:0;padding:24px;background:#faf8f5;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;color:#2b2620;line-height:1.5">
-    <div style="max-width:32rem;margin:0 auto;background:#ffffff;border:1px solid #e7e0d7;border-radius:12px;padding:28px">
-      <p style="margin:0 0 4px;font-size:20px;font-weight:600;color:#1c1917">Convite</p>
-      <p style="margin:0 0 20px;color:#6b6157">Coordinación de ayuda en la cuenca del Atrato.</p>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light only" />
+  </head>
+  <body style="margin:0;padding:24px;background:#faf9f7;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;color:#2a2622;line-height:1.55">
+    <div style="max-width:32rem;margin:0 auto;background:#ffffff;border:1px solid #e7e3dd;border-radius:12px;padding:28px">
+      <p style="margin:0 0 4px;font-size:20px;font-weight:600;letter-spacing:-0.01em;color:#1c1917">Convite</p>
+      <p style="margin:0 0 20px;color:#6f675e">Coordinación de ayuda en la cuenca del Atrato.</p>
 
       <p style="margin:0 0 20px">Alguien pidió un enlace para entrar con este correo. Si fue usted, entre aquí:</p>
 
       <p style="margin:0 0 20px">
-        <a href="${url}" style="display:inline-block;background:#2f5d3f;color:#ffffff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:500">Entrar a Convite</a>
+        <a href="${url}" style="display:inline-block;background:#1f5c4a;color:#ffffff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:500">Entrar a Convite</a>
       </p>
 
-      <p style="margin:0 0 20px;color:#6b6157;font-size:14px">
+      <p style="margin:0 0 20px;color:#6f675e;font-size:14px">
         El enlace vence en ${minutos} minutos y sirve una sola vez. Ábralo desde este mismo equipo.
       </p>
 
-      <p style="margin:0;color:#6b6157;font-size:14px">
+      <p style="margin:0;color:#6f675e;font-size:14px">
         Si no lo pidió, no tiene que hacer nada: sin abrir el enlace, nadie entra.
       </p>
 
-      <p style="margin:24px 0 0;padding-top:16px;border-top:1px solid #e7e0d7;color:#9a8f82;font-size:12px;word-break:break-all">
+      <p style="margin:24px 0 0;padding-top:16px;border-top:1px solid #e7e3dd;color:#877e72;font-size:12px;word-break:break-all">
         ¿No funciona el botón? Copie esta dirección en su navegador:<br />${url}
       </p>
     </div>
