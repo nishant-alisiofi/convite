@@ -46,8 +46,16 @@ const DESCONOCIDO = 'nadie.prueba@convite.test'
 
 let pool: Pool
 
-/** Turns «I typed my address» into «I clicked the link», and reports what happened. */
-async function entrar(correo: string): Promise<{ estado: number; destino: string }> {
+/**
+ * Turns «I typed my address» into «I clicked the link», and reports what happened.
+ *
+ * `galleta` is the real Set-Cookie the browser would be handed, signature and all — the
+ * session cookie is signed, so the bare token out of `auth_session` does not authenticate
+ * anything and cannot stand in for it.
+ */
+async function entrar(
+  correo: string,
+): Promise<{ estado: number; destino: string; galleta: string }> {
   enviado.url = ''
   await getAuth().api.signInMagicLink({
     headers: new Headers(),
@@ -56,7 +64,15 @@ async function entrar(correo: string): Promise<{ estado: number; destino: string
   expect(enviado.url, 'no se generó ningún enlace').not.toBe('')
 
   const respuesta = await getAuth().handler(new Request(enviado.url, { redirect: 'manual' }))
-  return { estado: respuesta.status, destino: respuesta.headers.get('location') ?? '' }
+  const galleta = (respuesta.headers.getSetCookie?.() ?? [])
+    .map((c) => c.split(';')[0])
+    .join('; ')
+
+  return {
+    estado: respuesta.status,
+    destino: respuesta.headers.get('location') ?? '',
+    galleta,
+  }
 }
 
 async function idDeAuth(correo: string): Promise<string | null> {
@@ -148,6 +164,28 @@ conBase('2.10 — un enlace prueba que el correo es suyo, no que usted sea del e
     // Hay identidad; todavía no hay acceso. Son dos cosas.
     const { rowCount } = await pool.query('select 1 from usuarios where id = $1', [authId])
     expect(rowCount).toBe(0)
+  })
+})
+
+conBase('salir', () => {
+  it('borra la sesión del servidor, no solo la galleta del navegador', async () => {
+    // El panel llama a esto desde una Server Action. Importa que la fila desaparezca: una
+    // salida que solo limpia la cookie deja un token vivo en la base que sigue sirviendo
+    // para entrar si alguien lo copió antes — que es justo el caso de un equipo compartido,
+    // que es como se usa esto.
+    const { galleta } = await entrar(INVITADO)
+    const authId = (await idDeAuth(INVITADO))!
+
+    const { rows: antes } = await pool.query('select 1 from auth_session where auth_user_id = $1', [authId])
+    expect(antes.length).toBe(1)
+
+    const cabeceras = new Headers({ cookie: galleta })
+    expect(await getAuth().api.getSession({ headers: cabeceras })).not.toBeNull()
+    await getAuth().api.signOut({ headers: cabeceras })
+
+    const { rows: despues } = await pool.query('select 1 from auth_session where auth_user_id = $1', [authId])
+    expect(despues.length).toBe(0)
+    expect(await getAuth().api.getSession({ headers: cabeceras })).toBeNull()
   })
 })
 

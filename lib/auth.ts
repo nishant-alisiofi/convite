@@ -116,10 +116,24 @@ function construir() {
       // halfway through a shift, and should not stay signed in on a shared laptop for a week.
       expiresIn: 60 * 60 * 12,
       updateAge: 60 * 60,
-      // The panel re-reads the staff record from Postgres on every request anyway
-      // (`sesionActual`), so a short cookie cache saves a query without holding a
-      // revocation open: deactivating someone takes effect on the next read, not this one.
-      cookieCache: { enabled: true, maxAge: 60 },
+      /**
+       * No cookie cache, deliberately.
+       *
+       * Turning it on is the usual advice and it saves one query per request. What it buys
+       * in exchange is a window — up to `maxAge` — in which a session that has been
+       * *deleted* still validates, because the answer is read out of a signed cookie
+       * instead of the table. It was set to 60 seconds here and
+       * tests/autenticacion.db.test.ts caught it immediately: the row was gone and
+       * `getSession` kept saying yes.
+       *
+       * In a browser that window is mostly theoretical — signing out clears the cookie
+       * too. But «I pressed Salir» has to mean the session is dead now, on a shared laptop
+       * in a field office, for a product holding the locations of displaced families. And
+       * the saving is not real anyway: `sesionActual()` reads the staff row from Postgres
+       * on every panel request regardless, so this removes one query out of two on a panel
+       * used by a handful of people.
+       */
+      cookieCache: { enabled: false },
     },
 
     plugins: [

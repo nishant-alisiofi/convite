@@ -48,7 +48,7 @@ Solo los **nombres**. Los valores no viven en el repo ni en este documento.
 
 | Variable | Para qué |
 |---|---|
-| `DATABASE_URL` | Postgres con PostGIS. En Supabase, la cadena del pooler. |
+| `DATABASE_URL` | Postgres con PostGIS. Aquí vive también la identidad (migración 0028): no hay una segunda base que configurar. |
 | `DATA_DIR` | Dónde se guardan audios y fotos. **Tiene que ser un volumen persistente**, no el sistema de archivos del contenedor: en Railway se reinicia en cada despliegue y las notas de voz desaparecen. Ver «Media» abajo. |
 
 ### Del servidor (`app`)
@@ -57,8 +57,10 @@ Solo los **nombres**. Los valores no viven en el repo ni en este documento.
 |---|---|
 | `PORT` | La pone la plataforma; `next start` la respeta sola. No hay que tocarla. |
 | `APP_BASE_URL` | Origen público. Entra en los enlaces mágicos. |
-| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | **Los que hay que poner.** Ver el aviso abajo. |
-| `SUPABASE_SERVICE_ROLE_KEY` | Alta de staff desde el servidor. |
+| `BETTER_AUTH_SECRET` | **Obligatoria.** Firma la cookie de sesión. `openssl rand -hex 32`. Sin ella el panel responde 503 y dice cuál falta. No tiene valor por defecto: un secreto compartido deja que cualquiera se fabrique una sesión con el correo que quiera. |
+| `BETTER_AUTH_URL` | Opcional. Si falta se usa `APP_BASE_URL`, que es lo correcto aquí: el panel y `/api/auth` son el mismo servidor. |
+| `RESEND_API_KEY` | Manda el enlace de ingreso. Si falta, el enlace se **imprime en el log del servidor** en vez de enviarse — útil en local, inservible para una coordinadora. |
+| `EMAIL_FROM` | Remitente. Tiene que ser un dominio **verificado en Resend**; uno sin verificar da 422 en cada envío. Nunca el dominio raíz. |
 | `WHATSAPP_APP_SECRET` | Verificación de firma del webhook. Sin esto el webhook rechaza todo, que es el fallo correcto. |
 | `WHATSAPP_WEBHOOK_VERIFY_TOKEN` | El `hub.verify_token` de la suscripción. |
 | `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_BUSINESS_ACCOUNT_ID`, `WHATSAPP_ACCESS_TOKEN` | La WABA del socio (D3, sin resolver). |
@@ -67,59 +69,94 @@ Solo los **nombres**. Los valores no viven en el repo ni en este documento.
 ### Del worker
 
 Le basta `DATABASE_URL` y `DATA_DIR`, más `WHATSAPP_ACCESS_TOKEN` para bajar media. No
-necesita `PORT` ni las claves de Supabase: no atiende tráfico.
+necesita `PORT` ni el secreto de sesión: no atiende tráfico.
 
 ---
 
-### Sin Supabase: se despliega igual, sin inicio de sesión
+## Entrar al panel
 
-**Sí se puede desplegar solo con base de datos.** Si faltan `NEXT_PUBLIC_SUPABASE_URL` y
-`NEXT_PUBLIC_SUPABASE_ANON_KEY`:
+La identidad vive en la misma base que todo lo demás (migración 0028). **No hay un segundo
+servicio que levantar**: con `DATABASE_URL` y `BETTER_AUTH_SECRET`, el inicio de sesión
+funciona. Antes esto dependía de un proyecto de Supabase que nunca se creó, y por eso el
+panel llevaba semanas respondiendo 503 en staging.
+
+### Habilitar a alguien
+
+Nadie entra por escribir su correo. Un admin tiene que ponerlo en la lista primero
+(no-negociable 2.10) y solo entonces el enlace sirve:
+
+```bash
+pnpm invitar rosa@organizacion.org coordinador
+pnpm invitar nubia@organizacion.org verificador TAG,MER,BET
+```
+
+Para una demostración, uno de cada rol de una vez, a direcciones que controlamos:
+
+```bash
+pnpm sembrar:staff                                   # talos+convite-<rol>@downshiftit.com
+CORREO_BASE=alguien@ejemplo.org pnpm sembrar:staff   # o a otra bandeja
+```
+
+Eso crea **invitaciones, no cuentas**. La cuenta se crea cuando la persona pide su enlace y
+lo abre, que es el mismo camino que sigue una coordinadora real. No existe forma de entrar
+sin pasar por el correo, y no la va a haber: un atajo «entrar como este usuario de prueba»
+se agrega para una demo y sigue ahí dos años después.
+
+### Recuperar el enlace en una demo
+
+El correo llega a la bandeja compartida. Con las direcciones `talos+…`, todo cae en
+`talos@downshiftit.com`:
+
+```bash
+bash ~/Github/Base/scripts/email.sh inbox
+```
+
+Si `RESEND_API_KEY` no está puesta, el enlace no se manda: se **imprime en el log del
+servidor**, que en Railway se lee así:
+
+```bash
+bash ~/Github/Base/scripts/railway-api.sh convite logs staging deploy 100
+```
+
+Es un recurso para diagnosticar, no la forma de operar. Un despliegue de verdad manda
+correos.
+
+---
+
+### Sin el secreto: se despliega igual, sin inicio de sesión
+
+**Sí se puede desplegar solo con base de datos.** Si falta `BETTER_AUTH_SECRET`:
 
 | Superficie | Qué pasa |
 |---|---|
 | `/api/webhooks/whatsapp`, `/api/jobs/correr`, `/api/salud`, `/`, `/entrar` | Funcionan normal |
-| El worker | Funciona normal: no usa Supabase para nada |
+| El worker | Funciona normal: no toca la identidad para nada |
 | El panel (`/tablero`, `/verificacion`, …) | **503** con una página que dice exactamente qué falta |
 
-Comprobado en el ensayo: `/api/salud` responde 200 con su JSON, el webhook responde 401 a una
-firma inválida (que es el fallo correcto), y `/tablero` responde 503 diciendo «Autenticación no
-configurada». Así se puede levantar staging esta noche y dejar el inicio de sesión pendiente de
-que exista un proyecto de Supabase.
+No es un bypass: con la variable puesta el comportamiento es el normal, y sin ella el panel
+sigue negándose — solo que explica por qué en vez de reventar. Se mantiene porque un
+despliegue que olvidó el secreto debería decir cuál olvidó, no caerse.
 
-No es un bypass: con las variables puestas el comportamiento es idéntico al de siempre, y sin
-ellas el panel sigue negándose — solo que ahora explica por qué en vez de reventar.
+**Antes fallaba de la peor manera posible:** el middleware construía el cliente de identidad
+antes de mirar si la ruta era pública, así que sin esas variables TODAS las rutas devolvían
+500 — incluidos el webhook (Meta reintentando contra un 500) y `/api/salud` (el monitor sin
+poder ni preguntar).
 
-**Antes fallaba de la peor manera posible:** el middleware construía el cliente antes de mirar
-si la ruta era pública, así que sin esas variables TODAS las rutas devolvían 500 — incluidos el
-webhook (Meta reintentando contra un 500) y `/api/salud` (el monitor sin poder ni preguntar).
+## Configuración manual de identidad: ya no hay
 
-Y ojo con el nombre: el código lee **`NEXT_PUBLIC_SUPABASE_URL`**, mientras que `.env.example`
-y `lib/env.ts` hablaban de `SUPABASE_URL`. Poner las variables documentadas y no las que el
-código lee es indistinguible de no poner ninguna.
+Aquí había tres pasos a mano en el panel de Supabase por cada ambiente — Site URL, Redirect
+URLs, y una plantilla de correo que tenía que apuntar a `?token_hash=` y no a `?code=`
+porque el token viajaba en el fragmento de la URL, que el navegador nunca manda al servidor.
+Estaba marcado como «el error de despliegue más probable de este sistema, porque no rompe
+nada visible».
 
-## Supabase: la configuración que hay que hacer a mano
+**Ya no aplica.** El panel y `/api/auth/*` son el mismo servidor y el mismo origen, así que
+no hay URL que registrar ni redirección que autorizar, y la plantilla del correo la escribe
+`lib/correo.ts` — está en el repositorio, se revisa en un diff y no se puede desincronizar
+de un ambiente. Un ambiente nuevo necesita variables de entorno y nada más.
 
-**Esto no se puede automatizar desde aquí y sin esto el ingreso falla en silencio.** PRD §6 lo
-marca como pendiente para todo ambiente desplegado.
-
-En el panel de Supabase, por cada ambiente:
-
-1. **Authentication → URL Configuration → Site URL**: el origen desplegado.
-2. **Redirect URLs**: agregar `<origen>/auth/callback`. Sin esto el enlace mágico rebota.
-3. **Authentication → Email Templates → Magic Link**: el enlace tiene que apuntar a
-
-   ```
-   {{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=magiclink
-   ```
-
-   No a `?code=`. Supabase manda el token en el **fragmento** de la URL, que el navegador
-   nunca envía al servidor, así que una callback que lee `?code=` rebota todo ingreso real de
-   vuelta al login. Se descubrió haciendo clic en el enlace, no leyendo el código (PRD §1).
-
-Cada ambiente nuevo repite los tres pasos. Es el error de despliegue más probable de este
-sistema, porque no rompe nada visible: la aplicación levanta, el correo sale, y el enlace
-simplemente no entra.
+Lo único externo que queda es el dominio remitente: `EMAIL_FROM` tiene que estar verificado
+en Resend. Eso sí falla en silencio si se equivoca — con 422 en cada envío.
 
 ---
 
@@ -182,9 +219,10 @@ que proteger.
 [
   {"nombre":"DATABASE_URL","servicio":"ambos","secreto":true,"obligatoria":true,"nota":"Postgres con PostGIS. Sin PostGIS las migraciones fallan en 0000."},
   {"nombre":"DATA_DIR","servicio":"ambos","secreto":false,"obligatoria":true,"nota":"Volumen persistente. En un contenedor efímero las notas de voz desaparecen en cada despliegue."},
-  {"nombre":"NEXT_PUBLIC_SUPABASE_URL","servicio":"app","secreto":false,"obligatoria":true,"nota":"Sin esto el panel da 503 y no hay inicio de sesion; el webhook, la cola y /api/salud siguen funcionando."},
-  {"nombre":"NEXT_PUBLIC_SUPABASE_ANON_KEY","servicio":"app","secreto":false,"obligatoria":true,"nota":"Igual que la anterior. La clave anon es publica por diseno."},
-  {"nombre":"SUPABASE_SERVICE_ROLE_KEY","servicio":"app","secreto":true,"obligatoria":false,"nota":"Alta de staff desde el servidor."},
+  {"nombre":"BETTER_AUTH_SECRET","servicio":"app","secreto":true,"obligatoria":true,"nota":"Firma la cookie de sesion. openssl rand -hex 32. Sin esto el panel da 503 y no hay inicio de sesion; el webhook, la cola y /api/salud siguen funcionando. Sin valor por defecto a proposito."},
+  {"nombre":"BETTER_AUTH_URL","servicio":"app","secreto":false,"obligatoria":false,"nota":"Si falta se usa APP_BASE_URL. El panel y /api/auth son el mismo servidor."},
+  {"nombre":"RESEND_API_KEY","servicio":"app","secreto":true,"obligatoria":true,"nota":"Manda el enlace de ingreso. Si falta, el enlace se imprime en el log en vez de enviarse: sirve para diagnosticar, no para operar."},
+  {"nombre":"EMAIL_FROM","servicio":"app","secreto":false,"obligatoria":false,"nota":"Remitente. Dominio VERIFICADO en Resend; uno sin verificar da 422 en cada envio. Nunca el dominio raiz."},
   {"nombre":"CRON_SECRET","servicio":"app","secreto":true,"obligatoria":true,"nota":"Protege /api/jobs/correr y el detalle de /api/salud. En producción esas rutas fallan cerradas si falta."},
   {"nombre":"APP_BASE_URL","servicio":"app","secreto":false,"obligatoria":true,"nota":"Origen público; entra en los enlaces mágicos."},
   {"nombre":"PORT","servicio":"app","secreto":false,"obligatoria":false,"nota":"La pone la plataforma. next start la respeta sola."},
@@ -197,5 +235,5 @@ que proteger.
 ]
 ```
 
-El worker no necesita `PORT`, ni las claves de Supabase, ni `CRON_SECRET`: no atiende
+El worker no necesita `PORT`, ni el secreto de sesión, ni `CRON_SECRET`: no atiende
 tráfico. Le basta `DATABASE_URL`, `DATA_DIR` y, para bajar media, `WHATSAPP_ACCESS_TOKEN`.

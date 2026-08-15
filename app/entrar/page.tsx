@@ -50,10 +50,19 @@ export default async function Entrar({
   if (await sesionActual()) redirect('/tablero')
   const { enviado, error, motivo, desde } = await searchParams
 
-  // Better Auth names its own failures (INVALID_TOKEN, failed_to_create_user…). A
-  // coordinator cannot act on any of them and they all mean the same thing, so everything
-  // that is not one of ours collapses into «that link is done, ask for another».
-  const errorEnlace = Boolean(error) && error !== 'correo' && error !== 'configuracion'
+  /**
+   * Better Auth names its own failures. A coordinator cannot act on any of them and nearly
+   * all of them mean the same thing, so they collapse into «that link is done, ask for
+   * another» — except one.
+   *
+   * `failed_to_create_user` is what the allowlist check in lib/auth.ts produces, and
+   * telling that person to request another link sends them round a loop that can never
+   * end. It is the same situation `motivo=sin_invitacion` already covers on the other path,
+   * so it gets the same answer: the address is fine, it is just not enabled yet.
+   */
+  const sinInvitacion = motivo === 'sin_invitacion' || error === 'failed_to_create_user'
+  const errorEnlace =
+    error !== undefined && !['correo', 'configuracion', 'failed_to_create_user'].includes(error)
 
   return (
     <div className="min-h-dvh bg-barro-50">
@@ -187,7 +196,7 @@ export default async function Entrar({
               </p>
             </div>
           )}
-          {motivo === 'sin_invitacion' && (
+          {sinInvitacion && (
             <div className="mt-4 rounded-lg border border-atrato-100 bg-atrato-50 px-4 py-3">
               <p className="font-medium text-barro-900">Su correo todavía no está habilitado.</p>
               <p className="mt-1 text-sm text-barro-700">

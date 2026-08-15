@@ -27,7 +27,8 @@
     "vista:mapa": "tsx scripts/vista-mapa.ts",
     "vista:bandeja": "tsx --tsconfig tsconfig.scripts.json scripts/vista-bandeja.tsx",
     "vista:manifiesto": "tsx --tsconfig tsconfig.scripts.json scripts/vista-manifiesto.tsx",
-    "build:limpio": "env -u DATABASE_URL -u BETTER_AUTH_SECRET -u BETTER_AUTH_URL -u RESEND_API_KEY next build"
+    "build:limpio": "env -u DATABASE_URL -u BETTER_AUTH_SECRET -u BETTER_AUTH_URL -u RESEND_API_KEY next build",
+    "sembrar:staff": "tsx scripts/sembrar-staff.ts"
   },
   "dependencies": {
     "better-auth": "1.6.29",
