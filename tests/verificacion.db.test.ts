@@ -99,6 +99,69 @@ conBase('nada llega a pedidos sin que una persona lo ponga ahí', () => {
     ).rejects.toThrow(/reporte verificado por una persona/)
   })
 
+  it('ni repuntando un pedido ya existente a un reporte sin verificar', async () => {
+    /*
+     * The hole the insert-only trigger left. `pedidos_coordina` lets a despachador update
+     * every column, so the guarantee lasted exactly as long as nobody ran an UPDATE — and
+     * repointing `reporte_id` at a RECIBIDO report put unverified demand on the board with a
+     * verified pedido's history behind it. Reproduced as `UPDATE 1` before 0031.
+     */
+    await client.query('savepoint caso')
+    const reporte = await reporteEnCola()
+    const { rows } = await client.query<{ id: string }>('select id from pedidos limit 1')
+
+    await expect(
+      client.query('update pedidos set reporte_id = $2 where id = $1', [rows[0]!.id, reporte.id]),
+    ).rejects.toThrow(/reporte verificado por una persona/)
+  })
+
+  it('ni desde un reporte de DAÑO, aunque esté verificado y firmado', async () => {
+    /*
+     * The other half: the check asked for estado and verificado_por, never for tipo. «The
+     * bridge is out» is not a request for anything, and promoting it to a pedido is the
+     * schema guessing what somebody meant — which is the one thing 2.12 forbids.
+     */
+    await client.query('savepoint caso')
+    const reporte = await reporteEnCola()
+    const { rows: quien } = await client.query<{ id: string }>('select id from usuarios limit 1')
+
+    await client.query(
+      `update reportes set tipo = 'dano', estado = 'VERIFICADO', verificado_por = $2,
+              verificado_en = now() where id = $1`,
+      [reporte.id, quien[0]!.id],
+    )
+
+    await expect(
+      client.query(
+        `insert into pedidos (reporte_id, comunidad_id, codigo_item, familias, urgencia)
+         select id, comunidad_id, coalesce(codigo_item, '11'), 5, 1 from reportes where id = $1`,
+        [reporte.id],
+      ),
+    ).rejects.toThrow(/reporte de necesidad/)
+  })
+
+  it('ni describiendo una comunidad distinta a la del reporte que lo origina', async () => {
+    // A pedido that claims a verified source while describing somebody else's need.
+    await client.query('savepoint caso')
+    const reporte = await reporteEnCola()
+    const { rows: quien } = await client.query<{ id: string }>('select id from usuarios limit 1')
+    await client.query(
+      `update reportes set estado = 'VERIFICADO', verificado_por = $2, verificado_en = now(),
+              codigo_item = coalesce(codigo_item, '11') where id = $1`,
+      [reporte.id, quien[0]!.id],
+    )
+
+    await expect(
+      client.query(
+        `insert into pedidos (reporte_id, comunidad_id, codigo_item, familias, urgencia)
+         select r.id, (select c.id from comunidades c where c.id <> r.comunidad_id limit 1),
+                r.codigo_item, 5, 1
+           from reportes r where r.id = $1`,
+        [reporte.id],
+      ),
+    ).rejects.toThrow(/comunidad distinta/)
+  })
+
   it('tampoco si alguien marca el reporte como verificado sin poner su nombre', async () => {
     await client.query('savepoint caso')
     const reporte = await reporteEnCola()

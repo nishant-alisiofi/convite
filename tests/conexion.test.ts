@@ -38,6 +38,44 @@ describe('sslPara', () => {
     })
   })
 
+  it('no se deja apagar el TLS con trucos de cadena', () => {
+    /*
+     * Both found by an adversarial review, both reproduced against the old regex version, and
+     * both fail in the worst way available: the connection succeeds, unencrypted, against a
+     * production database, and raises nothing anywhere. The only way to notice is to be
+     * watching the wire.
+     *
+     * The lesson generalises past these two strings — a connection string is a structure, and
+     * a hostname can appear in several places in it without being the hostname. So the fix is
+     * to parse, and these are the regression cases proving it stays parsed.
+     */
+
+    // `@localhost:` is in the userinfo. The real host is remote and must keep TLS.
+    expect(
+      sslPara('postgresql://user@localhost:pass@db.produccion.com:5432/convite'),
+    ).toEqual({ rejectUnauthorized: false })
+
+    // `?sslmode=disable` is in the fragment, which the server never sees.
+    expect(
+      sslPara('postgresql://u:p@db.produccion.com:5432/convite#?sslmode=disable'),
+    ).toEqual({ rejectUnauthorized: false })
+
+    // The same word in a password, a database name, or a path is not a parameter either.
+    expect(sslPara('postgresql://u:sslmode=disable@db.produccion.com:5432/convite')).toEqual({
+      rejectUnauthorized: false,
+    })
+    expect(sslPara('postgresql://u:p@db.produccion.com:5432/localhost')).toEqual({
+      rejectUnauthorized: false,
+    })
+  })
+
+  it('ante una cadena ilegible deja el TLS puesto', () => {
+    // Failing closed. An unreadable connection string is not evidence that the other end is
+    // local, and guessing «local» there is how the two cases above became possible.
+    expect(sslPara('no-es-una-url')).toEqual({ rejectUnauthorized: false })
+    expect(sslPara('')).toEqual({ rejectUnauthorized: false })
+  })
+
   it('no confunde sslmode=disable con otros modos', () => {
     // `disable` is the only value that turns TLS off. `require`, `prefer` and a database
     // that merely contains the word must not.

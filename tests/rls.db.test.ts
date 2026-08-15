@@ -33,6 +33,9 @@ const ID = {
 
 type Rol = keyof typeof ID
 
+/** Rows in PAC — outside the verifier's territory — captured as owner in `beforeAll`. */
+const FUERA = { reporte: '', mensaje: '', adjunto: '', contacto: '' }
+
 beforeAll(async () => {
   if (!url) return
   pool = new Pool({
@@ -58,6 +61,43 @@ beforeAll(async () => {
      select $1, id from comunidades where codigo in ('TAG', 'MER', 'BET')`,
     [ID.verificador],
   )
+
+  /*
+   * A message and an attachment hanging off a report in PAC — outside the verifier's
+   * territory. The seed has neither, and that absence is why the leak below survived: a probe
+   * that reaches these through `reportes` gets filtered by the *reportes* policy and comes
+   * back empty, which reads exactly like the child tables being scoped when they are not.
+   * They have to be fetched by id to see the truth.
+   */
+  const { rows: pac } = await client.query<{ id: string }>(
+    `select r.id from reportes r join comunidades c on c.id = r.comunidad_id
+      where c.codigo = 'PAC' limit 1`,
+  )
+  FUERA.reporte = pac[0]!.id
+
+  const { rows: msg } = await client.query<{ id: string }>(
+    `insert into mensajes (organizacion_id, proveedor, direccion, canal, reporte_id, cuerpo, estado, telefono)
+       values ($1, 'simulador', 'entrante', 'whatsapp', $2,
+               'Necesitamos agua en Paimadó, somos 40 familias', 'recibido', '+573009990001')
+     returning id`,
+    [org, FUERA.reporte],
+  )
+  FUERA.mensaje = msg[0]!.id
+
+  const { rows: adj } = await client.query<{ id: string }>(
+    `insert into adjuntos (reporte_id, tipo, storage_key, mime, transcripcion)
+       values ($1, 'audio', 'pac/nota-de-voz-privada.ogg', 'audio/ogg',
+               'Habla una señora de Paimadó dando su dirección')
+     returning id`,
+    [FUERA.reporte],
+  )
+  FUERA.adjunto = adj[0]!.id
+
+  const { rows: ct } = await client.query<{ id: string }>(
+    `select ct.id from contactos ct join comunidades c on c.id = ct.comunidad_id
+      where c.codigo = 'PAC' limit 1`,
+  )
+  FUERA.contacto = ct[0]!.id
 })
 
 afterAll(async () => {
@@ -226,6 +266,76 @@ conBase('separación de funciones (Sección 11)', () => {
         [responsable, nodo],
       )
       expect(rowCount).toBe(1)
+    })
+  })
+})
+
+conBase('el territorio del verificador alcanza también a las tablas hijas', () => {
+  /*
+   * Section 11 scopes a verificador to their own communities, and `reportes` and `pedidos`
+   * enforce it. The tables hanging off a report did not: `contactos_lectura`,
+   * `mensajes_lectura` and `adjuntos_lectura` in 0017 asked only for a role. So a verifier in
+   * the Atrato medio could read Paimadó's phone numbers, the raw text of what people wrote,
+   * and the transcripts of their voice notes — the most sensitive rows in the database, and
+   * the ones 2.6 and 2.16 exist to keep from travelling.
+   *
+   * Fixed in 0030 by applying `convite_alcanza_comunidad` to all three. It is a no-op for
+   * every role that is not a verificador, so this scopes the one role that is scoped and
+   * changes nothing for coordinador, admin or despachador.
+   *
+   * Each row is fetched BY ID on purpose. Reaching them through a join on `reportes` returns
+   * empty even when the child policy is wide open, because the *parent* policy filters the
+   * join — a false negative that hides exactly this bug.
+   */
+  async function ve(tabla: string, id: string): Promise<boolean> {
+    const { rows } = await client.query(`select 1 from ${tabla} x where x.id = $1`, [id])
+    return rows.length > 0
+  }
+
+  it('no ve el contacto de una comunidad ajena', async () => {
+    await como('verificador', async () => {
+      expect(await ve('contactos', FUERA.contacto)).toBe(false)
+    })
+  })
+
+  it('no ve el mensaje crudo de un reporte ajeno', async () => {
+    await como('verificador', async () => {
+      expect(await ve('mensajes', FUERA.mensaje)).toBe(false)
+    })
+  })
+
+  it('no ve el adjunto ni la transcripción de un reporte ajeno', async () => {
+    await como('verificador', async () => {
+      expect(await ve('adjuntos', FUERA.adjunto)).toBe(false)
+    })
+  })
+
+  it('y el reporte ajeno tampoco, que es lo que ya funcionaba', async () => {
+    // The control. If this ever goes true the fix is not the problem — 0017 is.
+    await como('verificador', async () => {
+      expect(await ve('reportes', FUERA.reporte)).toBe(false)
+    })
+  })
+
+  it('un coordinador sí los ve: el alcance es del verificador, no de la tabla', async () => {
+    // The other half. A scope that quietly narrowed everybody would «pass» the tests above
+    // and break the basin — a coordinator coordinates across all of it.
+    await como('coordinador', async () => {
+      expect(await ve('contactos', FUERA.contacto)).toBe(true)
+      expect(await ve('mensajes', FUERA.mensaje)).toBe(true)
+      expect(await ve('adjuntos', FUERA.adjunto)).toBe(true)
+    })
+  })
+
+  it('un verificador sí ve lo de SU territorio', async () => {
+    // And the third half: scoping must not blind them to their own work.
+    await como('verificador', async () => {
+      const propios = await contar(
+        `select count(*)::text as n from contactos ct
+          join comunidades c on c.id = ct.comunidad_id
+         where c.codigo in ('TAG', 'MER', 'BET')`,
+      )
+      expect(propios).toBeGreaterThan(0)
     })
   })
 })
