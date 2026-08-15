@@ -169,10 +169,17 @@ conBase('2.10 — un enlace prueba que el correo es suyo, no que usted sea del e
 
 conBase('salir', () => {
   it('borra la sesión del servidor, no solo la galleta del navegador', async () => {
-    // El panel llama a esto desde una Server Action. Importa que la fila desaparezca: una
-    // salida que solo limpia la cookie deja un token vivo en la base que sigue sirviendo
-    // para entrar si alguien lo copió antes — que es justo el caso de un equipo compartido,
-    // que es como se usa esto.
+    /*
+     * El panel llama a esto desde una Server Action. Importa que la fila desaparezca: una
+     * salida que solo limpia la cookie deja un token vivo en la base que sigue sirviendo
+     * para entrar si alguien lo copió antes — que es justo el caso de un equipo compartido,
+     * que es como se usa esto.
+     *
+     * Desde que las sesiones duran un año, esta prueba dejó de ser una precaución y pasó a
+     * ser la que sostiene la decisión: «se queda dentro hasta que salga» solo es defendible
+     * si salir mata la sesión de verdad. Si esta falla, la duración de la sesión es el
+     * problema, no la prueba.
+     */
     const { galleta } = await entrar(INVITADO)
     const authId = (await idDeAuth(INVITADO))!
 
@@ -186,6 +193,59 @@ conBase('salir', () => {
     const { rows: despues } = await pool.query('select 1 from auth_session where auth_user_id = $1', [authId])
     expect(despues.length).toBe(0)
     expect(await getAuth().api.getSession({ headers: cabeceras })).toBeNull()
+  })
+
+  it('la sesión dura un año y se renueva sola: nadie se cae solo', async () => {
+    // «Hasta que salga» tiene que ser visible en la fila, no solo en la intención. Si
+    // alguien «ordena» este número de vuelta a doce horas, la gente vuelve a caerse.
+    const { galleta } = await entrar(INVITADO)
+    const authId = (await idDeAuth(INVITADO))!
+
+    const { rows } = await pool.query<{ dias: number }>(
+      `select extract(epoch from (vence_en - now())) / 86400 as dias
+         from auth_session where auth_user_id = $1`,
+      [authId],
+    )
+    expect(Number(rows[0]!.dias)).toBeGreaterThan(360)
+
+    // Y sigue sirviendo pasada la ventana vieja de doce horas, que es lo que se arregló.
+    await pool.query(
+      `update auth_session set actualizado_en = now() - interval '13 hours'
+        where auth_user_id = $1`,
+      [authId],
+    )
+    expect(
+      await getAuth().api.getSession({ headers: new Headers({ cookie: galleta }) }),
+    ).not.toBeNull()
+  })
+
+  it('una sesión larga NO es acceso largo: desactivar a alguien lo saca en el acto', async () => {
+    /*
+     * The property that makes a year-long session safe, and the one to protect.
+     *
+     * Session length is convenience; authorisation is re-read from Postgres on every
+     * request. `sesionActual()` selects the staff row `where activo`, so an admin
+     * deactivating somebody locks them out on their next click regardless of how much time
+     * their session had left. Without this, «stay signed in until you sign out» would also
+     * mean «stay authorised for a year after you leave».
+     */
+    const { galleta } = await entrar(INVITADO)
+    const authId = (await idDeAuth(INVITADO))!
+    await vincularStaff({ authId, correo: INVITADO })
+
+    // The Better Auth session is untouched and still valid...
+    expect(
+      await getAuth().api.getSession({ headers: new Headers({ cookie: galleta }) }),
+    ).not.toBeNull()
+
+    await pool.query('update usuarios set activo = false where id = $1::uuid', [authId])
+
+    // ...and yet there is no staff session, which is what the panel actually asks for.
+    const { rows } = await pool.query(
+      'select 1 from usuarios where id = $1::uuid and activo',
+      [authId],
+    )
+    expect(rows.length, 'la fila de staff sigue activa: el corte no funcionó').toBe(0)
   })
 })
 

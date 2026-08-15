@@ -34,8 +34,22 @@ import { env } from '@/lib/env'
  * too. See `generateId` below — it is load-bearing, not a preference.
  */
 
-/** How long a sign-in link is good for. Short: it is delivered instantly and used at once. */
-const MINUTOS_ENLACE = 15
+/**
+ * How long a sign-in link is good for. Still single-use; only the window moved.
+ *
+ * Fifteen minutes assumed the mail arrives instantly, and that assumption is wrong in the
+ * place this product is for. A coordinator asks for a link on a connection that drops, the
+ * mail lands twenty minutes later, the link is already dead, and they start again — on a bad
+ * connection, which is exactly when they could least afford the round trip.
+ *
+ * Sixty minutes costs very little. The link is one-use and dies on first click, so the extra
+ * window only matters to somebody who can already read the inbox — and somebody who can read
+ * the inbox can simply request a fresh link. It widens no door that was closed.
+ *
+ * This is a comfort change, not the fix for sign-in friction. That is the session length
+ * below: sign in once, stay in.
+ */
+const MINUTOS_ENLACE = 60
 
 /**
  * How long a WhatsApp code is good for, and how many guesses it takes.
@@ -231,10 +245,40 @@ function construir() {
     },
 
     session: {
-      // A working day, refreshed as it is used. A coordinator should not be signed out
-      // halfway through a shift, and should not stay signed in on a shared laptop for a week.
-      expiresIn: 60 * 60 * 12,
-      updateAge: 60 * 60,
+      /**
+       * You stay signed in until you press «Salir». Founder decision, and the right one for
+       * where this runs.
+       *
+       * A coordinator opens the panel on a laptop in a field office over a connection that
+       * may not be there when they come back. Being logged out is not a small friction for
+       * them: it means waiting on an email that may take twenty minutes to arrive, on the
+       * morning they are trying to get a boat out. The previous twelve hours meant signing in
+       * again roughly every day.
+       *
+       * A year, rolled forward on use: any request more than a day old refreshes the expiry,
+       * so somebody who opens the panel even once a year never reaches it. In practice the
+       * session ends when they end it.
+       *
+       * That is only defensible because ending it actually works, and three separate things
+       * have to keep being true — this is the list to check before touching any of them:
+       *
+       *   1. «Salir» deletes the session row server-side, not just the cookie. Tested in
+       *      tests/autenticacion.db.test.ts; that test is now load-bearing rather than
+       *      belt-and-braces.
+       *   2. No cookie cache (see below). With a twelve-hour session a stale cache was a
+       *      small window; against a year it would be the difference between revoked and
+       *      revoked-eventually.
+       *   3. Access is re-read from Postgres on every request. `sesionActual()` selects the
+       *      staff row `where activo`, so deactivating somebody locks them out on their next
+       *      click no matter how long their session had left. A long session extends
+       *      convenience, not authorisation — that is the property that makes the length
+       *      safe, and there is a test for it.
+       *
+       * The real cost is a shared laptop somebody walks away from. Nothing here fixes that;
+       * it is why «Salir» sits in the header on every screen rather than behind a menu.
+       */
+      expiresIn: 60 * 60 * 24 * 365,
+      updateAge: 60 * 60 * 24,
       /**
        * No cookie cache, deliberately.
        *
@@ -251,6 +295,10 @@ function construir() {
        * the saving is not real anyway: `sesionActual()` reads the staff row from Postgres
        * on every panel request regardless, so this removes one query out of two on a panel
        * used by a handful of people.
+       *
+       * Since sessions became year-long this stopped being a preference. A cache that keeps
+       * answering «yes» after the row is gone is a bounded annoyance against a twelve-hour
+       * session and a real hole against this one.
        */
       cookieCache: { enabled: false },
     },
