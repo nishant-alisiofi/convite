@@ -136,6 +136,57 @@ conBase('el racionamiento se registra o el envío no sale', () => {
     ).rejects.toThrow(/decisión de asignación/)
   })
 
+  it('una decisión vacía no cuenta como decisión', async () => {
+    /*
+     * The gate used to check that a `decisiones_asignacion` row *existed*. Both list columns
+     * default to `[]`, so a row naming a rule and a person and nobody else satisfied it, and
+     * a shipment that short-changed somebody dispatched clean with a record of zero served
+     * requests. Reproduced before 0032.
+     *
+     * 2.9 is not about having a row. «A deferred community with nobody to argue with is how
+     * the reporter network dies» — an empty record leaves precisely nobody to argue with,
+     * while looking on the board like due process happened. That is worse than no record,
+     * because a missing one is visibly missing.
+     */
+    await client.query('savepoint caso')
+    const { envioId } = await planConRecorte()
+
+    await client.query(
+      `insert into decisiones_asignacion (envio_id, regla_aplicada, confirmado_por)
+       values ($1, 'urgencia', $2)`,
+      [envioId, DESPACHADOR],
+    )
+
+    await expect(
+      client.query(
+        `update envios set estado = 'DESPACHADO', despachado_por = $2, despachado_en = now()
+          where id = $1`,
+        [envioId, DESPACHADOR],
+      ),
+    ).rejects.toThrow(/no dice a quién se le repartió/)
+  })
+
+  it('ni una que se salta justamente a quien recortó', async () => {
+    // The subtler version: a record that names somebody, just not the person who was cut.
+    await client.query('savepoint caso')
+    const { envioId } = await planConRecorte()
+
+    await client.query(
+      `insert into decisiones_asignacion
+         (envio_id, regla_aplicada, confirmado_por, pedidos_atendidos)
+       values ($1, 'urgencia', $2, '[{"folio": 99999, "comunidad": "Otra"}]'::jsonb)`,
+      [envioId, DESPACHADOR],
+    )
+
+    await expect(
+      client.query(
+        `update envios set estado = 'DESPACHADO', despachado_por = $2, despachado_en = now()
+          where id = $1`,
+        [envioId, DESPACHADOR],
+      ),
+    ).rejects.toThrow(/no menciona el\/los folio/)
+  })
+
   it('con la decisión registrada, sale', async () => {
     await client.query('savepoint caso')
     const { envioId } = await planConRecorte()

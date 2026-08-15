@@ -65,7 +65,18 @@ function esArchivoConvencional(ruta: string): boolean {
 }
 
 export function esRutaPublica(ruta: string): boolean {
-  return esArchivoConvencional(ruta) || PUBLICAS.some((p) => ruta.startsWith(p)) || ruta === '/'
+  /*
+   * Exact match, or a whole path segment below it. A bare `startsWith` is the trap: `/api/salud`
+   * on the list also made `/api/salud-privada` public, `/entrar` made `/entrar-copia` public,
+   * and `/api/jobs` made `/api/jobs-interno` public. Nobody would add those routes *intending*
+   * them to be open, which is exactly why it would go unnoticed — the list would look correct
+   * and the route would be reachable.
+   *
+   * `SIEMPRE_PUBLICAS` already matched this way (see `esArchivoConvencional`, and the note
+   * there about `/robots.txt.bak`). This brings the main list up to the same rule.
+   */
+  const coincide = (p: string) => ruta === p || ruta.startsWith(`${p}/`)
+  return esArchivoConvencional(ruta) || PUBLICAS.some(coincide) || ruta === '/'
 }
 
 /**

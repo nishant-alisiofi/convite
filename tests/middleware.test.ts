@@ -44,6 +44,28 @@ describe('la lista de rutas públicas', () => {
     }
   })
 
+  it('una ruta que solo EMPIEZA igual no es pública', () => {
+    /*
+     * `startsWith` on a bare prefix made all of these public without anybody adding them:
+     * `/api/salud` covered `/api/salud-privada`, `/entrar` covered `/entrar-copia`,
+     * `/api/jobs` covered `/api/jobs-interno`. Nobody would create those routes intending
+     * them to be open — which is why it would never be spotted. The list would read
+     * correctly and the door would be open anyway.
+     */
+    expect(esRutaPublica('/api/salud-privada')).toBe(false)
+    expect(esRutaPublica('/api/jobs-interno')).toBe(false)
+    expect(esRutaPublica('/entrar-copia')).toBe(false)
+    expect(esRutaPublica('/api/webhooks-internos')).toBe(false)
+    expect(esRutaPublica('/authorization')).toBe(false)
+
+    // And the real ones still are, exactly and by segment.
+    expect(esRutaPublica('/api/salud')).toBe(true)
+    expect(esRutaPublica('/api/salud/detalle')).toBe(true)
+    expect(esRutaPublica('/entrar')).toBe(true)
+    expect(esRutaPublica('/entrar/nueva-clave')).toBe(true)
+    expect(esRutaPublica('/auth/callback')).toBe(true)
+  })
+
   it('incluye los propios endpoints de autenticación', () => {
     // How somebody with no session gets one. Gating these behind a session is a deadlock:
     // /entrar would render and its form would 307 to /entrar forever.
