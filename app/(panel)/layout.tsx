@@ -65,6 +65,14 @@ export default async function PanelLayout({ children }: { children: React.ReactN
             <span className="truncate text-barro-500">
               {identidadVisible(sesion)} · {sesion.rolStaff}
             </span>
+            {/* Account-level, so it sits by the identity rather than in the section nav —
+                nothing about the basin lives here. */}
+            <Link
+              href="/clave"
+              className="shrink-0 text-barro-600 underline hover:text-barro-900"
+            >
+              Su contraseña
+            </Link>
             <form action={salir}>
               <button
                 type="submit"

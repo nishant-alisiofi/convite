@@ -7,7 +7,7 @@ import { phoneNumber } from 'better-auth/plugins/phone-number'
 import { getDb, getPool } from '@/db/client'
 import { autenticacion } from '@/db/schema/autenticacion'
 import { enviarCodigo } from '@/lib/codigo-whatsapp'
-import { enviarCorreo, plantillaEnlace } from '@/lib/correo'
+import { enviarCorreo, plantillaEnlace, plantillaRestablecer } from '@/lib/correo'
 import { env } from '@/lib/env'
 
 /**
@@ -47,6 +47,9 @@ const MINUTOS_ENLACE = 15
  */
 const MINUTOS_CODIGO = 5
 const INTENTOS_CODIGO = 3
+
+/** How long a password-reset link lives. Longer than a sign-in link: it is read, then acted on. */
+const MINUTOS_RESTABLECER = 60
 
 /**
  * Six digits, and the length is load-bearing rather than cosmetic.
@@ -181,8 +184,51 @@ function construir() {
       },
     },
 
-    /** No passwords anywhere (Section 3). The magic link below is the only door. */
-    emailAndPassword: { enabled: false },
+    /**
+     * A password, but never as a way *in* for the first time.
+     *
+     * This is the door that can quietly break the rule the other two enforce, so it is worth
+     * being explicit about the rule first: an account is usable only if the address was
+     * invited **and** somebody proved they control it. An allowlist alone is not enough —
+     * plenty of people know a colleague's work address, and a list of invited addresses is
+     * exactly the sort of thing that gets forwarded.
+     *
+     * So a password cannot create anything. Two structural guarantees, not one:
+     *
+     *   1. `disableSignUp` — there is no HTTP path that turns an address and a chosen
+     *      password into an account. Accounts come into existence only through the magic
+     *      link or the WhatsApp code, both of which require receiving something first.
+     *   2. Better Auth's `setPassword` is `serverOnly` — it is not mounted as a route at
+     *      all. The only caller is our own Server Action in app/(panel)/clave, which already
+     *      requires a live session. A password can therefore only ever be attached to an
+     *      account whose owner has already proved ownership and is signed in.
+     *
+     * The alternative — let somebody sign up with a password and gate it behind an email
+     * verification link — was rejected. It has a real pre-hijacking attack: whoever knows an
+     * invited address registers it first with a password of their choosing, the genuine
+     * person receives a verification mail they did not ask for, and if they click it (people
+     * click) the attacker's credential goes live on their account. The shape above cannot
+     * express that attack.
+     *
+     * Password reset stays safe for the same reason the magic link is safe: it requires
+     * reading mail sent to the address.
+     */
+    emailAndPassword: {
+      enabled: true,
+      disableSignUp: true,
+      // The portfolio floor is 12. A coordinator types this rarely — the magic link is still
+      // the default door — so length is the cheapest strength to ask for.
+      minPasswordLength: 12,
+      maxPasswordLength: 128,
+      // A reset is how somebody recovers from a password they think is compromised, so it
+      // has to actually end the other sessions rather than leave them running.
+      revokeSessionsOnPasswordReset: true,
+      sendResetPassword: async ({ user, url }) => {
+        const { asunto, html } = plantillaRestablecer(url, MINUTOS_RESTABLECER)
+        await enviarCorreo({ para: user.email, asunto, html })
+      },
+      resetPasswordTokenExpiresIn: 60 * MINUTOS_RESTABLECER,
+    },
 
     session: {
       // A working day, refreshed as it is used. A coordinator should not be signed out

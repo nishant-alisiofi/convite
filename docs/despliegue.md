@@ -80,13 +80,38 @@ servicio que levantar**: con `DATABASE_URL` y `BETTER_AUTH_SECRET`, el inicio de
 funciona. Antes esto dependía de un proyecto de Supabase que nunca se creó, y por eso el
 panel llevaba semanas respondiendo 503 en staging.
 
-Hay **dos puertas** y las dos terminan en el mismo expediente de staff, la misma lista de
+Hay **tres puertas** y las tres terminan en el mismo expediente de staff, la misma lista de
 invitaciones y las mismas políticas RLS:
 
 | Puerta | Cómo | Estado |
 |---|---|---|
-| Correo | Enlace mágico, vence en 15 min | **Funcionando en staging** |
+| Correo (por defecto) | Enlace mágico, vence en 15 min | **Funcionando en staging** |
 | WhatsApp | Código de 6 dígitos, vence en 5 min, 3 intentos | Flujo completo; **el envío real espera una WABA (D3)** |
+| Contraseña | Opcional, mínimo 12 caracteres | **Funcionando**; solo para volver, nunca para llegar |
+
+### La invariante de la contraseña
+
+Una cuenta solo sirve si la dirección **estaba invitada** y **alguien probó que la controla**.
+La lista de invitados sola no alcanza: saber la dirección de un colega no es lo mismo que leer
+su correo, y una lista de direcciones invitadas es justo lo que se reenvía dentro de una
+organización.
+
+Por eso **una contraseña no puede crear nada**. Dos garantías estructurales, no un chequeo que
+se pueda olvidar:
+
+1. `disableSignUp` — no existe ninguna ruta HTTP que convierta una dirección más una
+   contraseña elegida en una cuenta. Las cuentas nacen solo del enlace mágico o del código de
+   WhatsApp, y las dos exigen recibir algo.
+2. El `setPassword` de Better Auth es `serverOnly`: no está montado como ruta. El único que lo
+   llama es nuestra propia acción en `/clave`, que ya exige sesión viva.
+
+Se descartó la alternativa (registrarse con contraseña y verificar el correo después): tiene un
+ataque real de pre-secuestro — quien conozca una dirección invitada la registra primero con su
+propia contraseña, la persona legítima recibe un correo de verificación que no pidió, y si lo
+abre la credencial del atacante queda viva en su cuenta. La forma de arriba no puede expresar
+ese ataque.
+
+Restablecer la contraseña es seguro por lo mismo que el enlace mágico: hay que leer el correo.
 
 ### Habilitar a alguien
 

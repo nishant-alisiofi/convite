@@ -127,3 +127,56 @@ export function plantillaEnlace(url: string, minutos: number): { asunto: string;
 </html>`,
   }
 }
+
+/**
+ * The password-reset email.
+ *
+ * Same shape and the same constraints as the sign-in link above — inline styles, no images,
+ * no web fonts — because it reaches the same people on the same connections.
+ *
+ * It says plainly that ignoring it changes nothing. A reset mail nobody asked for is alarming
+ * on its own, and the honest reassurance is also the true one: the old password keeps working
+ * until this link is opened.
+ */
+export function plantillaRestablecer(
+  url: string,
+  minutos: number,
+): { asunto: string; html: string } {
+  return {
+    asunto: 'Cambiar su contraseña de Convite',
+    html: `<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light only" />
+  </head>
+  <body style="margin:0;padding:24px;background:#faf9f7;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;color:#2a2622;line-height:1.55">
+    <div style="max-width:32rem;margin:0 auto;background:#ffffff;border:1px solid #e7e3dd;border-radius:12px;padding:28px">
+      <p style="margin:0 0 4px;font-size:20px;font-weight:600;letter-spacing:-0.01em;color:#1c1917">Convite</p>
+      <p style="margin:0 0 20px;color:#6f675e">Coordinación de ayuda en la cuenca del Atrato.</p>
+
+      <p style="margin:0 0 20px">Alguien pidió cambiar la contraseña de esta cuenta. Si fue usted, hágalo aquí:</p>
+
+      <p style="margin:0 0 20px">
+        <a href="${url}" style="display:inline-block;background:#1f5c4a;color:#ffffff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:500">Poner una contraseña nueva</a>
+      </p>
+
+      <p style="margin:0 0 20px;color:#6f675e;font-size:14px">
+        El enlace vence en ${minutos} minutos y sirve una sola vez.
+      </p>
+
+      <p style="margin:0;color:#6f675e;font-size:14px">
+        Si no lo pidió, no tiene que hacer nada: su contraseña actual sigue funcionando y nadie
+        entra sin abrir este enlace. Puede seguir entrando con el enlace mágico o con el código
+        de WhatsApp como siempre.
+      </p>
+
+      <p style="margin:24px 0 0;padding-top:16px;border-top:1px solid #e7e3dd;color:#877e72;font-size:12px;word-break:break-all">
+        ¿No funciona el botón? Copie esta dirección en su navegador:<br />${url}
+      </p>
+    </div>
+  </body>
+</html>`,
+  }
+}

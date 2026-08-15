@@ -35,6 +35,10 @@ const POLITICA: Record<string, 'publica' | 'autenticada'> = {
   '/respuesta': 'publica',
   '/entrar': 'publica',
   '/auth/callback': 'publica',
+  // Where a password-reset link lands. Public by necessity — somebody who cannot sign in has
+  // to reach it — and safe for the same reason the magic link is: getting here with a usable
+  // token means having read mail sent to an invited address.
+  '/entrar/nueva-clave': 'publica',
   // Better Auth's own endpoints. Public by necessity — they are how somebody with no
   // session gets one — and they answer about sessions and nothing else, so there is no
   // basin data behind them to leak.
@@ -43,6 +47,8 @@ const POLITICA: Record<string, 'publica' | 'autenticada'> = {
   '/api/webhooks/whatsapp': 'publica',
   '/api/jobs/correr': 'publica',
   '/tablero': 'autenticada',
+  // Setting a password. Behind a session on purpose: that is the whole mechanism.
+  '/clave': 'autenticada',
   '/mapa': 'autenticada',
   '/rutas': 'autenticada',
   '/recogidas': 'autenticada',

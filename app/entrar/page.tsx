@@ -19,14 +19,19 @@ import {
 import { rutaInterna, sesionActual } from '@/lib/sesion'
 
 /**
- * Sign-in. Two doors, no passwords: an emailed link, or a code over WhatsApp.
+ * Sign-in. Three doors, and the emailed link is still the default one.
  *
- * Section 3 says no passwords, and one fewer credential is one fewer thing a coordinator has
- * to recover from a field office with bad signal. WhatsApp is the second door because in the
- * Atrato it is the channel that works first — it is what the whole intake side of this
- * product already runs on — and asking somebody to open a mailbox to reach the panel asks for
- * the one thing the field office may not have. Email stays, and is the fallback when a phone
- * is lost or a number changes.
+ * Section 3's «no passwords» was about not *making* anyone keep one, and that holds: the link
+ * is first on the page and nothing pushes you past it. WhatsApp is second because in the
+ * Atrato it is the channel that works first — it is what the whole intake side of this product
+ * already runs on — and asking somebody to open a mailbox to reach the panel asks for the one
+ * thing the field office may not have. A password is third and optional, for the coordinator
+ * who signs in every morning from the same laptop and would rather not wait for mail.
+ *
+ * The password can only ever be a *return* trip. It cannot create an account and it cannot be
+ * set by anyone who has not already proved they own the address — see lib/auth.ts and
+ * app/(panel)/clave. That property is the whole reason it is safe to offer, and it is the one
+ * to preserve if this page is ever rearranged.
  *
  * Section 10 sets the visual register: light, calm, readable at 14px+, works on a laptop
  * over a weak connection. Everything here is server-rendered and the page carries no
@@ -62,6 +67,61 @@ async function enviarEnlace(formData: FormData) {
   // The same outcome either way: whether an address belongs to staff is not something an
   // unauthenticated form gets to reveal.
   redirect('/entrar?enviado=1')
+}
+
+/**
+ * The password door — for returning, never for arriving.
+ *
+ * A password cannot create an account here or anywhere: `disableSignUp` in lib/auth.ts closes
+ * that route, and one is only ever set from inside a live session at /clave. So this form
+ * either matches a credential somebody set after proving they own the address, or it fails.
+ */
+async function entrarConClave(formData: FormData) {
+  'use server'
+  const correo = String(formData.get('correo') ?? '')
+    .trim()
+    .toLowerCase()
+  const clave = String(formData.get('clave') ?? '')
+  const desde = rutaInterna(String(formData.get('desde') ?? ''))
+
+  if (!correo.includes('@') || clave.length === 0) redirect('/entrar?error=credenciales')
+  if (!autenticacionConfigurada()) redirect('/entrar?error=configuracion')
+
+  try {
+    await getAuth().api.signInEmail({
+      headers: await headers(),
+      body: { email: correo, password: clave },
+    })
+  } catch {
+    // Wrong password, no password set, or no such account. One message for all three: telling
+    // them apart tells somebody which invited addresses exist and which have a credential.
+    redirect('/entrar?error=credenciales')
+  }
+
+  redirect(`/auth/callback${desde ? `?desde=${encodeURIComponent(desde)}` : ''}`)
+}
+
+/** «Olvidé mi contraseña.» Sends the reset link, and says nothing about who has an account. */
+async function pedirRestablecer(formData: FormData) {
+  'use server'
+  const correo = String(formData.get('correo') ?? '')
+    .trim()
+    .toLowerCase()
+  if (!correo.includes('@')) redirect('/entrar?error=correo')
+  if (!autenticacionConfigurada()) redirect('/entrar?error=configuracion')
+
+  // Better Auth is already silent about unknown addresses here. The allowlist check keeps us
+  // from mailing anybody who was never invited in the first place.
+  if (await correoInvitado(correo)) {
+    await getAuth().api
+      .requestPasswordReset({
+        headers: await headers(),
+        body: { email: correo, redirectTo: '/entrar/nueva-clave' },
+      })
+      .catch(() => undefined)
+  }
+
+  redirect('/entrar?restablecer=1')
 }
 
 /** Step one of the WhatsApp door: a number goes in, a six-digit code goes out. */
@@ -138,10 +198,12 @@ export default async function Entrar({
     desde?: string
     codigo?: string
     tel?: string
+    clave?: string
+    restablecer?: string
   }>
 }) {
   if (await sesionActual()) redirect('/tablero')
-  const { enviado, error, motivo, desde, codigo, tel } = await searchParams
+  const { enviado, error, motivo, desde, codigo, tel, clave, restablecer } = await searchParams
   const pidiendoCodigo = codigo === '1' && Boolean(tel)
 
   /**
@@ -157,7 +219,14 @@ export default async function Entrar({
   const sinInvitacion = motivo === 'sin_invitacion' || error === 'failed_to_create_user'
   const errorEnlace =
     error !== undefined &&
-    !['correo', 'telefono', 'codigo', 'configuracion', 'failed_to_create_user'].includes(error)
+    ![
+      'correo',
+      'telefono',
+      'codigo',
+      'credenciales',
+      'configuracion',
+      'failed_to_create_user',
+    ].includes(error)
 
   return (
     <div className="min-h-dvh bg-barro-50">
@@ -384,6 +453,101 @@ export default async function Entrar({
                     </span>
                   </p>
                 </form>
+
+                {/* Third door, and last on purpose: only useful to somebody who already has an
+                    account and chose to put a password on it. A `details` element so it is
+                    closed by default without a line of JavaScript. */}
+                <details className="group mt-6 border-t border-barro-200 pt-4">
+                  <summary className="cursor-pointer list-none text-sm text-barro-600 hover:text-barro-900">
+                    <span className="underline underline-offset-2">
+                      Ya tengo contraseña
+                    </span>
+                  </summary>
+
+                  <form action={entrarConClave} className="mt-4 space-y-4">
+                    <input type="hidden" name="desde" value={desde ?? ''} />
+                    <div>
+                      <label
+                        htmlFor="correo-clave"
+                        className="block text-sm font-medium text-barro-800"
+                      >
+                        Su correo
+                      </label>
+                      <input
+                        id="correo-clave"
+                        name="correo"
+                        type="email"
+                        required
+                        autoComplete="username"
+                        placeholder="nombre@organizacion.org"
+                        className="mt-1.5 w-full rounded-lg border border-barro-200 bg-white px-3 py-2.5
+                                   text-base text-barro-900 placeholder:text-barro-400
+                                   focus:border-selva-600 focus:outline-none focus:ring-2
+                                   focus:ring-selva-600/20"
+                      />
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="clave"
+                        className="block text-sm font-medium text-barro-800"
+                      >
+                        Su contraseña
+                      </label>
+                      <input
+                        id="clave"
+                        name="clave"
+                        type="password"
+                        required
+                        autoComplete="current-password"
+                        className="mt-1.5 w-full rounded-lg border border-barro-200 bg-white px-3 py-2.5
+                                   text-base text-barro-900 focus:border-selva-600
+                                   focus:outline-none focus:ring-2 focus:ring-selva-600/20"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full rounded-lg border border-barro-300 bg-white px-4 py-2.5
+                                 font-medium text-barro-900 hover:bg-barro-50
+                                 focus:outline-none focus:ring-2 focus:ring-barro-400/30
+                                 focus:ring-offset-2"
+                    >
+                      Entrar con contraseña
+                    </button>
+                  </form>
+
+                  <p className="mt-3 text-sm text-barro-500">
+                    La contraseña se pone desde adentro, en «Su contraseña». Si nunca puso una,
+                    entre con el enlace o con el código.
+                  </p>
+
+                  <form action={pedirRestablecer} className="mt-3">
+                    <label htmlFor="correo-olvido" className="sr-only">
+                      Correo para restablecer la contraseña
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        id="correo-olvido"
+                        name="correo"
+                        type="email"
+                        required
+                        placeholder="nombre@organizacion.org"
+                        className="min-w-0 flex-1 rounded-lg border border-barro-200 bg-white px-3 py-2
+                                   text-sm text-barro-900 placeholder:text-barro-400
+                                   focus:border-selva-600 focus:outline-none focus:ring-2
+                                   focus:ring-selva-600/20"
+                      />
+                      <button
+                        type="submit"
+                        className="shrink-0 rounded-lg px-3 py-2 text-sm text-barro-600 underline
+                                   hover:text-barro-900 focus:outline-none focus:ring-2
+                                   focus:ring-barro-400/30"
+                      >
+                        Olvidé mi contraseña
+                      </button>
+                    </div>
+                  </form>
+                </details>
               </>
             )}
           </div>
@@ -396,6 +560,23 @@ export default async function Entrar({
           {error === 'correo' && (
             <p className="mt-4 rounded-lg border border-barro-200 bg-white px-4 py-3 text-sm text-barro-700">
               Escriba un correo válido para poder entrar.
+            </p>
+          )}
+          {clave === '1' && (
+            <p className="mt-4 rounded-lg border border-selva-200 bg-selva-50 px-4 py-3 text-sm text-barro-800">
+              Contraseña cambiada. Ya puede entrar con ella.
+            </p>
+          )}
+          {restablecer === '1' && (
+            <p className="mt-4 rounded-lg border border-barro-200 bg-white px-4 py-3 text-sm text-barro-700">
+              Si esa dirección tiene cuenta, le llegó un enlace para poner una contraseña nueva.
+              Vence en una hora. Mientras tanto, la de antes sigue sirviendo.
+            </p>
+          )}
+          {error === 'credenciales' && (
+            <p className="mt-4 rounded-lg border border-barro-200 bg-white px-4 py-3 text-sm text-barro-700">
+              Ese correo y esa contraseña no coinciden. Si nunca puso una contraseña, entre con
+              el enlace por correo o con el código de WhatsApp.
             </p>
           )}
           {error === 'telefono' && (
