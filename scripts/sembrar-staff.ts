@@ -51,6 +51,33 @@ const COMUNIDADES_DEL_VERIFICADOR = ['TAG', 'MER', 'BET']
  */
 const TELEFONO_DEMO = process.env.WHATSAPP_DEMO ?? '+573000000100'
 
+/**
+ * Real people, as `admin`.
+ *
+ * Different in kind from the five above: those are plus-addressed rigs that exist so a demo
+ * can show each role, and they all land in one shared inbox. These are addresses somebody
+ * actually reads, and they are here because staging only ever gets invitations through this
+ * script — an address that is not on this list cannot sign in, however senior its owner.
+ *
+ * `CORREOS_STAFF` adds more without a deploy: a comma-separated list on the Railway variable,
+ * each one invited as admin. That is the knob to use when the rest of the Alisio team needs
+ * in; editing this array should be reserved for people who should be invited on every
+ * environment, forever.
+ */
+const CORREOS_ADMIN = ['manuel.zamora.86@gmail.com']
+
+function correosDelEntorno(): string[] {
+  return (process.env.CORREOS_STAFF ?? '')
+    .split(',')
+    .map((c) => c.trim().toLowerCase())
+    .filter((c) => c.includes('@'))
+}
+
+/** Both sources, deduplicated — the same address in the array and the env var is one person. */
+function administradores(): string[] {
+  return [...new Set([...CORREOS_ADMIN.map((c) => c.toLowerCase()), ...correosDelEntorno()])]
+}
+
 async function main() {
   if (!CORREO_BASE.includes('@')) {
     throw new Error(`CORREO_BASE no parece un correo: ${CORREO_BASE}`)
@@ -104,12 +131,29 @@ async function main() {
     [TELEFONO_DEMO, org.id],
   )
 
+  // Real people. Same mechanism as everything above — an invitation, not an account. They
+  // still have to ask for a link and open it, and re-running this leaves them exactly as
+  // they were: `vincular_usuario_staff()` answers 'ya_existe' once they have signed in.
+  const admins = administradores()
+  for (const correo of admins) {
+    await pool.query(
+      `insert into invitaciones_staff (correo, rol_staff, organizacion_id)
+         values ($1, 'admin', $2)
+       on conflict (correo) where correo is not null
+         do update set rol_staff = excluded.rol_staff`,
+      [correo, org.id],
+    )
+  }
+
   console.log(`\nInvitaciones listas en «${org.nombre}»:\n`)
   for (const { rol, correo, comunidades } of puestos) {
     const alcance = comunidades > 0 ? `  (${comunidades} comunidades)` : ''
     console.log(`  ${rol.padEnd(12)} ${correo}${alcance}`)
   }
   console.log(`  ${'coordinador'.padEnd(12)} ${TELEFONO_DEMO}  (WhatsApp)`)
+  for (const correo of admins) {
+    console.log(`  ${'admin'.padEnd(12)} ${correo}  (persona real)`)
+  }
 
   console.log(
     `\nCada uno entra desde /entrar: los correos piden un enlace, el número pide un código.` +
