@@ -113,6 +113,19 @@ Notas para quien la registre:
 
 ---
 
+## Cuando Meta apruebe una
+
+El código no confía en que una plantilla exista: confía en que esté **aprobada**. `PLANTILLAS`
+en `lib/canales/ventana.ts` lleva un `aprobada` por plantilla, hoy `false` en todas, y
+`decidirSalida` se niega a mandar fuera de la ventana de 24 h cualquiera que no lo tenga en
+`true` — porque una plantilla redactada y no aprobada la acepta nuestra regla y la rechaza Meta
+(132001), y el único que se entera es quien esperaba el folio.
+
+El día que Meta apruebe una, el cambio completo es poner su `aprobada` en `true`. Es un solo
+lugar a propósito. Dentro de la ventana no cambia nada: ahí el texto libre siempre pudo salir.
+
+---
+
 ## Pendiente antes de enviar a aprobación
 
 - Nombre a mostrar definitivo de la cuenta (debe corresponder a la entidad legal — decisión #2).

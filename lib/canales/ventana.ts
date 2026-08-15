@@ -17,31 +17,49 @@
 export const VENTANA_SERVICIO_HORAS = 24
 
 /**
- * The five utility templates in docs/plantillas-whatsapp.md.
+ * The templates in docs/plantillas-whatsapp.md, and whether Meta has cleared each one.
  *
- * Drafted, not approved: decision D4 is still open and approval takes days per template. So
- * a name being on this list means "we wrote it", never "Meta cleared it" — which is why the
- * outbound path has to keep failing closed until D3/D4 land.
+ * `aprobada` is the point of this table. Being written is not being approved: D4 is open,
+ * approval takes days per template and templates get rejected, so a name existing here means
+ * «we drafted it» and nothing more. Treating drafted as sendable is a specific failure —
+ * the message is accepted by our own rule, queued, sent, and refused by Meta with a 132001,
+ * which nobody sees except the person who never got their folio.
+ *
+ * So the flag, and it starts false for every one of them. The day a template is approved,
+ * flipping it here is the whole change; `decidirSalida` reads the flag rather than a name
+ * list, so there is one place to be wrong and it is this one.
  */
-export const PLANTILLAS = [
-  'reporte_recibido',
-  'envio_programado',
-  'entrega_pendiente',
-  'chequeo_periodico',
-  'dano_verificado',
+export const PLANTILLAS = {
+  reporte_recibido: { aprobada: false },
+  envio_programado: { aprobada: false },
+  entrega_pendiente: { aprobada: false },
+  chequeo_periodico: { aprobada: false },
+  dano_verificado: { aprobada: false },
   /**
    * The sign-in code. The only one of these that is not `UTILITY`.
    *
    * Meta files it under `AUTHENTICATION`, which is a different category with its own approval
    * track, its own pricing, and a fixed body shape — the code is the whole message. It is on
    * this list because it must be, not because it is like the others: a sign-in is by
-   * definition unsolicited, so the 24-hour window is always closed for it, and only a name on
-   * this list is allowed through `decidirSalida` when that is true.
+   * definition unsolicited, so the 24-hour window is always closed for it, and only an
+   * approved name here is allowed through `decidirSalida` when that is true.
    */
-  'codigo_ingreso',
-] as const
+  codigo_ingreso: { aprobada: false },
+} as const satisfies Record<string, { aprobada: boolean }>
 
-export type Plantilla = (typeof PLANTILLAS)[number]
+export type Plantilla = keyof typeof PLANTILLAS
+
+/**
+ * The approval state of every registered template.
+ *
+ * A parameter of `decidirSalida` so a test can ask what happens the day Meta approves one,
+ * without anybody having to write `aprobada: true` above before it is true. It cannot invent
+ * a template — only say whether a known one is cleared.
+ */
+export type EstadoPlantillas = Record<Plantilla, { aprobada: boolean }>
+
+/** The names, for the places that only need to know a template is registered. */
+export const NOMBRES_PLANTILLA = Object.keys(PLANTILLAS) as Plantilla[]
 
 export type SalidaPropuesta = {
   cuerpo: string
@@ -68,6 +86,10 @@ export function ventanaAbierta(contexto: ContextoVentana): boolean {
   return horas < VENTANA_SERVICIO_HORAS
 }
 
+function esPlantilla(nombre: string, registro: EstadoPlantillas): nombre is Plantilla {
+  return Object.hasOwn(registro, nombre)
+}
+
 /**
  * What, if anything, may be sent right now.
  *
@@ -77,6 +99,7 @@ export function ventanaAbierta(contexto: ContextoVentana): boolean {
 export function decidirSalida(
   propuesta: SalidaPropuesta,
   contexto: ContextoVentana,
+  registro: EstadoPlantillas = PLANTILLAS,
 ): DecisionVentana {
   if (propuesta.cuerpo.trim().length === 0) {
     return { permitido: false, motivo: 'No se envía un mensaje vacío.' }
@@ -93,8 +116,21 @@ export function decidirSalida(
         'Encole la salida y péguela al próximo mensaje entrante (2.14).',
     }
   }
-  if (!(PLANTILLAS as readonly string[]).includes(nombre)) {
+  if (!esPlantilla(nombre, registro)) {
     return { permitido: false, motivo: `'${nombre}' no es una de las plantillas de utilidad.` }
   }
-  return { permitido: true, modo: 'plantilla', plantilla: nombre as Plantilla }
+  // Written is not approved. Until Meta clears it (D4) this template is exactly as sendable
+  // as free text is — which outside the window is not at all. Saying otherwise here means the
+  // folio is accepted by our own rule and then refused by Meta, and the only person who finds
+  // out is the one who never received it.
+  if (!registro[nombre].aprobada) {
+    return {
+      permitido: false,
+      motivo:
+        `La plantilla '${nombre}' está redactada pero Meta no la ha aprobado (D4), así que ` +
+        'fuera de la ventana de 24 h no sale. Encole la salida y péguela al próximo mensaje ' +
+        'entrante (2.14).',
+    }
+  }
+  return { permitido: true, modo: 'plantilla', plantilla: nombre }
 }

@@ -47,10 +47,16 @@ describe('el simulador de envío por WhatsApp', () => {
 describe('la plantilla del código está registrada', () => {
   it('figura en PLANTILLAS, o la ventana de 24 h la bloquearía', () => {
     /*
-     * `decidirSalida` only lets a name on this list through when the window is closed, and for
+     * `decidirSalida` only lets a registered name through when the window is closed, and for
      * a sign-in it is always closed — nobody writes to us first in order to be allowed to log
-     * in. A code that is not on the list is a code that cannot be sent.
+     * in. A code that is not registered is a code that cannot be sent.
      */
-    expect(PLANTILLAS).toContain('codigo_ingreso')
+    expect(PLANTILLAS).toHaveProperty('codigo_ingreso')
+  })
+
+  it('sigue sin aprobar mientras D4 esté abierta', () => {
+    // Not a wish list. This is AUTHENTICATION category with its own approval track, and the
+    // flag has to say so until Meta actually says so — see docs/plantillas-whatsapp.md §6.
+    expect(PLANTILLAS.codigo_ingreso.aprobada).toBe(false)
   })
 })

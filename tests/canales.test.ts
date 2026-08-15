@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   decidirSalida,
+  NOMBRES_PLANTILLA,
+  PLANTILLAS,
   PROVEEDOR_SIMULADOR,
   recibirSimulado,
   ventanaAbierta,
@@ -154,16 +156,63 @@ describe('la ventana de servicio de 24 h', () => {
     expect(decision.permitido).toBe(false)
   })
 
-  it('fuera de la ventana solo pasa una plantilla de utilidad', () => {
+  it('fuera de la ventana no pasa una plantilla que no existe', () => {
     const contexto = { ultimoEntranteEn: hace(30), ahora: AHORA }
-
-    expect(
-      decidirSalida({ cuerpo: 'Recibimos su reporte…', plantilla: 'reporte_recibido' }, contexto),
-    ).toEqual({ permitido: true, modo: 'plantilla', plantilla: 'reporte_recibido' })
 
     expect(
       decidirSalida({ cuerpo: '¡Aproveche!', plantilla: 'promocion_agosto' }, contexto).permitido,
     ).toBe(false)
+  })
+
+  it('fuera de la ventana no pasa una plantilla que Meta todavía no aprobó', () => {
+    // The five utility templates are written, not cleared: D4 is open and approval takes days
+    // per template. Letting a draft through means the folio is accepted here, queued, sent,
+    // and refused by Meta — and the only person who finds out is the one still waiting for it.
+    const contexto = { ultimoEntranteEn: hace(30), ahora: AHORA }
+
+    const decision = decidirSalida(
+      { cuerpo: 'Recibimos su reporte…', plantilla: 'reporte_recibido' },
+      contexto,
+    )
+
+    expect(decision.permitido).toBe(false)
+    if (!decision.permitido) expect(decision.motivo).toContain('aprobado')
+    // Every template in the registry, so approving one by accident cannot pass unnoticed.
+    for (const nombre of NOMBRES_PLANTILLA) {
+      expect(PLANTILLAS[nombre].aprobada).toBe(false)
+      expect(decidirSalida({ cuerpo: 'Hola', plantilla: nombre }, contexto).permitido).toBe(false)
+    }
+  })
+
+  it('fuera de la ventana sí pasa una plantilla aprobada', () => {
+    // The other half of the gate: the day Meta clears `reporte_recibido`, flipping the flag
+    // is the whole change and the folio goes out cold.
+    const contexto = { ultimoEntranteEn: hace(30), ahora: AHORA }
+    const aprobadas = { ...PLANTILLAS, reporte_recibido: { aprobada: true } }
+
+    expect(
+      decidirSalida(
+        { cuerpo: 'Recibimos su reporte…', plantilla: 'reporte_recibido' },
+        contexto,
+        aprobadas,
+      ),
+    ).toEqual({ permitido: true, modo: 'plantilla', plantilla: 'reporte_recibido' })
+
+    // Approving one does not approve the rest.
+    expect(
+      decidirSalida({ cuerpo: 'Su envío va en camino…', plantilla: 'envio_programado' }, contexto, aprobadas)
+        .permitido,
+    ).toBe(false)
+  })
+
+  it('dentro de la ventana no le pide aprobación a nada', () => {
+    // Inside 24 hours free text is fine, and so is a draft: the rule Meta enforces there is
+    // about the window, not about the template.
+    const contexto = { ultimoEntranteEn: hace(2), ahora: AHORA }
+
+    expect(
+      decidirSalida({ cuerpo: 'Recibimos su reporte…', plantilla: 'reporte_recibido' }, contexto),
+    ).toEqual({ permitido: true, modo: 'libre' })
   })
 
   it('no envía un mensaje vacío por ningún camino', () => {

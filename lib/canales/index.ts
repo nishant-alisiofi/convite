@@ -95,11 +95,18 @@ export type {
 } from './transcripcion'
 export {
   decidirSalida,
+  NOMBRES_PLANTILLA,
   PLANTILLAS,
   ventanaAbierta,
   VENTANA_SERVICIO_HORAS,
 } from './ventana'
-export type { ContextoVentana, DecisionVentana, Plantilla, SalidaPropuesta } from './ventana'
+export type {
+  ContextoVentana,
+  DecisionVentana,
+  EstadoPlantillas,
+  Plantilla,
+  SalidaPropuesta,
+} from './ventana'
 export { leerAcotado, LIMITE_CUERPO_BYTES } from './whatsapp/cuerpo'
 export type { Lectura } from './whatsapp/cuerpo'
 export { CABECERA_FIRMA, firmar, revisarFirmaPrevia, verificarFirma } from './whatsapp/firma'
