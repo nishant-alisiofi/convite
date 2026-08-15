@@ -18,16 +18,22 @@ import { Marca } from '@/components/marca'
  * plugs into. This is the surface that decides whether someone trusts Convite with a
  * community's data, so it is built to the same bar as the tool behind it.
  *
- * Kept out of the route file so it renders from a harness without a database; wiring it as a
- * public route is done (`/acerca`, already in middleware's PUBLICAS).
+ * This is the site root (`/`). A cold visitor — an aid org, a funder — should meet what
+ * Convite is and why to trust it before the live numbers, so the landing is the front door
+ * and the aggregate response lives one click in at `/respuesta`.
  *
- * Same ethos as the rest of the product, and the ethos is the design brief: no client
- * JavaScript, no web fonts, no images — it has to arrive whole over a weak connection. Colour
- * is rationed to `selva` (the primary) and `atrato`; everything else stays quiet `barro`. The
- * one indulgence is register: display headings are set in the system serif (`font-serif`, a
- * Georgia-led stack that ships with every device — zero bytes over the wire) because a
- * humanitarian instrument should read as a considered thing, not a startup landing page.
+ * Static marketing content — no database, no client JavaScript — so it prerenders cleanly and
+ * arrives whole on a weak connection, the same bar the rest of the product holds to. That
+ * also lets a harness render it without standing up Next.
+ *
+ * Same ethos as the rest of the product, and the ethos is the design brief: no web fonts, no
+ * images — it has to arrive whole over a weak connection. Colour is rationed to `selva` (the
+ * primary) and `atrato`; everything else stays quiet `barro`. The one indulgence is register:
+ * display headings are set in the system serif (`font-serif`, a Georgia-led stack that ships
+ * with every device — zero bytes over the wire) because a humanitarian instrument should read
+ * as a considered thing, not a startup landing page.
  */
+export const dynamic = 'force-static'
 
 const CANALES = [
   {
@@ -82,7 +88,7 @@ function Enlaces({ compacto = false }: { compacto?: boolean }) {
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
       <a
-        href="/"
+        href="/respuesta"
         className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-selva-700 px-5 py-3 font-medium text-white transition-colors hover:bg-selva-900 sm:w-auto"
       >
         Ver cómo va la respuesta
@@ -100,7 +106,7 @@ function Enlaces({ compacto = false }: { compacto?: boolean }) {
   )
 }
 
-export default function Acerca() {
+export default function Inicio() {
   return (
     <div className="min-h-dvh bg-barro-50">
       {/* Quiet top bar. One lockup, one link — the front door announces itself and gets out

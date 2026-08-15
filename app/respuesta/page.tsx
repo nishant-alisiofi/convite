@@ -1,5 +1,5 @@
 import { cargarMapaPublico } from '@/lib/publico'
-import VistaPublica from './vista-publica'
+import VistaPublica from './vista'
 
 /**
  * Rendered per request, never at build time.
@@ -20,7 +20,7 @@ import VistaPublica from './vista-publica'
 export const dynamic = 'force-dynamic'
 
 /**
- * The public page.
+ * The public response page (`/respuesta`).
  *
  * Everything anybody can see without signing in, which is counts by municipality and family
  * of need. No coordinate, no community name, no phone number, no individual request —
@@ -36,7 +36,7 @@ export const dynamic = 'force-dynamic'
  * is the boundary, and rendered on the server with no JavaScript.
  */
 
-export default async function Inicio() {
+export default async function Respuesta() {
   const filas = await cargarMapaPublico()
   return <VistaPublica filas={filas} />
 }
