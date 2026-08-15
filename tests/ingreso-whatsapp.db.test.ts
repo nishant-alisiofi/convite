@@ -170,6 +170,8 @@ conBase('de código a permiso, y hasta las políticas', () => {
       telefono: INVITADA,
       rolStaff: 'coordinador',
       organizacionId: '',
+      esPlataforma: false,
+      estadoOrganizacion: 'aprobada',
     }
 
     const visto = await conSesion(sesion, async (client) => {

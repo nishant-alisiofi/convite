@@ -27,6 +27,11 @@ import { NextResponse, type NextRequest } from 'next/server'
  */
 export const PUBLICAS = [
   '/entrar',
+  // §4: requesting to run a centre is a low-friction, unauthenticated path — the whole point is
+  // that somebody who is not yet staff can ask. It creates a `pendiente` organisation and a
+  // pending invitation; nothing operates until the platform approves, so opening the door here
+  // opens nothing behind it.
+  '/solicitar-centro',
   '/auth',
   // Better Auth's own endpoints. They are how a person who has no session gets one, so
   // gating them behind a session is the deadlock it sounds like.

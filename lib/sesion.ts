@@ -55,6 +55,19 @@ export type SesionStaff = {
   telefono: string | null
   rolStaff: string
   organizacionId: string
+  /**
+   * §2.5: the platform tier. A route guard reads this to show the cross-org screens; RLS reads
+   * the same fact from the table through `convite_es_plataforma()`, so the UI and the data
+   * boundary agree without either trusting the other.
+   */
+  esPlataforma: boolean
+  /**
+   * The approval state of the caller's own organisation (§2.4). `aprobada` for anyone who can
+   * work; anything else means the panel is gated behind a «pending approval» screen, unless the
+   * caller is a platform admin (they approve centres and must not be locked out of doing so).
+   * See `panelBloqueado` in lib/organizacion.ts.
+   */
+  estadoOrganizacion: string
 }
 
 /**
@@ -77,9 +90,19 @@ export async function sesionActual(): Promise<SesionStaff | null> {
   if (!sesion?.user) return null
 
   // The staff record is read with the owner role: a session with no `usuarios` row has no
-  // access to `usuarios` either, so it could never discover that it is not staff.
-  const { rows } = await getPool().query<{ rol_staff: string; organizacion_id: string }>(
-    'select rol_staff, organizacion_id from usuarios where id = $1 and activo',
+  // access to `usuarios` either, so it could never discover that it is not staff. The
+  // organisation's approval state comes along in the same read so the panel gate has it without
+  // a second round trip.
+  const { rows } = await getPool().query<{
+    rol_staff: string
+    organizacion_id: string
+    es_plataforma: boolean
+    estado_aprobacion: string
+  }>(
+    `select u.rol_staff, u.organizacion_id, u.es_plataforma, o.estado_aprobacion
+       from usuarios u
+       join organizaciones o on o.id = u.organizacion_id
+      where u.id = $1 and u.activo`,
     [sesion.user.id],
   )
   const fila = rows[0]
@@ -91,6 +114,8 @@ export async function sesionActual(): Promise<SesionStaff | null> {
     telefono: (sesion.user as { phoneNumber?: string | null }).phoneNumber ?? null,
     rolStaff: fila.rol_staff,
     organizacionId: fila.organizacion_id,
+    esPlataforma: fila.es_plataforma,
+    estadoOrganizacion: fila.estado_aprobacion,
   }
 }
 
@@ -117,6 +142,11 @@ export async function conSesion<T>(
         // `convite_rol()` — so the RLS contract is unchanged by its presence. Only
         // `vincular_usuario_staff()` looks at it, and only to find the invitation.
         ...(sesion.telefono ? { telefono: sesion.telefono } : {}),
+        // §2.5: carried so the claim names the platform tier too. The helper
+        // `convite_es_plataforma()` reads the table (the source of truth), so RLS does not
+        // depend on this being present; it is here so a route guard reading claims and the
+        // database agree on the same fact.
+        ...(sesion.esPlataforma ? { es_plataforma: true } : {}),
       }),
     ])
     await client.query('set local role authenticated')

@@ -17,6 +17,7 @@ import { actualizadoEn, creadoEn, enLista, pk, punto } from './_shared'
 import {
   CANALES,
   CANALES_PREFERIDOS,
+  ESTADOS_APROBACION,
   FUENTES_UBICACION,
   ROLES_CONTACTO,
   ROLES_STAFF,
@@ -41,6 +42,15 @@ export const organizaciones = pgTable(
      */
     wabaPhoneNumberId: text('waba_phone_number_id'),
     wabaId: text('waba_id'),
+    /**
+     * §2.4 / §4: a centre handles aid and PII, so it operates only once the platform has
+     * approved it. `pendiente` on a newly-requested centre, `aprobada` once a platform admin
+     * says yes, `rechazada` for a decided no. Migration 0034 backfills every organisation that
+     * existed before this column to `aprobada`, so nothing that already worked is cut off. The
+     * panel gate is in app/(panel)/layout.tsx; a member of a non-approved centre sees a
+     * «pending approval» screen, never a 500.
+     */
+    estadoAprobacion: text('estado_aprobacion').notNull().default('pendiente'),
     activo: boolean('activo').notNull().default(true),
     creadoEn: creadoEn(),
     actualizadoEn: actualizadoEn(),
@@ -50,6 +60,7 @@ export const organizaciones = pgTable(
     uniqueIndex('organizaciones_waba_phone_number_id_key')
       .on(t.wabaPhoneNumberId)
       .where(sql`waba_phone_number_id is not null`),
+    check('organizaciones_estado_aprobacion_check', enLista('estado_aprobacion', ESTADOS_APROBACION)),
   ],
 )
 
@@ -195,6 +206,17 @@ export const usuarios = pgTable(
     organizacionId: uuid('organizacion_id')
       .notNull()
       .references(() => organizaciones.id),
+    /**
+     * §2.5: the platform tier (Alisio / us), a level above a centre's own admin. Orthogonal to
+     * `rol_staff` on purpose — a platform admin still has a working desk inside their own
+     * organisation (they are an `admin`), and this flag is the cross-org elevation on top: it
+     * lets them approve centres and reach across organisations. Modelling it as a flag rather
+     * than a sixth role keeps every existing `convite_es(array[...])` policy untouched; the
+     * cross-org reach is added additively in migration 0034 via `convite_es_plataforma()`.
+     * Set only from a platform invitation (`invitaciones_staff.es_plataforma`) — never by a
+     * centre admin, which the escalation guard in 0034 enforces.
+     */
+    esPlataforma: boolean('es_plataforma').notNull().default(false),
     activo: boolean('activo').notNull().default(true),
     creadoEn: creadoEn(),
     actualizadoEn: actualizadoEn(),

@@ -295,7 +295,7 @@ conBase('de enlace a permiso: la vinculación con el registro de staff', () => {
     const authId = (await idDeAuth(INVITADO))!
     await vincularStaff({ authId, correo: INVITADO })
 
-    const sesion = { authId, correo: INVITADO, telefono: null, rolStaff: 'coordinador', organizacionId: '' }
+    const sesion = { authId, correo: INVITADO, telefono: null, rolStaff: 'coordinador', organizacionId: '', esPlataforma: false, estadoOrganizacion: 'aprobada' }
 
     const visto = await conSesion(sesion, async (client) => {
       const { rows } = await client.query<{ uid: string; rol: string }>(

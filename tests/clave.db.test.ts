@@ -249,6 +249,8 @@ conBase('el recorrido real: poner, salir, volver a entrar', () => {
       telefono: null,
       rolStaff: 'coordinador',
       organizacionId: '',
+      esPlataforma: false,
+      estadoOrganizacion: 'aprobada',
     }
 
     const visto = await conSesion(sesion, async (client) => {

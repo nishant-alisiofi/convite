@@ -26,6 +26,23 @@ export const ROLES_STAFF = [
   'lectura',
 ] as const
 
+/**
+ * Worker roles a centre's admin may invite (§2.4). A narrower set than ROLES_STAFF: an admin
+ * hands out desks — verify, dispatch, coordinate, read — but does not mint another admin, and
+ * platform-admin is not a role at all (it is the `es_plataforma` flag, granted only by the
+ * platform). The invite UI offers exactly these; the escalation guard in migration 0034 is
+ * what enforces the boundary at the database.
+ */
+export const ROLES_TRABAJADOR = ['coordinador', 'verificador', 'despachador', 'lectura'] as const
+
+/**
+ * §2.4 / §4: a centre is an organisation, and it does not operate until the platform approves
+ * it. `pendiente` is where a requested centre starts; `aprobada` is the only state whose members
+ * reach the panel; `rechazada` is a decided no. Existing seeded organisations are backfilled to
+ * `aprobada` by migration 0034 so nothing that works today stops working.
+ */
+export const ESTADOS_APROBACION = ['pendiente', 'aprobada', 'rechazada'] as const
+
 export const TIPOS_COMUNIDAD = [
   'cabecera',
   'corregimiento',
@@ -189,6 +206,8 @@ export const ESTADOS_JOB = ['pendiente', 'corriendo', 'hecho', 'fallido'] as con
 
 export type RolContacto = (typeof ROLES_CONTACTO)[number]
 export type RolStaff = (typeof ROLES_STAFF)[number]
+export type RolTrabajador = (typeof ROLES_TRABAJADOR)[number]
+export type EstadoAprobacion = (typeof ESTADOS_APROBACION)[number]
 export type TipoComunidad = (typeof TIPOS_COMUNIDAD)[number]
 export type Canal = (typeof CANALES)[number]
 export type TipoReporte = (typeof TIPOS_REPORTE)[number]
