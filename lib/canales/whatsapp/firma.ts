@@ -24,28 +24,56 @@ export type ResultadoFirma =
   | { valida: true }
   | { valida: false; motivo: string }
 
-export function firmar(cuerpoCrudo: string, appSecret: string): string {
-  return `sha256=${createHmac('sha256', appSecret).update(cuerpoCrudo, 'utf8').digest('hex')}`
+export function firmar(cuerpoCrudo: string | Buffer, appSecret: string): string {
+  // A string is hashed as UTF-8 (Node's default) and a Buffer as the bytes it holds, so the
+  // route can verify the bytes it received without decoding them first.
+  return `sha256=${createHmac('sha256', appSecret).update(cuerpoCrudo).digest('hex')}`
 }
 
+export type RevisionPrevia =
+  | { valida: true; appSecret: string; cabecera: string }
+  | { valida: false; motivo: string }
+
 /**
- * Fails closed everywhere: a missing header, a malformed header, a missing secret and a
- * wrong digest are all rejections. There is deliberately no "skip verification in
- * development" flag — that flag is how an unverified webhook reaches production.
+ * Everything that can be refused before the body is read.
+ *
+ * Split out because the body is the expensive part. This endpoint is public and takes
+ * unauthenticated POSTs, so buffering megabytes and *then* noticing there was no signature
+ * is a way to spend our memory on somebody who never had the secret. The route runs this
+ * first, off the headers alone.
+ *
+ * Fails closed everywhere: a missing secret, a missing header and a malformed header are all
+ * rejections. There is deliberately no "skip verification in development" flag — that flag
+ * is how an unverified webhook reaches production.
  */
-export function verificarFirma(
-  cuerpoCrudo: string,
+export function revisarFirmaPrevia(
   cabecera: string | null,
   appSecret: string | undefined,
-): ResultadoFirma {
+): RevisionPrevia {
   if (!appSecret) return { valida: false, motivo: 'WHATSAPP_APP_SECRET no está configurado.' }
   if (!cabecera) return { valida: false, motivo: `Falta la cabecera ${CABECERA_FIRMA}.` }
   if (!cabecera.startsWith('sha256=')) {
     return { valida: false, motivo: 'La firma no viene en el formato sha256=<hex>.' }
   }
+  return { valida: true, appSecret, cabecera }
+}
 
-  const esperada = Buffer.from(firmar(cuerpoCrudo, appSecret), 'utf8')
-  const recibida = Buffer.from(cabecera, 'utf8')
+/**
+ * The full check: the header conditions above, and then the digest over the body.
+ *
+ * One definition of «fails closed», shared with `revisarFirmaPrevia`, so the cheap early
+ * rejection and the real verification cannot drift apart.
+ */
+export function verificarFirma(
+  cuerpoCrudo: string | Buffer,
+  cabecera: string | null,
+  appSecret: string | undefined,
+): ResultadoFirma {
+  const previa = revisarFirmaPrevia(cabecera, appSecret)
+  if (!previa.valida) return previa
+
+  const esperada = Buffer.from(firmar(cuerpoCrudo, previa.appSecret), 'utf8')
+  const recibida = Buffer.from(previa.cabecera, 'utf8')
 
   // timingSafeEqual throws on a length mismatch, which is itself a rejection.
   if (esperada.length !== recibida.length) return { valida: false, motivo: 'Firma inválida.' }

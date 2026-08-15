@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getPool } from '@/db/client'
-import { CABECERA_FIRMA, verificarFirma } from '@/lib/canales/whatsapp/firma'
+import { LIMITE_CUERPO_BYTES, leerAcotado } from '@/lib/canales/whatsapp/cuerpo'
+import { CABECERA_FIRMA, revisarFirmaPrevia, verificarFirma } from '@/lib/canales/whatsapp/firma'
 import { encolar } from '@/lib/jobs/cola'
 
 export const dynamic = 'force-dynamic'
@@ -8,12 +9,17 @@ export const dynamic = 'force-dynamic'
 /**
  * The WhatsApp Cloud API webhook.
  *
- * Two rules shape this file and neither is negotiable.
+ * Three rules shape this file and none is negotiable.
  *
  * **Verify the signature over the raw bytes.** The URL is public and Meta sends no bearer
- * token, so the HMAC is the only authentication. `request.text()` is read exactly once and
- * handed to the verifier untouched — parsing and re-serialising first would reorder keys and
- * break the digest for reasons that are invisible in a log.
+ * token, so the HMAC is the only authentication. The body is read exactly once and handed to
+ * the verifier as the bytes that arrived — parsing and re-serialising first would reorder
+ * keys and break the digest for reasons that are invisible in a log.
+ *
+ * **Refuse before reading.** Anyone can POST here. Buffering a whole body and *then*
+ * noticing there was no signature means an unauthenticated stranger decides how much memory
+ * we spend, and a chunked upload with no `content-length` can decide it is unbounded. So the
+ * header conditions are checked off the headers alone, and the read itself is capped.
  *
  * **Answer 200 first, work later** (contract §3). Every provider retries on a slow or
  * non-200 response, so a webhook that does its work inline turns a bad database minute into
@@ -44,23 +50,36 @@ export async function GET(request: Request): Promise<Response> {
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
-  const cuerpoCrudo = await request.text()
+  const cabecera = request.headers.get(CABECERA_FIRMA)
+  const appSecret = process.env.WHATSAPP_APP_SECRET
 
-  const firma = verificarFirma(
-    cuerpoCrudo,
-    request.headers.get(CABECERA_FIRMA),
-    process.env.WHATSAPP_APP_SECRET,
-  )
-  if (!firma.valida) {
+  // Headers first, body second. A missing secret or a missing or malformed signature is
+  // decided here, before a single byte of an unauthenticated body is held.
+  const previa = revisarFirmaPrevia(cabecera, appSecret)
+  if (!previa.valida) {
     // Logged, because a run of these is somebody probing the endpoint and that is worth
     // seeing. The body is deliberately not logged: it is unauthenticated and may be anything.
+    console.warn(`[whatsapp] firma rechazada: ${previa.motivo}`)
+    return NextResponse.json({ error: 'firma inválida' }, { status: 401 })
+  }
+
+  const lectura = await leerAcotado(request, LIMITE_CUERPO_BYTES)
+  if (!lectura.ok) {
+    console.warn(`[whatsapp] cuerpo rechazado: ${lectura.motivo}`)
+    return NextResponse.json({ error: 'cuerpo demasiado grande' }, { status: 413 })
+  }
+
+  // Over the bytes exactly as they arrived: decoding and re-encoding first is the same
+  // mistake as parsing and re-serialising.
+  const firma = verificarFirma(lectura.cuerpo, cabecera, appSecret)
+  if (!firma.valida) {
     console.warn(`[whatsapp] firma rechazada: ${firma.motivo}`)
     return NextResponse.json({ error: 'firma inválida' }, { status: 401 })
   }
 
   let webhook: unknown
   try {
-    webhook = JSON.parse(cuerpoCrudo)
+    webhook = JSON.parse(lectura.cuerpo.toString('utf8'))
   } catch {
     // Signed but unreadable. Retrying will not fix it, so take the 200 and move on.
     console.warn('[whatsapp] payload firmado pero no es JSON válido')

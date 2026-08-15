@@ -100,7 +100,9 @@ export {
   VENTANA_SERVICIO_HORAS,
 } from './ventana'
 export type { ContextoVentana, DecisionVentana, Plantilla, SalidaPropuesta } from './ventana'
-export { CABECERA_FIRMA, firmar, verificarFirma } from './whatsapp/firma'
-export type { ResultadoFirma } from './whatsapp/firma'
+export { leerAcotado, LIMITE_CUERPO_BYTES } from './whatsapp/cuerpo'
+export type { Lectura } from './whatsapp/cuerpo'
+export { CABECERA_FIRMA, firmar, revisarFirmaPrevia, verificarFirma } from './whatsapp/firma'
+export type { ResultadoFirma, RevisionPrevia } from './whatsapp/firma'
 export { interpretarWebhook, PROVEEDOR_WHATSAPP } from './whatsapp/payload'
 export type { EstadoEntrante, LoteWebhook, SobreDirigido } from './whatsapp/payload'
