@@ -52,17 +52,22 @@ const COMUNIDADES_DEL_VERIFICADOR = ['TAG', 'MER', 'BET']
 const TELEFONO_DEMO = process.env.WHATSAPP_DEMO ?? '+573000000100'
 
 /**
- * Real people, as `admin`.
+ * Real people, as platform admins (§2.5).
  *
  * Different in kind from the five above: those are plus-addressed rigs that exist so a demo
  * can show each role, and they all land in one shared inbox. These are addresses somebody
  * actually reads, and they are here because staging only ever gets invitations through this
  * script — an address that is not on this list cannot sign in, however senior its owner.
  *
+ * These are the Alisio team, so they are seeded as the platform tier: `es_plataforma = true`
+ * on the invitation, which `vincular_usuario_staff()` carries onto the staff row. That is what
+ * lets them approve centres and see across organisations — a level above any single centre's
+ * admin.
+ *
  * `CORREOS_STAFF` adds more without a deploy: a comma-separated list on the Railway variable,
- * each one invited as admin. That is the knob to use when the rest of the Alisio team needs
- * in; editing this array should be reserved for people who should be invited on every
- * environment, forever.
+ * each one invited as a platform admin. That is the knob to use when the rest of the Alisio
+ * team needs in; editing this array should be reserved for people who should be invited on
+ * every environment, forever.
  */
 const CORREOS_ADMIN = ['manuel.zamora.86@gmail.com']
 
@@ -137,10 +142,10 @@ async function main() {
   const admins = administradores()
   for (const correo of admins) {
     await pool.query(
-      `insert into invitaciones_staff (correo, rol_staff, organizacion_id)
-         values ($1, 'admin', $2)
+      `insert into invitaciones_staff (correo, rol_staff, organizacion_id, es_plataforma)
+         values ($1, 'admin', $2, true)
        on conflict (correo) where correo is not null
-         do update set rol_staff = excluded.rol_staff`,
+         do update set rol_staff = excluded.rol_staff, es_plataforma = excluded.es_plataforma`,
       [correo, org.id],
     )
   }
@@ -152,7 +157,7 @@ async function main() {
   }
   console.log(`  ${'coordinador'.padEnd(12)} ${TELEFONO_DEMO}  (WhatsApp)`)
   for (const correo of admins) {
-    console.log(`  ${'admin'.padEnd(12)} ${correo}  (persona real)`)
+    console.log(`  ${'plataforma'.padEnd(12)} ${correo}  (persona real, admin de plataforma)`)
   }
 
   console.log(

@@ -34,6 +34,10 @@ const POLITICA: Record<string, 'publica' | 'autenticada'> = {
   '/': 'publica',
   '/respuesta': 'publica',
   '/entrar': 'publica',
+  // §4: the vetted door for running a centre. Public by necessity — somebody who is not yet
+  // staff asks here — and safe because it creates only a `pendiente` organisation and a pending
+  // invitation, with nothing operable behind either until the platform approves.
+  '/solicitar-centro': 'publica',
   '/auth/callback': 'publica',
   // Where a password-reset link lands. Public by necessity — somebody who cannot sign in has
   // to reach it — and safe for the same reason the magic link is: getting here with a usable
@@ -50,6 +54,10 @@ const POLITICA: Record<string, 'publica' | 'autenticada'> = {
   // Setting a password. Behind a session on purpose: that is the whole mechanism.
   '/clave': 'autenticada',
   '/mapa': 'autenticada',
+  // The centre-admin team screen (§2.4) and the platform approval screen (§2.5). Both behind a
+  // session; RLS is the boundary, and each also refuses the wrong role with a legible note.
+  '/equipo': 'autenticada',
+  '/centros': 'autenticada',
   '/rutas': 'autenticada',
   '/recogidas': 'autenticada',
   '/ajustes': 'autenticada',
