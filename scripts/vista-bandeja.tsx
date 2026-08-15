@@ -8,8 +8,8 @@ import Tarjeta from '@/app/(panel)/verificacion/tarjeta'
 /**
  * Renders the verification inbox to a standalone page so somebody can look at it.
  *
- * `/verificacion` sits behind a Supabase session and a local clone has no Supabase project,
- * so without this nothing about this screen is ever seen — which is how a map ships with its
+ * `/verificacion` sits behind a session, and getting one means inviting an address and
+ * clicking a link, so without this the screen is rarely seen — which is how a map ships with its
  * accuracy circles hidden behind the labels. It renders the real `Tarjeta` component with
  * real rows from `cargarBandeja`, so what appears here is the component the panel renders.
  *

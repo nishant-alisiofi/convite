@@ -16,8 +16,8 @@ import type { RutaAfectada } from '@/lib/verificacion/danos'
  * One report in the inbox.
  *
  * Kept out of the page so the same markup can be rendered — with real rows — by
- * `pnpm vista:bandeja`, which is how this screen gets looked at at all: /verificacion sits
- * behind a Supabase session that a local clone does not have. Two copies of the card would
+ * `pnpm vista:bandeja`, which is how this screen gets looked at without signing in:
+ * /verificacion sits behind a session and a magic link. Two copies of the card would
  * drift, and the copy that drifted would be the one used to check the layout.
  *
  * `accion` is a server action on the real screen and a plain string in the harness, where

@@ -1,7 +1,7 @@
 import { TriangleAlert } from 'lucide-react'
 
 /**
- * The Tablero's markup, kept out of the route so it renders without a Supabase session.
+ * The Tablero's markup, kept out of the route so it renders without a signed-in session.
  *
  * `page.tsx` runs the query under RLS and hands the rows here; this file only lays them out —
  * the same split as `verificacion/tarjeta.tsx`, and for the same reason: a screen behind auth

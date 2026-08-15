@@ -8,8 +8,8 @@ import { temporadaVigente } from '@/lib/temporada'
 /**
  * Renders the coordinator map to a standalone page so somebody can look at it.
  *
- * `/mapa` sits behind a Supabase session and a local clone has no Supabase project, so
- * without this there is no way to check the thing the screen exists for — whether a
+ * `/mapa` sits behind a session, and getting one means inviting an address and clicking a
+ * link, so without this there is no quick way to check what the screen exists for — whether a
  * centroid draws as a kilometre-wide circle or quietly as a dot. It reads real rows through
  * the same `cargarMapa` query and takes its sources and layers from the same
  * `lib/mapa/capas`, so what appears here is what the panel draws.
