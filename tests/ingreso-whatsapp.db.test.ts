@@ -23,7 +23,7 @@ const conBase = describe.skipIf(!url)
 process.env.BETTER_AUTH_SECRET ??= 'x'.repeat(64)
 process.env.APP_BASE_URL ??= 'http://localhost:3000'
 
-const { getAuth, telefonoInvitado } = await import('@/lib/auth')
+const { getAuth } = await import('@/lib/auth')
 const { simuladorIngreso, PLANTILLA_CODIGO } = await import('@/lib/codigo-whatsapp')
 const { conSesion, vincularStaff } = await import('@/lib/sesion')
 
@@ -104,12 +104,7 @@ afterAll(async () => {
   await pool.end()
 })
 
-conBase('2.10 sigue en pie: el código prueba el número, no la pertenencia', () => {
-  it('sabe qué número está invitado y cuál no', async () => {
-    expect(await telefonoInvitado(INVITADA)).toBe(true)
-    expect(await telefonoInvitado(DESCONOCIDA)).toBe(false)
-  })
-
+conBase('ingreso abierto — el código prueba el número, y la posesión basta (0035)', () => {
   it('a una invitada le llega el código y entra', async () => {
     const { codigo, verificar } = await entrarPorWhatsApp(INVITADA)
 
@@ -121,13 +116,14 @@ conBase('2.10 sigue en pie: el código prueba el número, no la pertenencia', ()
     expect(await idDeAuth(INVITADA)).not.toBeNull()
   })
 
-  it('a un número desconocido NO se le crea identidad, aunque consiga un código', async () => {
-    // El guardián que no se puede rodear: la pantalla ni siquiera manda el código, pero si
-    // alguien llega a `sendPhoneNumberOTP` por otro camino, la fila no se escribe igual.
+  it('a un número desconocido TAMBIÉN se le crea identidad si verifica el código', async () => {
+    // Ya no hay guardián de lista: cualquiera que pruebe posesión del número obtiene una
+    // identidad. Verificar el código la crea, igual que para una invitada.
     const { verificar } = await entrarPorWhatsApp(DESCONOCIDA)
 
-    await expect(verificar()).rejects.toThrow()
-    expect(await idDeAuth(DESCONOCIDA)).toBeNull()
+    const resultado = await verificar()
+    expect(resultado.status).toBe(true)
+    expect(await idDeAuth(DESCONOCIDA)).not.toBeNull()
   })
 
   it('un código equivocado no entra', async () => {
@@ -159,8 +155,10 @@ conBase('de código a permiso, y hasta las políticas', () => {
     // y `auth.uid()` lo castea.
     expect(authId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/)
 
-    // El correo de una sesión por WhatsApp es un marcador que no está en ninguna lista: si la
-    // vinculación se hiciera por correo, esto diría 'sin_invitacion'.
+    // El correo de una sesión por WhatsApp es un marcador que no casa con ninguna invitación:
+    // por eso se busca por número. Si la vinculación se hiciera por correo, no hallaría la
+    // invitación y caería al rol por defecto del ingreso abierto ('admin') en vez del que puso
+    // el admin ('coordinador'); casar por número es lo que preserva el rol invitado.
     expect(await vincularStaff({ authId, correo: 'x@wa.convite.invalid', telefono: INVITADA }))
       .toBe('creado')
 

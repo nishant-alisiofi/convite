@@ -4,11 +4,12 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 /**
  * The password door, and the one property that makes it safe to have.
  *
- * **An account is usable only if the address was invited AND somebody proved they control
- * it.** The magic link and the WhatsApp code both prove control by construction — you have to
- * receive something. A password does not, and that is the hole this file exists to keep shut:
- * knowing an invited address is not the same as reading mail sent to it, and a list of invited
- * addresses is exactly the kind of thing that gets forwarded around an organisation.
+ * Open sign-in (0035) means anyone who proves possession of an address or number gets an
+ * account — but a password is not proof of possession, it is a secret somebody chose. So the
+ * rule this file keeps is narrower and unchanged by the open-sign-in switch: **a password can
+ * never be the FIRST proof.** An account comes into existence only after its owner proved they
+ * can receive something (the magic link or the WhatsApp code); a password is only ever a faster
+ * return trip for an account that already exists.
  *
  * The mechanism is two structural guarantees rather than a check that could be forgotten:
  * `disableSignUp` means no HTTP route turns an address plus a chosen password into an account,
@@ -123,11 +124,11 @@ afterAll(async () => {
 })
 
 conBase('la invariante: una contraseña nunca es la primera prueba de nada', () => {
-  it('conocer una dirección invitada NO alcanza para crear cuenta con contraseña', async () => {
+  it('una contraseña elegida NO crea cuenta, ni siquiera para una dirección con invitación', async () => {
     /*
-     * The attack this closes. The address is genuinely on the allowlist — so an allowlist
-     * check alone would wave this through — but nobody has proved they can read its mail.
-     * Sign-up has to refuse, and no account may exist afterwards.
+     * The attack this closes. The address even has an invitation waiting — but choosing a
+     * password is not proving you can read its mail, and open sign-in still never lets a
+     * password be the first proof. Sign-up has to refuse, and no account may exist afterwards.
      */
     await expect(
       getAuth().api.signUpEmail({

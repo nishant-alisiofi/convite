@@ -49,8 +49,9 @@ export type SesionStaff = {
    *
    * Carried because `vincular_usuario_staff()` has to find the invitation by whichever
    * identifier the person actually proved. A phone sign-in's `correo` is a placeholder that
-   * matches nothing on the allowlist by design, so without this the WhatsApp door would
-   * always answer «sin invitación».
+   * matches no invitation by design, so without this a coordinator invited by number would
+   * miss their invitation and fall to the open-sign-in default (an `admin`) instead of the
+   * role the admin pre-assigned.
    */
   telefono: string | null
   rolStaff: string
@@ -162,9 +163,10 @@ export async function conSesion<T>(
 }
 
 /**
- * Links a fresh sign-in to its staff record, if an admin invited that address or that number.
- * Returns what happened so the caller can say something useful rather than dumping the person
- * on an empty screen.
+ * Links a fresh sign-in to its staff record. Open sign-in (0035): everyone who proves
+ * possession gets a row — from a matching invitation if one exists (using its role, org and
+ * platform flag), otherwise a default `admin` in the earliest active organisation. Invitations
+ * pre-assign; they do not gate. Returns what happened so the caller can react.
  *
  * `ya_vinculada` is the one to know about: the invitation was already spent by the *other*
  * door. One human invited with both an address and a number gets two different Better Auth
@@ -175,7 +177,7 @@ export async function vincularStaff(sesion: {
   authId: string
   correo: string
   telefono?: string | null
-}): Promise<'creado' | 'ya_existe' | 'sin_invitacion' | 'ya_vinculada' | 'sin_sesion'> {
+}): Promise<'creado' | 'ya_existe' | 'ya_vinculada' | 'sin_sesion'> {
   const client = await getPool().connect()
   try {
     await client.query('begin')

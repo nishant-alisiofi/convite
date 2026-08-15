@@ -10,12 +10,7 @@ import {
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { aE164 } from '@/lib/canales'
-import {
-  autenticacionConfigurada,
-  correoInvitado,
-  getAuth,
-  telefonoInvitado,
-} from '@/lib/auth'
+import { autenticacionConfigurada, getAuth } from '@/lib/auth'
 import { rutaInterna, sesionActual } from '@/lib/sesion'
 
 /**
@@ -55,17 +50,13 @@ async function enviarEnlace(formData: FormData) {
   const desde = rutaInterna(String(formData.get('desde') ?? ''))
   const destino = `/auth/callback${desde ? `?desde=${encodeURIComponent(desde)}` : ''}`
 
-  // The allowlist (2.10), checked before anything is sent. `lib/auth.ts` asks the same
-  // question again when the row would be written; see the note on `correoInvitado`.
-  if (await correoInvitado(correo)) {
-    await getAuth().api.signInMagicLink({
-      headers: await headers(),
-      body: { email: correo, callbackURL: destino, errorCallbackURL: '/entrar' },
-    })
-  }
+  // Open sign-in (0035): the link goes to anyone who asks. Possession of the address is what
+  // gets proved by clicking it, and possession is enough — there is no allowlist to consult.
+  await getAuth().api.signInMagicLink({
+    headers: await headers(),
+    body: { email: correo, callbackURL: destino, errorCallbackURL: '/entrar' },
+  })
 
-  // The same outcome either way: whether an address belongs to staff is not something an
-  // unauthenticated form gets to reveal.
   redirect('/entrar?enviado=1')
 }
 
@@ -110,16 +101,15 @@ async function pedirRestablecer(formData: FormData) {
   if (!correo.includes('@')) redirect('/entrar?error=correo')
   if (!autenticacionConfigurada()) redirect('/entrar?error=configuracion')
 
-  // Better Auth is already silent about unknown addresses here. The allowlist check keeps us
-  // from mailing anybody who was never invited in the first place.
-  if (await correoInvitado(correo)) {
-    await getAuth().api
-      .requestPasswordReset({
-        headers: await headers(),
-        body: { email: correo, redirectTo: '/entrar/nueva-clave' },
-      })
-      .catch(() => undefined)
-  }
+  // Better Auth is already silent about unknown addresses here: it only mails an account that
+  // exists and has this address, and says nothing either way. A reset presupposes an account,
+  // which only ever came from proving possession — so there is nothing to gate at this door.
+  await getAuth().api
+    .requestPasswordReset({
+      headers: await headers(),
+      body: { email: correo, redirectTo: '/entrar/nueva-clave' },
+    })
+    .catch(() => undefined)
 
   redirect('/entrar?restablecer=1')
 }
@@ -140,17 +130,13 @@ async function enviarCodigoWhatsApp(formData: FormData) {
 
   const desde = rutaInterna(String(formData.get('desde') ?? ''))
 
-  // The allowlist (2.10), before anything is sent — same as the email door. `lib/auth.ts`
-  // asks again when the row would be written.
-  if (await telefonoInvitado(telefono)) {
-    await getAuth().api.sendPhoneNumberOTP({
-      headers: await headers(),
-      body: { phoneNumber: telefono },
-    })
-  }
+  // Open sign-in (0035): the code goes to any number that asks — same as the email door.
+  // Verifying it proves possession of the number, and possession is enough.
+  await getAuth().api.sendPhoneNumberOTP({
+    headers: await headers(),
+    body: { phoneNumber: telefono },
+  })
 
-  // Same screen either way. Whether a number belongs to staff is not something an
-  // unauthenticated form gets to reveal — and the code step below refuses anyway.
   const parametros = new URLSearchParams({ codigo: '1', tel: telefono })
   if (desde) parametros.set('desde', desde)
   redirect(`/entrar?${parametros}`)
@@ -207,26 +193,15 @@ export default async function Entrar({
   const pidiendoCodigo = codigo === '1' && Boolean(tel)
 
   /**
-   * Better Auth names its own failures. A coordinator cannot act on any of them and nearly
-   * all of them mean the same thing, so they collapse into «that link is done, ask for
-   * another» — except one.
+   * Better Auth names its own failures. A coordinator cannot act on any of them and they all
+   * mean the same thing, so they collapse into «that link is done, ask for another».
    *
-   * `failed_to_create_user` is what the allowlist check in lib/auth.ts produces, and
-   * telling that person to request another link sends them round a loop that can never
-   * end. It is the same situation `motivo=sin_invitacion` already covers on the other path,
-   * so it gets the same answer: the address is fine, it is just not enabled yet.
+   * There is no longer a «not enabled yet» state: open sign-in (0035) creates an account for
+   * anyone who proves possession, so account creation no longer fails for lack of an invitation.
    */
-  const sinInvitacion = motivo === 'sin_invitacion' || error === 'failed_to_create_user'
   const errorEnlace =
     error !== undefined &&
-    ![
-      'correo',
-      'telefono',
-      'codigo',
-      'credenciales',
-      'configuracion',
-      'failed_to_create_user',
-    ].includes(error)
+    !['correo', 'telefono', 'codigo', 'credenciales', 'configuracion'].includes(error)
 
   return (
     <div className="min-h-dvh bg-barro-50">
@@ -607,14 +582,6 @@ export default async function Entrar({
               <p className="mt-1 text-sm text-barro-700">
                 No es algo que usted pueda resolver desde aquí. Avísele a quien opera Convite:
                 faltan <code>BETTER_AUTH_SECRET</code> o <code>DATABASE_URL</code>.
-              </p>
-            </div>
-          )}
-          {sinInvitacion && (
-            <div className="mt-4 rounded-lg border border-atrato-100 bg-atrato-50 px-4 py-3">
-              <p className="font-medium text-barro-900">Su correo todavía no está habilitado.</p>
-              <p className="mt-1 text-sm text-barro-700">
-                Pídale a quien administra Convite en su organización que lo agregue.
               </p>
             </div>
           )}

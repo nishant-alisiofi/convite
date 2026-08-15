@@ -38,7 +38,7 @@ vi.mock('@/lib/correo', () => ({
   plantillaEnlace: (u: string) => ({ asunto: 'x', html: `<a href="${u}">x</a>` }),
 }))
 
-const { correoInvitado, getAuth } = await import('@/lib/auth')
+const { getAuth } = await import('@/lib/auth')
 const { conSesion, vincularStaff } = await import('@/lib/sesion')
 
 const INVITADO = 'coordinadora.prueba@convite.test'
@@ -130,14 +130,7 @@ afterAll(async () => {
   await pool.end()
 })
 
-conBase('2.10 — un enlace prueba que el correo es suyo, no que usted sea del equipo', () => {
-  it('sabe quién está invitado y quién no', async () => {
-    expect(await correoInvitado(INVITADO)).toBe(true)
-    expect(await correoInvitado(DESCONOCIDO)).toBe(false)
-    // La mayúscula y el espacio de más son de quien escribe, no del permiso.
-    expect(await correoInvitado(`  ${INVITADO.toUpperCase()} `)).toBe(true)
-  })
-
+conBase('ingreso abierto — un enlace prueba posesión, y la posesión basta (0035)', () => {
   it('a un invitado le llega el enlace y entra', async () => {
     const { estado, destino } = await entrar(INVITADO)
 
@@ -148,13 +141,16 @@ conBase('2.10 — un enlace prueba que el correo es suyo, no que usted sea del e
     expect(await idDeAuth(INVITADO)).not.toBeNull()
   })
 
-  it('a un desconocido que consiga un enlace NO se le crea identidad', async () => {
-    // El guardián que no se puede rodear: la página ni siquiera manda el correo, pero si
-    // alguien llega a `signInMagicLink` por otro camino, la fila no se escribe igual.
-    const { destino } = await entrar(DESCONOCIDO)
+  it('a un desconocido que consigue un enlace TAMBIÉN se le crea identidad', async () => {
+    // Ya no hay guardián de lista: cualquiera que pruebe posesión del correo obtiene una
+    // identidad. El acceso al panel llega después, cuando el callback crea la fila de staff.
+    const { estado, destino } = await entrar(DESCONOCIDO)
 
-    expect(destino).toContain('error')
-    expect(await idDeAuth(DESCONOCIDO)).toBeNull()
+    expect(enviado.para).toBe(DESCONOCIDO)
+    expect([302, 307]).toContain(estado)
+    expect(destino).toContain('/auth/callback')
+    expect(destino).not.toContain('error')
+    expect(await idDeAuth(DESCONOCIDO)).not.toBeNull()
   })
 
   it('estar autenticado no crea la fila de staff por sí solo', async () => {
@@ -283,9 +279,34 @@ conBase('de enlace a permiso: la vinculación con el registro de staff', () => {
     expect(rows[0]?.rol_staff).toBe('coordinador')
   })
 
-  it('un id autenticado sin invitación no obtiene fila', async () => {
+  it('un id autenticado sin invitación ahora obtiene una fila de admin (ingreso abierto)', async () => {
     const { randomUUID } = await import('node:crypto')
-    expect(await vincularStaff({ authId: randomUUID(), correo: DESCONOCIDO })).toBe('sin_invitacion')
+    const authId = randomUUID()
+    try {
+      expect(await vincularStaff({ authId, correo: DESCONOCIDO })).toBe('creado')
+
+      const { rows } = await pool.query<{
+        rol_staff: string
+        es_plataforma: boolean
+        organizacion_id: string
+      }>(
+        'select rol_staff, es_plataforma, organizacion_id from usuarios where id = $1::uuid',
+        [authId],
+      )
+      // El valor por defecto de un ingreso sin invitación: admin, nunca plataforma.
+      expect(rows[0]?.rol_staff).toBe('admin')
+      expect(rows[0]?.es_plataforma).toBe(false)
+
+      // Cae en la organización activa más antigua — la misma que elige sembrar-plataforma.ts.
+      const { rows: org } = await pool.query<{ id: string }>(
+        'select id from organizaciones where activo order by creado_en limit 1',
+      )
+      expect(rows[0]?.organizacion_id).toBe(org[0]!.id)
+    } finally {
+      // El uuid no está atado a ningún auth_user, así que el afterEach no lo recoge: limpio aquí.
+      await pool.query('delete from auditoria where actor_id = $1::uuid', [authId])
+      await pool.query('delete from usuarios where id = $1::uuid', [authId])
+    }
   })
 
   it('y con la fila puesta, RLS deja leer exactamente lo del rol', async () => {
