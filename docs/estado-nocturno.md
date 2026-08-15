@@ -1,3 +1,36 @@
+# Convite — ACTUALIZACIÓN 2026-08-15: demoable, en el estándar de la plataforma
+
+Cambios desde la nota nocturna, todos en `origin/main` y desplegados en staging:
+
+- **Auth movido de Supabase a nuestro estándar** — better-auth sobre nuestro Postgres de
+  Railway, correo por Resend. Supabase eliminado por completo. RLS intacto (0 políticas
+  tocadas; `conSesion` fija `request.jwt.claims` igual que antes). Migración `0028` (tablas
+  `auth_user/session/account/verification`). 507/507 tests.
+- **El panel del coordinador está VIVO y caminado en staging** — login por magic-link
+  (5 roles sembrados: coordinador/verificador/despachador/admin/lectura →
+  `talos+convite-<rol>@downshiftit.com`, llegan al buzón talos). Tablero renderiza la salida
+  real del emparejador (clasificación-como-llamada). RLS por comunidad verificado en vivo
+  (verificador ve solo su comunidad). Mobile 360px sin overflow (tablero + verificación).
+- **Landing-as-root** — `/` = landing (estático), `/respuesta` = respuesta en vivo (dinámico,
+  cache + rate-limit + k-anon), `/acerca`→`/`. Diseño world-class (Dante) en marketing + panel.
+- **Correo de sign-in** on-brand, charset arreglado (acentos intactos).
+- **Ya no bloquea nada del lado del founder** para el demo. La decisión de Supabase que se
+  citaba abajo quedó obsoleta: no usamos Supabase.
+
+Pendientes reales (ninguno bloquea el demo):
+- **Dominio de envío de producción** — hoy `dev.downshiftit.com` (verificado) para el demo;
+  producción querrá un dominio Convite/Alisio propio en Resend.
+- **Nishant / migraciones** — solo relevante si algún día se migran sus datos de la Supabase
+  original; el app corre 100% sobre nuestro Railway DB.
+- **Liveness endpoint** — el healthcheck de Railway apunta a `/` (no a `/api/salud`, que da 503
+  ante cualquier alerta operativa); vale un endpoint de liveness dedicado para no confundir
+  «app viva» con «sin alertas».
+
+URLs vivas: landing `https://convite-app-staging.up.railway.app/` · respuesta `/respuesta` ·
+panel `/entrar`.
+
+---
+
 # Convite — estado tras la sesión nocturna (2026-08-14)
 
 Resumen para Manuel y para Nishant. Toda la construcción del PRD (M4–M12 + trabajo transversal)
