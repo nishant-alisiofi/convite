@@ -79,7 +79,7 @@ export default function VistaPublica({ filas }: { filas: FilaPublica[] }) {
         <section className="pt-12 sm:pt-16">
           <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-selva-700">
             <span className="h-1.5 w-1.5 rounded-full bg-selva-600" aria-hidden />
-            Ayuda humanitaria · Cuenca del Atrato, Chocó
+            Ayuda humanitaria · Chocó y el Pacífico colombiano
           </p>
           <h1 className="mt-4 font-serif text-3xl font-semibold tracking-[-0.01em] text-barro-900 sm:text-4xl">
             Así va la respuesta
@@ -119,7 +119,7 @@ export default function VistaPublica({ filas }: { filas: FilaPublica[] }) {
                 </div>
               </div>
               <p className="mt-4 text-sm text-barro-600">
-                En {zonas.length} {zonas.length === 1 ? 'zona' : 'zonas'} de la cuenca.
+                En {zonas.length} {zonas.length === 1 ? 'zona' : 'zonas'} del territorio.
               </p>
             </section>
 

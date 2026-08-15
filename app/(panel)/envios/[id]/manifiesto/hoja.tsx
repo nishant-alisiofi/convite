@@ -165,7 +165,7 @@ export default function HojaManifiesto({
 
         <p className="mt-6 border-t border-stone-300 pt-3 text-xs text-stone-600">
           Despachado {manifiesto.despachadoEn?.toLocaleString('es-CO') ?? '—'}. Convite ·
-          coordinación de ayuda en la cuenca del Atrato.
+          coordinación de ayuda en el Chocó y el Pacífico colombiano.
         </p>
       </div>
     </main>

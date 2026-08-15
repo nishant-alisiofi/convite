@@ -69,7 +69,7 @@ const CANALES = [
 const PARA_QUIEN = [
   {
     icono: Users,
-    titulo: 'Las comunidades de la cuenca',
+    titulo: 'Las comunidades del territorio',
     texto: 'Piden lo que necesitan por el canal que tengan. Sin costo, sin app y sin contraseña.',
   },
   {
@@ -128,15 +128,15 @@ export default function Inicio() {
         <section className="pt-14 sm:pt-20">
           <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-selva-700">
             <span className="h-1.5 w-1.5 rounded-full bg-selva-600" aria-hidden />
-            Ayuda humanitaria · Cuenca del Atrato, Chocó
+            Ayuda humanitaria · Chocó y el Pacífico colombiano
           </p>
           <h1 className="mt-5 max-w-3xl font-serif text-[2.15rem] font-semibold leading-[1.08] tracking-[-0.015em] text-barro-900 sm:text-5xl md:text-[3.4rem]">
             Quien necesita ayuda nunca paga por pedirla.
           </h1>
           <p className="mt-6 max-w-2xl text-lg leading-relaxed text-barro-700 sm:text-xl">
-            En la cuenca del Atrato, las comunidades reportan lo que necesitan por el canal que
-            tengan a la mano. Una persona verifica cada reporte, y la ayuda se despacha por río
-            y por carretera hasta que llega.
+            En el Chocó y el Pacífico colombiano, las comunidades reportan lo que necesitan por
+            el canal que tengan a la mano. Una persona verifica cada reporte, y la ayuda se
+            despacha por río y por carretera hasta que llega.
           </p>
           <div className="mt-8">
             <Enlaces />
@@ -314,7 +314,7 @@ export default function Inicio() {
       <footer className="border-t border-barro-200">
         <div className="mx-auto flex max-w-4xl flex-col gap-3 px-5 py-8 text-sm text-barro-500 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <Marca />
-          <p>Cuenca del Atrato, Chocó.</p>
+          <p>Chocó y el Pacífico colombiano.</p>
         </div>
       </footer>
     </div>

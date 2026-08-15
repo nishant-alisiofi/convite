@@ -103,7 +103,7 @@ export function plantillaEnlace(url: string, minutos: number): { asunto: string;
   <body style="margin:0;padding:24px;background:#faf9f7;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;color:#2a2622;line-height:1.55">
     <div style="max-width:32rem;margin:0 auto;background:#ffffff;border:1px solid #e7e3dd;border-radius:12px;padding:28px">
       <p style="margin:0 0 4px;font-size:20px;font-weight:600;letter-spacing:-0.01em;color:#1c1917">Convite</p>
-      <p style="margin:0 0 20px;color:#6f675e">Coordinación de ayuda en la cuenca del Atrato.</p>
+      <p style="margin:0 0 20px;color:#6f675e">Coordinación de ayuda en el Chocó y el Pacífico colombiano.</p>
 
       <p style="margin:0 0 20px">Alguien pidió un enlace para entrar con este correo. Si fue usted, entre aquí:</p>
 
@@ -154,7 +154,7 @@ export function plantillaRestablecer(
   <body style="margin:0;padding:24px;background:#faf9f7;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;color:#2a2622;line-height:1.55">
     <div style="max-width:32rem;margin:0 auto;background:#ffffff;border:1px solid #e7e3dd;border-radius:12px;padding:28px">
       <p style="margin:0 0 4px;font-size:20px;font-weight:600;letter-spacing:-0.01em;color:#1c1917">Convite</p>
-      <p style="margin:0 0 20px;color:#6f675e">Coordinación de ayuda en la cuenca del Atrato.</p>
+      <p style="margin:0 0 20px;color:#6f675e">Coordinación de ayuda en el Chocó y el Pacífico colombiano.</p>
 
       <p style="margin:0 0 20px">Alguien pidió cambiar la contraseña de esta cuenta. Si fue usted, hágalo aquí:</p>
 
