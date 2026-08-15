@@ -230,9 +230,11 @@ export default async function Entrar({
 
   return (
     <div className="min-h-dvh bg-barro-50">
-      <main className="mx-auto grid min-h-dvh max-w-5xl items-center gap-12 px-6 py-12 md:grid-cols-2">
-        {/* Left: what this is. A coordinator signing in at 6am should see the point. */}
-        <section className="max-w-sm">
+      <main className="mx-auto grid min-h-dvh max-w-5xl items-center gap-12 px-5 py-12 sm:px-6 md:grid-cols-2">
+        {/* What this is. On desktop it sits to the left of the door; on a phone it drops BELOW
+            it (order-2), so a coordinator signing in at 6am meets the door first and the
+            context second, instead of scrolling past four lines of it to reach the form. */}
+        <section className="order-2 max-w-sm md:order-1">
           <div className="flex items-center gap-2 text-barro-900">
             <Waves className="h-6 w-6 text-selva-700" aria-hidden />
             <span className="text-2xl font-semibold tracking-tight">Convite</span>
@@ -259,8 +261,8 @@ export default async function Entrar({
           </ul>
         </section>
 
-        {/* Right: the actual door. */}
-        <section>
+        {/* The actual door — first on a phone, right-hand column on desktop. */}
+        <section className="order-1 md:order-2">
           <div className="rounded-xl border border-barro-200 bg-white p-6 shadow-sm">
             {pidiendoCodigo ? (
               <>
