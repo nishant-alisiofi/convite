@@ -32,7 +32,7 @@ const conBase = describe.skipIf(!url)
  */
 const POLITICA: Record<string, 'publica' | 'autenticada'> = {
   '/': 'publica',
-  '/acerca': 'publica',
+  '/respuesta': 'publica',
   '/entrar': 'publica',
   '/auth/callback': 'publica',
   // Better Auth's own endpoints. Public by necessity — they are how somebody with no
@@ -241,6 +241,9 @@ conBase('toda la superficie, no solo la página', () => {
      * motivo contrario al que se buscaba, justo en la prueba que existe para el límite.
      */
     expect(esRutaPublica('/')).toBe(true)
+    // The response page moved off the root; its leak-safety below only means anything if the
+    // middleware still lets a stranger reach it instead of bouncing them to the login.
+    expect(esRutaPublica('/respuesta')).toBe(true)
     expect(esRutaPublica('/tablero')).toBe(false)
   })
 
@@ -298,7 +301,7 @@ conBase('toda la superficie, no solo la página', () => {
   })
 
   it('la página pública muestra conteos y nada más', async () => {
-    const respuesta = await fetch(`${base}/`)
+    const respuesta = await fetch(`${base}/respuesta`)
     expect(respuesta.status).toBe(200)
     const cuerpo = await respuesta.text()
 
@@ -310,7 +313,7 @@ conBase('toda la superficie, no solo la página', () => {
   })
 
   it('la página pública se puede cachear; el panel nunca', async () => {
-    const publica = await fetch(`${base}/`)
+    const publica = await fetch(`${base}/respuesta`)
     const cabecera = publica.headers.get('cache-control') ?? ''
     // `s-maxage` is the shared-cache directive; Next emits it from `revalidate` without the
     // literal `public` token. What matters is that a cache may hold it and that nothing
@@ -325,7 +328,7 @@ conBase('toda la superficie, no solo la página', () => {
   it('el límite por IP responde 429 antes de reventar la base', async () => {
     // La ventana es de 60 por minuto; se piden bastantes más de golpe.
     const respuestas = await Promise.all(
-      Array.from({ length: 90 }, () => fetch(`${base}/`, { redirect: 'manual' })),
+      Array.from({ length: 90 }, () => fetch(`${base}/respuesta`, { redirect: 'manual' })),
     )
     const codigos = respuestas.map((r) => r.status)
     expect(codigos).toContain(429)

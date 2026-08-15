@@ -34,7 +34,9 @@ export const PUBLICAS = [
   '/api/webhooks',
   '/api/jobs',
   '/api/salud',
-  '/acerca',
+  // The aggregate response page. The landing at `/` is public via the `ruta === '/'` clause
+  // below; this covers the page it links to.
+  '/respuesta',
 ]
 
 /**
@@ -154,9 +156,11 @@ export async function middleware(request: NextRequest) {
   const ruta = request.nextUrl.pathname
   const esPublica = esRutaPublica(ruta)
 
-  // Only the public page is metered. The panel is behind a session, the webhooks carry a
-  // signature and their own idempotency, and the job runner is called by cron.
-  if (ruta === '/') {
+  // Only the DB-backed response page is metered — that is the one a stranger can reach that
+  // touches Postgres. The landing at `/` is static (no query to hammer), the panel is behind a
+  // session, the webhooks carry a signature and their own idempotency, and the job runner is
+  // called by cron.
+  if (ruta === '/respuesta') {
     const ip =
       request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
       request.headers.get('x-real-ip') ??
@@ -189,10 +193,13 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(destino)
   }
 
-  // Nothing behind a session is ever cached: a shared cache holding a coordinator's screen
-  // is a leak with a long tail. The public page's cacheability is Next's to set from its own
-  // `revalidate` — setting it here too would just fight the framework.
-  if (ruta !== '/') respuesta.headers.set('Cache-Control', 'private, no-store')
+  // Nothing behind a session is ever cached: a shared cache holding a coordinator's screen is
+  // a leak with a long tail. The two public pages are left alone — the landing at `/` is
+  // static (Next sets its own caching) and the response at `/respuesta` gets its Cache-Control
+  // from next.config, the only place a dynamic route's header survives.
+  if (ruta !== '/' && ruta !== '/respuesta') {
+    respuesta.headers.set('Cache-Control', 'private, no-store')
+  }
 
   return respuesta
 }

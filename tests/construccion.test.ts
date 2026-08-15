@@ -23,9 +23,10 @@ import { describe, expect, it } from 'vitest'
 const PERMITIDAS_ESTATICAS = new Set([
   // A 404 page that touches nothing. Prerendering it is free and correct.
   '/_not-found',
-  // The landing page: static marketing content, no database read. Prerendering is free and
-  // correct, and it must NOT become dynamic — that would open a DB connection at build.
-  '/acerca',
+  // The landing page, now the site root: static marketing content, no database read.
+  // Prerendering is free and correct, and it must NOT become dynamic — that would open a DB
+  // connection at build. The live response moved to `/respuesta`, which stays dynamic.
+  '/',
   // robots.txt: generated from a static rule set, no database. Free and correct to prerender.
   '/robots.txt',
 ])
@@ -56,8 +57,9 @@ describe('la construcción sobrevive sin base de datos', () => {
       readFileSync('.next/prerender-manifest.json', 'utf8'),
     ) as { routes: Record<string, unknown> }
 
-    // Y no de una cáscara construida sin base: esa diría «todavía no hay solicitudes
-    // registradas», que no es un número viejo sino uno falso.
-    expect(Object.keys(manifiesto.routes ?? {})).not.toContain('/')
+    // La respuesta en vivo vive en `/respuesta` y se sirve por petición — no de una cáscara
+    // construida sin base: esa diría «todavía no hay solicitudes registradas», que no es un
+    // número viejo sino uno falso.
+    expect(Object.keys(manifiesto.routes ?? {})).not.toContain('/respuesta')
   })
 })

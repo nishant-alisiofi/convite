@@ -182,7 +182,7 @@ describe('con identidad configurada', () => {
 
   it('no molesta a lo público', async () => {
     conAutenticacionConfigurada()
-    for (const ruta of ['/', '/entrar', '/acerca', '/api/salud', '/api/auth/sign-in/magic-link']) {
+    for (const ruta of ['/', '/entrar', '/respuesta', '/api/salud', '/api/auth/sign-in/magic-link']) {
       const respuesta = await middleware(pedir(ruta))
       expect(respuesta.status, ruta).toBe(200)
       expect(respuesta.headers.get('location'), ruta).toBeNull()

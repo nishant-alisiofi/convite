@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { renderToStaticMarkup } from 'react-dom/server'
-import Acerca from '@/app/acerca/vista'
-import VistaPublica from '@/app/vista-publica'
+import Inicio from '@/app/page'
+import VistaPublica from '@/app/respuesta/vista'
 import type { FilaPublica } from '@/lib/publico'
 
 /**
@@ -37,6 +37,6 @@ const FILAS: FilaPublica[] = [
 ]
 
 mkdirSync(SALIDA, { recursive: true })
-writeFileSync(`${SALIDA}/acerca.html`, page(renderToStaticMarkup(<Acerca />)))
-writeFileSync(`${SALIDA}/publica.html`, page(renderToStaticMarkup(<VistaPublica filas={FILAS} />)))
-console.log(`${SALIDA}/{acerca,publica}.html`)
+writeFileSync(`${SALIDA}/inicio.html`, page(renderToStaticMarkup(<Inicio />)))
+writeFileSync(`${SALIDA}/respuesta.html`, page(renderToStaticMarkup(<VistaPublica filas={FILAS} />)))
+console.log(`${SALIDA}/{inicio,respuesta}.html`)

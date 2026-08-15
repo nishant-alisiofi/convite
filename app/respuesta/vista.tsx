@@ -67,7 +67,7 @@ export default function VistaPublica({ filas }: { filas: FilaPublica[] }) {
         <div className="mx-auto flex max-w-4xl items-center justify-between px-5 py-4 sm:px-6">
           <Marca />
           <a
-            href="/acerca"
+            href="/"
             className="text-sm font-medium text-selva-700 underline underline-offset-4 hover:text-selva-900"
           >
             Qué es Convite

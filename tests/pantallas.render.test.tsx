@@ -250,8 +250,8 @@ conBase('cada pantalla del panel se dibuja con datos reales', () => {
   })
 
   it('la página pública', async () => {
-    const { default: Inicio } = await import('@/app/page')
-    const marcado = await pintar('publica', Inicio as never)
+    const { default: Respuesta } = await import('@/app/respuesta/page')
+    const marcado = await pintar('publica', Respuesta as never)
     expect(marcado).toContain('Convite')
     // 2.4 otra vez, esta vez sobre el HTML que de verdad se emite.
     expect(marcado).not.toContain('Bellavista')
