@@ -204,11 +204,63 @@ export const ESTADOS_LLAMADA = [
 
 export const ESTADOS_JOB = ['pendiente', 'corriendo', 'hecho', 'fallido'] as const
 
+/**
+ * §29.3b: the shared registry holds diverse kinds of organisation — an anchor community
+ * network, a foundation, an arriving NGO, a diocese, a community council, a donor, a
+ * transporter, a shop. Kept as text + check so a new kind is a one-line ALTER, with `otro` so
+ * the registry never has to reject a real organisation just to record it. Registry typing and
+ * enforcement are PRD-35; this vocabulary only backs the `organizaciones.tipo` column.
+ */
+export const TIPOS_ORGANIZACION = [
+  'red_comunitaria',
+  'fundacion',
+  'ong',
+  'diocesis',
+  'consejo_comunitario',
+  'donante',
+  'transportista',
+  'comercio',
+  'gobierno',
+  'otro',
+] as const
+
+/** §5.7: a region groups communities for the map and jornada planning. `mixta` = urban + rural. */
+export const TIPOS_REGION = ['rural', 'urbana', 'mixta'] as const
+
+/** §22: a jornada is one occurrence; the type names what arrives (goods, people, a facilitator…). */
+export const TIPOS_JORNADA = [
+  'distribucion',
+  'brigada',
+  'taller',
+  'formacion',
+  'evaluacion',
+  'obra',
+] as const
+
+/**
+ * §22/§23: a jornada begins as a draft laid over the map, is planned, happens, and ends
+ * completed or cancelled. `historico` is a past jornada seeded so a partner opens the map onto
+ * their own work rather than an empty screen (§31). The flow itself is PRD-30; this vocabulary
+ * only backs the `jornadas.estado` column.
+ */
+export const ESTADOS_JORNADA = [
+  'borrador',
+  'planificada',
+  'en_curso',
+  'completada',
+  'cancelada',
+  'historico',
+] as const
+
 export type RolContacto = (typeof ROLES_CONTACTO)[number]
 export type RolStaff = (typeof ROLES_STAFF)[number]
 export type RolTrabajador = (typeof ROLES_TRABAJADOR)[number]
 export type EstadoAprobacion = (typeof ESTADOS_APROBACION)[number]
+export type TipoOrganizacion = (typeof TIPOS_ORGANIZACION)[number]
 export type TipoComunidad = (typeof TIPOS_COMUNIDAD)[number]
+export type TipoRegion = (typeof TIPOS_REGION)[number]
+export type TipoJornada = (typeof TIPOS_JORNADA)[number]
+export type EstadoJornada = (typeof ESTADOS_JORNADA)[number]
 export type Canal = (typeof CANALES)[number]
 export type TipoReporte = (typeof TIPOS_REPORTE)[number]
 export type TipoReporteRegistrado = (typeof TIPOS_REPORTE_REGISTRADO)[number]
