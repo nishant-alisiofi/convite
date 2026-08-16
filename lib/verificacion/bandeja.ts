@@ -1,6 +1,9 @@
 import type { PoolClient } from 'pg'
+import { getPool } from '@/db/client'
 import type { Canal, TipoReporteRegistrado } from '@/db/schema/vocabulario'
+import { emparejar } from '@/lib/matching/persistencia'
 import { cargarCatalogo, extraer, type Catalogo } from '@/lib/normalizador'
+import { temporadaVigente } from '@/lib/temporada'
 
 /**
  * The verification inbox — the daily work of this system.
@@ -282,6 +285,13 @@ export async function posiblesDuplicados(
 
 export type Resultado = { ok: true } | { ok: false; error: string }
 
+/**
+ * Promotion's result carries the new pedido's id, because the caller has one more thing to do
+ * with it: run the matcher so the request lands in a Tablero group instead of sitting in the
+ * invisible `ABIERTO` default. See `promoverAPedido` and `emparejarPedido`.
+ */
+export type ResultadoPromocion = { ok: true; pedidoId: string } | { ok: false; error: string }
+
 function traducirError(error: unknown): string {
   const restriccion = (error as { constraint?: string })?.constraint
   const mensaje = (error as { message?: string })?.message ?? ''
@@ -458,7 +468,7 @@ export async function promoverAPedido(
   reporteId: string,
   usuarioId: string,
   familias: number,
-): Promise<Resultado> {
+): Promise<ResultadoPromocion> {
   if (!Number.isInteger(familias) || familias <= 0) {
     return { ok: false, error: 'Diga a cuántas familias les falta.' }
   }
@@ -477,7 +487,7 @@ export async function promoverAPedido(
       return { ok: false, error: 'Ese reporte ya salió de la cola, o no tiene permiso.' }
     }
 
-    const insercion = await client.query(
+    const insercion = await client.query<{ id: string }>(
       `insert into pedidos (reporte_id, comunidad_id, codigo_item, familias, urgencia)
        select r.id, r.comunidad_id, r.codigo_item, $2,
               greatest(coalesce(r.urgencia, 1), ci.urgencia_min)
@@ -488,7 +498,8 @@ export async function promoverAPedido(
           -- Section 4.5: an item that asks for detail and did not get any is incomplete, and
           -- an incomplete row does not enter the queue. «Medicamento crónico» with no idea
           -- which medicine is a trip somebody makes for nothing.
-          and not (ci.pide_detalle and r.detalle_libre is null)`,
+          and not (ci.pide_detalle and r.detalle_libre is null)
+       returning id`,
       [reporteId, familias],
     )
 
@@ -504,10 +515,39 @@ export async function promoverAPedido(
 
     await auditar(client, usuarioId, 'reporte.promovido', reporteId, { familias })
     await client.query('release savepoint promover')
-    return { ok: true }
+    return { ok: true, pedidoId: insercion.rows[0]!.id }
   } catch (error) {
     await client.query('rollback to savepoint promover').catch(() => {})
     return { ok: false, error: traducirError(error) }
+  }
+}
+
+/**
+ * Runs the matcher for a single, freshly-promoted pedido so it lands in a Tablero group with a
+ * motivo — instead of sitting in the `ABIERTO` default the board counts in its total but shows
+ * in no bucket. Section 8 lists «a new pedido» as one of the five matcher triggers; promotion
+ * is where a pedido is born, so this is where that trigger has to fire.
+ *
+ * It runs on its own pool connection as the table owner, the same footing as the cron worker
+ * (`emparejar_pedido`) and `pnpm emparejar`. Two reasons it cannot ride the promoting user's
+ * transaction: the matcher writes `pedidos.estado/motivo` and *proposed* `emparejamientos`
+ * rows, none of which RLS lets a verificador do (0017); and a separate connection could not
+ * see the pedido until its transaction has committed. So the caller promotes first, then calls
+ * this. The engine only proposes — it never commits capacity or stock, so «the matcher
+ * proposes; a person commits» still holds (2.1).
+ */
+export async function emparejarPedido(pedidoId: string): Promise<void> {
+  const client = await getPool().connect()
+  try {
+    await client.query('begin')
+    const temporada = await temporadaVigente(client)
+    await emparejar(client, { temporada, pedidoId })
+    await client.query('commit')
+  } catch (error) {
+    await client.query('rollback').catch(() => {})
+    throw error
+  } finally {
+    client.release()
   }
 }
 
