@@ -5,7 +5,15 @@ self-contained markdown. Each file carries its own acceptance criteria and, for 
 ordered **Codex validation** checklist that a validator runs on **`staging.convite.ai`**.
 
 **Numbering:** one shared sequence, type-prefixed (`PRD-` feature/scoped, `BUG-` defect,
-`FR-` open request). IDs are forever — never renumber.
+`FR-` open request). IDs are forever — never renumber. Highest allocated ID: **PRD-38**.
+
+> **Governing spec:** `docs/PRD_Convite_v3.md` (v3.0, Aug 2026) **supersedes the earlier PRDs**
+> (`docs/PRD.md` and the v1.0/v2 vision) as the canonical product specification. v3 is written
+> against the running product: its **Part II** is descriptive (built behaviour is canonical, and its
+> load-bearing copy must not be "tidied"), **Part III** lists defects (→ `BUG-19..27`), **Part IV**
+> lists gaps (→ `PRD-28..38` + enrichments of the existing Tier-2 items), **Part V** covers partners
+> and the pilot. Where v3 expands an existing WI, that WI was **enriched with a "PRD v3 update"
+> section** rather than duplicated.
 
 **Sources:**
 - **Jam A** — "Convite - Populate data" (Nishant): clicked through every panel page; all empty.
@@ -21,6 +29,11 @@ ordered **Codex validation** checklist that a validator runs on **`staging.convi
   product vision v1.0 (three-sided marketplace; four channels; three supply modes incl. funded
   local purchase; transport of people; connection points; radio ingestion; sponsorship; offline
   PMTiles; multi-org membership; Ley 1581; pilot = 50 parteras / ASOREDIPARCHOCÓ).
+- **PRD v3** — `docs/PRD_Convite_v3.md` (the governing spec, see the note above). Part III defects →
+  `BUG-19..27`; Part IV gaps → `PRD-28..38` and enrichments of `PRD-8/9/12/13/14/15/16` + `FR-17/18`.
+- **Territory seed** — `db/seed/territorio.sql` (real registry data: 3 regions, ~65 communities,
+  catalogue, nodes, seasonal routes, Herencia's historical jornadas) → wired by `PRD-38`, on the
+  schema from `PRD-37`.
 
 **Validation surface (Tier 1):** `https://staging.convite.ai` only. **Never** validate on
 `https://convite.ai` (production) — it is intentionally clean; do not sign up or submit forms
@@ -40,6 +53,23 @@ there. Test accounts and how to fetch magic links: `docs/validacion-codex-0a1.md
 | [BUG-6](BUG-6-mapa-en-blanco.md) | Mapa renders blank / schematic with no basemap | BUG | Jam A | P0 | Demo | ✅ Fixed (real OSM base) |
 | [BUG-7](BUG-7-recogidas-sin-ubicacion.md) | Recogidas: centers have no location ("Ningún centro tiene ubicación") | BUG | Jam A | P1 | Demo | ✅ Fixed (offer + center locations) |
 
+## Tier 1 — Defects on the live demo (PRD v3 Part III) — fix now
+
+The §33 "day's work" defect batch (D1–D9). D2 and D7 are correctness/safety issues, not polish.
+Validate on `staging.convite.ai` (D7/D8 are on the public surface, no login).
+
+| ID | Title | Type | Source | Priority | Status |
+|----|-------|------|--------|----------|--------|
+| [BUG-19](BUG-19-copia-de-estado-no-se-regenera.md) | State-dependent copy not regenerated on transition (Paimadó) | BUG | v3 §D1 | P0 | Open |
+| [BUG-20](BUG-20-correccion-prellenada-baja-confianza.md) | Correction field pre-filled below the confidence threshold | BUG | v3 §D2 | P1 | Open |
+| [BUG-21](BUG-21-clasificacion-item-no-corregible.md) | Proposed item classification (`codigo_item`) not correctable | BUG | v3 §D3 | P1 | Open |
+| [BUG-22](BUG-22-defectos-de-locale.md) | Locale defects (mm/dd/yyyy date; raw `todo_el_ano` enum) | BUG | v3 §D4 | P2 | Open |
+| [BUG-23](BUG-23-falsa-precision-perecederos.md) | False precision on perishable expiry timestamps | BUG | v3 §D5 | P2 | Open |
+| [BUG-24](BUG-24-silencio-tier1-vs-tier4.md) | Never-seen tier-1 escalated the same as tier-3/4 silence | BUG | v3 §D6 | P1 | Open |
+| [BUG-25](BUG-25-divulgacion-celda-pequena-respuesta.md) | Small-cell disclosure on `/respuesta` (k-anonymity) | BUG | v3 §D7 | P0 | Open |
+| [BUG-26](BUG-26-claim-zero-rating-landing.md) | Overstated zero-rating claim on the landing page | BUG | v3 §D8 | P1 | Open |
+| [BUG-27](BUG-27-codigo-catalogo-como-cantidad.md) | Catalogue code reads as a quantity in Inventario | BUG | v3 §D9 | P1 | Open |
+
 ## Tier 2 — Roadmap (from PRD v1.0, not this pass)
 
 | ID | Title | Type | Source | Priority | Demo/Roadmap | Status |
@@ -56,6 +86,39 @@ there. Test accounts and how to fetch magic links: `docs/validacion-codex-0a1.md
 | [FR-17](FR-17-integracion-telesalud.md) | Telehealth-module integration | FR | PRD v1.0 | P3 | Roadmap | Backlog |
 | [FR-18](FR-18-autoregistro-transportista.md) | Transporter self-signup flow (decision pending) | FR | Jam B | P3 | Roadmap | Decision pending |
 
+**Enriched by PRD v3 (not duplicated):** `PRD-8` (§25 transport of people), `PRD-9` (§24 funded
+local purchase), `PRD-12` (§13 Apadrinar built + §21b.4 programa funding + §21 house-pricing),
+`PRD-13` (§26 offline run bundles), `PRD-14` (§4.1.7 recording-pipeline privacy rules), `PRD-15`
+(§4.1/§20 Infobip missed-call callback, adaptive link, spend caps, channel-reality gate), `PRD-16`
+(§29.4–29.7 ceiling + membership + offboarding + separation of duties), `FR-17` (§27/§27b
+telemedicine fulfilment + services), `FR-18` (§29.2–29.3b tier model resolves the decision). Each
+carries a "PRD v3 update (2026-08-15)" section citing the new sections.
+
+## Tier 2 — Roadmap (PRD v3 Part IV gaps) — new
+
+Continues the ID sequence after FR-18. Build order follows PRD v3 §33.
+
+| ID | Title | Type | Source | Priority | Status |
+|----|-------|------|--------|----------|--------|
+| [PRD-28](PRD-28-bandeja-unificada-navegacion.md) | Unified Bandeja + 7-section navigation (silence as first-class item) | PRD | v3 §18–19 | P1 | Backlog |
+| [PRD-29](PRD-29-evaluaciones-y-recuperacion.md) | Assessments & recovery (levels 2–4, coverage, bill of materials) | PRD | v3 §21 | P1 | Backlog |
+| [PRD-30](PRD-30-jornadas.md) | Jornadas — the scheduling container over the same matching | PRD | v3 §22 | P2 | Backlog |
+| [PRD-31](PRD-31-programas.md) | Programas — funded layer above jornadas, seasonal feasibility | PRD | v3 §21b | P2 | Backlog |
+| [PRD-32](PRD-32-mapa-como-superficie-de-planificacion.md) | Map as planning surface (draft-over-facts, area selection, assessment-recency) | PRD | v3 §23 | P1 | Backlog |
+| [PRD-33](PRD-33-cadena-de-frio-y-suministro-anticipado.md) | Cold chain constraints + anticipatory supply | PRD | v3 §24 | P2 | Backlog |
+| [PRD-34](PRD-34-grupos-e-integraciones.md) | Groups & integrations (.ics feeds, Meet, Google import/export, group bridges) | PRD | v3 §28 | P2 | Backlog |
+| [PRD-35](PRD-35-admision-de-organizaciones-y-registro-comun.md) | Org admission tiers, vouching, shared community gazetteer, manual-entry channel | PRD | v3 §29.3b | P1 | Backlog |
+| [PRD-36](PRD-36-onboarding-por-fases.md) | Staged onboarding by phase (Configurar / Operar / Revisar) | PRD | v3 §29b | P2 | Backlog |
+| [PRD-37](PRD-37-esquema-territorio-y-registro.md) | Territory & registry schema (regiones, verificado_en, org ceiling/aval, jornadas tables) | PRD | v3 §14/§29/§22 + seed | P1 | Backlog |
+| [PRD-38](PRD-38-sembrar-territorio-real.md) | Wire the real territory seed (`db/seed/territorio.sql`) | PRD | territory seed | P1 | Backlog |
+
+**Dependency chain for the territory seed:** `PRD-37` (schema: regiones + `comunidades.region_id`/
+`verificado_en` + `organizaciones.techo_permisos`/`aval_motivo` + `jornadas`/`jornada_paradas`
+tables) → **then** `PRD-38` (run the seed). The seed needs only the *schema* from PRD-37, so it is
+unblockable ahead of the feature logic in `PRD-16` (ceiling), `PRD-30` (jornadas) and `PRD-35`
+(vouching). The `territorio.sql` registry data is valid for **both staging and production** (it is
+the community registry, not demo test data) — unlike the staging-only demo `db:seed` reports/pedidos.
+
 ---
 
 ## Notes on scope
@@ -69,3 +132,11 @@ there. Test accounts and how to fetch magic links: `docs/validacion-codex-0a1.md
   the existing walkthrough in `docs/validacion-codex-0a1.md`.
 - **The whole M4–M12 pipeline is built** (see `docs/PRD.md` and `docs/estado-nocturno.md`). Tier 1
   is about making that pipeline *visible with data on staging*, not building new pipeline logic.
+- **PRD v3 Part II is canonical and copy is load-bearing.** Several built screens (Tablero motivos,
+  the map precision legend, Verificación "lo que oyó la máquina se conserva aparte", Comunidades
+  "en silencio" vs "nunca vista") solve the problem better than v1/v2 described — that behaviour and
+  its exact Spanish copy must not be "tidied" by a future contributor. Defect fixes (`BUG-19..27`)
+  preserve it while correcting the specific defect.
+- **Enrich, don't duplicate.** Where PRD v3 expands an existing WI, the WI was updated in place with
+  a dated "PRD v3 update" section, not re-filed under a new ID. New IDs (`PRD-28..38`, `BUG-19..27`)
+  are only for genuinely new gaps/defects. IDs are forever.

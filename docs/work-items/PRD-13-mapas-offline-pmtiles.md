@@ -40,3 +40,24 @@ effort (PRD.md non-goals reference Kobo/ODK for offline capture).
 Build a bundle, load the map with the network disabled, and confirm the basemap renders; re-enable
 network and confirm an update path works. Verify a second-territory bundle (e.g. Buenaventura)
 renders independently. Never validate on production.
+
+---
+
+## PRD v3 update (2026-08-15) — §26 sharpens this into transporter run bundles
+
+PRD v3 **§26** ("Offline") reframes this specifically as **transporter bundles** and adds hard rules:
+- **PMTiles + MapLibre, downloaded while signal exists**, with a **GPS dot on top**. **GPS needs no
+  connection — only the map does** (the phone's GPS works offline; we only need the tiles cached).
+- **Precompute the run:** the bundle carries the **manifest, ordered stops, confirmation codes, and
+  corridor tiles** — not the whole territory. **No on-device routing engine** — "a lanchero upriver is
+  not choosing between routes."
+- **Bundle scope is a safety requirement**, not just a size budget: **only the stops on that run,
+  encrypted, expiring on completion.** This couples to offboarding — **termination cancels active run
+  assignments** and the bundle expires (§29.6, PRD-16), and to the transporter tiers
+  (`transportista_avalado` sees exact addresses only for their own active run, time-boxed — §29.3).
+- **This does not violate "no app to install"** — that principle protects **reporters**; a transporter
+  bundle is for a vetted transporter on an assigned run.
+
+Add to scope: **run-scoped, encrypted, expiring bundles** (manifest + ordered stops + confirmation
+codes + corridor tiles), distinct from the general per-territory basemap bundle already scoped above.
+Cross-ref PRD-16 (§29.6 offboarding cancels the run), PRD-32 (the run/manifest comes from planning).

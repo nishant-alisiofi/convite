@@ -43,3 +43,18 @@ EMS integration.
 Seed a people-transport request; as coordinador, confirm it appears distinctly from goods, is
 matched by seats+window, dispatched with a human decision, and confirmed by code. As a role
 without scope, confirm the person's PII is not visible. Never validate on production.
+
+---
+
+## PRD v3 update (2026-08-15) — §25 confirms and expands this
+
+PRD v3 **§25** ("Transport of people") reaffirms this WI and adds detail: parteras travel out for
+**surgery and specialist care**, needing **river, road, sometimes air, plus lodging, food,
+accompaniment and a return leg** — the record carries a person, not a quantity, but the same matching
+logic applies. Add these to scope: **lodging · food · accompaniment · return leg** as part of the
+people-transport unit.
+
+It is also **clinically triggered**: §27b.2b ("moving the person when remote is not enough") routes
+here when a teleconsultation escalates — triggered clinically (by the partner/telemedicine side),
+fulfilled by Convite. Cross-ref **FR-17** (§27b) for the referral trigger. "Human accompaniment is
+part of the system, not a shortfall of it" (principle 10).
