@@ -1,0 +1,3 @@
+# Offline basemap archives (PRD-13) are served from here at runtime.
+# The .pmtiles files themselves are operational data and are gitignored — build them with
+# `bash scripts/construir-pmtiles.sh`. This .gitkeep only preserves the directory.
