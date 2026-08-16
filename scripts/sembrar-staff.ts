@@ -44,7 +44,9 @@ function direccionPara(rol: RolStaff): string {
  * inside their own territory, and an unscoped one would demo a permission that does not
  * exist. The rest of the roles are not community-scoped at all.
  */
-const COMUNIDADES_DEL_VERIFICADOR = ['TAG', 'MER', 'BET']
+// PRD-39: registry codes (db/seed/territorio.sql), not the old demo short codes —
+// Tagachí, Las Mercedes, Beté. The community set is now the real registry alone.
+const COMUNIDADES_DEL_VERIFICADOR = ['CH-QUI-TAG', 'CH-QUI-MER', 'CH-MAT']
 
 /**
  * One extra invitation, by number instead of address, so the WhatsApp door is demonstrable too.

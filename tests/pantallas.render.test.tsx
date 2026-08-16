@@ -156,7 +156,7 @@ beforeAll(async () => {
 
   const { rows: pedidos } = await client.query<{ id: string; familias: number }>(
     `select p.id, p.familias from pedidos p join comunidades c on c.id = p.comunidad_id
-      where c.codigo in ('TAG', 'MER') and p.estado in ('LISTO', 'SIN_CAPACIDAD')`,
+      where c.codigo in ('CH-QUI-TAG', 'CH-QUI-MER') and p.estado in ('LISTO', 'SIN_CAPACIDAD')`,
   )
   for (const [i, p] of pedidos.entries()) {
     await ponerParada(client, envioId, p.id, i === 0 ? p.familias : Math.max(1, p.familias - 5))
@@ -269,7 +269,7 @@ conBase('cada pantalla del panel se dibuja con datos reales', () => {
     const { rows } = await client.query<{ id: string }>(
       `select r.id from rutas r join comunidades o on o.id = r.origen_id
          join comunidades d on d.id = r.destino_id
-        where o.codigo = 'MER' and d.codigo = 'WIN' and r.temporada = 'lluvias'`,
+        where o.codigo = 'CH-QUI-MER' and d.codigo = 'CH-QUI-WIN' and r.temporada = 'lluvias'`,
     )
     const { default: Rutas } = await import('@/app/(panel)/rutas/page')
     const marcado = await pintar('rutas-cierre', Rutas as never, {

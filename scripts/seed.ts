@@ -5,7 +5,7 @@ import { closeDb, getPool } from '@/db/client'
 import { resolve } from 'node:path'
 import { almacenamientoLocal, raizDatos } from '@/lib/canales/almacenamiento'
 import { CATALOGO_SEMILLA, UNIDADES_SEMILLA } from '@/db/seed/catalogo'
-import { COMUNIDADES_DEMO, COMUNIDADES_SEMILLA, type ComunidadSemilla } from '@/db/seed/comunidades'
+import { CODIGO_DEMO_A_REGISTRO } from '@/db/seed/comunidades'
 import {
   CAPACIDADES_DEMO,
   CAPACIDADES_SEMILLA,
@@ -59,7 +59,7 @@ async function main() {
     await client.query('begin')
 
     const organizacionId = await sembrarOrganizacion(client)
-    const comunidades = await sembrarComunidades(client, organizacionId)
+    const comunidades = await sembrarComunidades(client)
     await sembrarCatalogo(client)
     const contactos = await sembrarContactos(client, comunidades)
     await sembrarUsuarios(client, organizacionId, contactos, comunidades)
@@ -171,60 +171,34 @@ async function sembrarOrganizacion(client: PoolClient): Promise<string> {
   return id
 }
 
-async function sembrarComunidades(
-  client: PoolClient,
-  organizacionId: string,
-): Promise<Map<string, string>> {
+async function sembrarComunidades(client: PoolClient): Promise<Map<string, string>> {
+  // PRD-39: the demo no longer mints its own community rows. `sembrar:territorio` has already
+  // planted the ONE real registry (long codes like CH-QUI-TAG), so here we only resolve each
+  // demo short code to its registry community id. Everything downstream keeps addressing
+  // communities by the short code it always used — this map is the single translation point —
+  // and the result is one community set with zero duplicate real places (two Quibdós, two
+  // Bellavistas… are gone). See db/seed/comunidades.ts CODIGO_DEMO_A_REGISTRO.
   const mapa = new Map<string, string>()
+  const faltantes: string[] = []
 
-  // The canonical basin is all gazetteer centroids; the demo layer adds a couple of honest
-  // exceptions (a GPS pin the field team dropped on Pizarro, radio-relayed circles for the
-  // places we have only heard about). The source and radius come from the row, defaulting to
-  // 'centroide' / 1000 m — a coordinate is never silently promoted to a pin (non-negotiable 2.2).
-  const comunidades: ComunidadSemilla[] = [...COMUNIDADES_SEMILLA, ...COMUNIDADES_DEMO]
-
-  for (const c of comunidades) {
-    const fuente = c.ubicacionFuente ?? 'centroide'
-    const precision = c.ubicacionPrecisionM ?? 1000
+  for (const [corto, registro] of Object.entries(CODIGO_DEMO_A_REGISTRO)) {
     const { rows } = await client.query<{ id: string }>(
-      `insert into comunidades (
-         organizacion_id, codigo, nombre, tipo, municipio, agrupador,
-         ubicacion, ubicacion_fuente, ubicacion_precision_m,
-         familias_estimadas, tier_conectividad, intervalo_chequeo_dias
-       ) values (
-         $1, $2, $3, $4, $5, $6,
-         st_setsrid(st_makepoint($7, $8), 4326), $12, $13,
-         $9, $10, $11
-       )
-       on conflict (codigo) do update set
-         nombre = excluded.nombre,
-         tipo = excluded.tipo,
-         municipio = excluded.municipio,
-         agrupador = excluded.agrupador,
-         ubicacion = excluded.ubicacion,
-         ubicacion_fuente = excluded.ubicacion_fuente,
-         ubicacion_precision_m = excluded.ubicacion_precision_m,
-         familias_estimadas = excluded.familias_estimadas,
-         tier_conectividad = excluded.tier_conectividad,
-         intervalo_chequeo_dias = excluded.intervalo_chequeo_dias
-       returning id`,
-      [
-        organizacionId,
-        c.codigo,
-        c.nombre,
-        c.tipo,
-        c.municipio,
-        c.agrupador,
-        c.lon,
-        c.lat,
-        c.familiasEstimadas,
-        c.tierConectividad,
-        c.intervaloChequeoDias,
-        fuente,
-        precision,
-      ],
+      'select id from comunidades where codigo = $1',
+      [registro],
     )
-    mapa.set(c.codigo, rows[0]!.id)
+    const id = rows[0]?.id
+    if (!id) {
+      faltantes.push(`${corto} → ${registro}`)
+      continue
+    }
+    mapa.set(corto, id)
+  }
+
+  if (faltantes.length > 0) {
+    throw new Error(
+      `No se encontraron en el registro las comunidades: ${faltantes.join(', ')}.\n` +
+        `Corra 'pnpm sembrar:territorio' antes de 'pnpm db:seed' (así lo hace 'pnpm db:reset').`,
+    )
   }
 
   return mapa
@@ -923,14 +897,21 @@ async function sembrarApadrinamientos(
     )
 
     for (const asig of a.asignaciones ?? []) {
+      // PRD-39: `comunidadPedido` is a demo short code; resolve it through the same registry
+      // map every other demo row uses, then find the pedido by community id.
+      const comunidadPedidoId = comunidades.get(asig.comunidadPedido)
+      if (!comunidadPedidoId) {
+        throw new Error(
+          `Apadrinamiento ${a.semilla}: comunidad ${asig.comunidadPedido} desconocida.`,
+        )
+      }
       const { rows: peds } = await client.query<{ id: string }>(
         `select p.id
            from pedidos p
-           join comunidades c on c.id = p.comunidad_id
-          where c.codigo = $1 and p.codigo_item = $2
+          where p.comunidad_id = $1 and p.codigo_item = $2
           order by p.creado_en
           limit 1`,
-        [asig.comunidadPedido, asig.codigoItem],
+        [comunidadPedidoId, asig.codigoItem],
       )
       const pedidoId = peds[0]?.id
       if (!pedidoId) {
@@ -1116,6 +1097,11 @@ async function sembrarDespacho(): Promise<void> {
       return
     }
 
+    // PRD-39: DESPACHO_DEMO addresses communities by demo short code; the registry stores the
+    // real code (CH-RQU for Paimadó), so translate before matching against `comunidades.codigo`.
+    const hastaComunidadRegistro = CODIGO_DEMO_A_REGISTRO[DESPACHO_DEMO.hastaComunidad]
+    const pedidoComunidadRegistro = CODIGO_DEMO_A_REGISTRO[DESPACHO_DEMO.pedidoComunidad]
+
     const { rows: caps } = await client.query<{ id: string }>(
       `select c.id
          from capacidades c
@@ -1124,7 +1110,7 @@ async function sembrarDespacho(): Promise<void> {
         where ct.telefono = $1 and com.codigo = $2 and c.estado = 'OFRECIDA'
         order by c.creado_en
         limit 1`,
-      [DESPACHO_DEMO.transportistaTelefono, DESPACHO_DEMO.hastaComunidad],
+      [DESPACHO_DEMO.transportistaTelefono, hastaComunidadRegistro],
     )
     const { rows: peds } = await client.query<{ id: string; familias: number }>(
       `select p.id, p.familias
@@ -1133,7 +1119,7 @@ async function sembrarDespacho(): Promise<void> {
         where com.codigo = $1 and p.codigo_item = $2
         order by p.creado_en
         limit 1`,
-      [DESPACHO_DEMO.pedidoComunidad, DESPACHO_DEMO.pedidoCodigoItem],
+      [pedidoComunidadRegistro, DESPACHO_DEMO.pedidoCodigoItem],
     )
     const { rows: desp } = await client.query<{ id: string }>(
       `select id from usuarios where rol_staff = 'despachador' order by creado_en limit 1`,

@@ -158,7 +158,7 @@ conBase('cambiar la temporada cambia lo que el motor cree alcanzable', () => {
     const { rows } = await client.query<{ estado: string }>(
       `select p.estado
          from pedidos p join comunidades c on c.id = p.comunidad_id
-        where c.codigo = 'WIN'`,
+        where c.codigo = 'CH-QUI-WIN'`,
     )
     return rows[0]!.estado
   }
