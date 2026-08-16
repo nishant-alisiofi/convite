@@ -217,7 +217,9 @@ function Silencio({
   nuncaVistas: number
 }) {
   return (
-    <section className="mt-10">
+    // Anchor target for the Bandeja/Comunidades «Silencio» nav item (PRD-28 §19): landing on
+    // /estado#silencio scrolls straight to the silent-communities list.
+    <section id="silencio" className="mt-10 scroll-mt-24">
       <h2 className="flex items-center gap-2 font-semibold text-barro-900">
         <EarOff className="size-4" aria-hidden />
         Comunidades calladas
