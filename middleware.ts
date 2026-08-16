@@ -32,6 +32,11 @@ export const PUBLICAS = [
   // pending invitation; nothing operates until the platform approves, so opening the door here
   // opens nothing behind it.
   '/solicitar-centro',
+  // FR-18 (§29.2–29.3b): a transporter self-registers to OFFER capacity — the frictionless supply
+  // side. Public by necessity (somebody not yet staff proves possession here) and safe: it lands
+  // the person as an aportante with an empty ceiling and a `lectura` role, so RLS gives them no
+  // household address by any route. Covers /transportar and its /registro callback.
+  '/transportar',
   '/auth',
   // Better Auth's own endpoints. They are how a person who has no session gets one, so
   // gating them behind a session is the deadlock it sounds like.

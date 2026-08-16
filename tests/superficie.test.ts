@@ -38,6 +38,12 @@ const POLITICA: Record<string, 'publica' | 'autenticada'> = {
   // staff asks here — and safe because it creates only a `pendiente` organisation and a pending
   // invitation, with nothing operable behind either until the platform approves.
   '/solicitar-centro': 'publica',
+  // FR-18: the transporter self-signup (offer capacity) and its possession callback. Public by
+  // necessity — a driver who is not yet staff proves possession here — and safe: signed out it
+  // shows only the sign-in doors, and the aportante it creates has a `lectura` role + empty ceiling,
+  // so RLS never hands it a household address. The leak-pattern assertions below cover both.
+  '/transportar': 'publica',
+  '/transportar/registro': 'publica',
   '/auth/callback': 'publica',
   // Where a password-reset link lands. Public by necessity — somebody who cannot sign in has
   // to reach it — and safe for the same reason the magic link is: getting here with a usable
