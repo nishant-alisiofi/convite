@@ -10,6 +10,18 @@
 --
 --     Cada registro sembrado lleva verificado_en = NULL. Nada sembrado cuenta
 --     como verificado hasta que alguien del territorio lo confirme.
+--
+--   DATOS DE REGISTRO, NO DE PRUEBA. Regiones, comunidades, catálogo, nodos,
+--   rutas y jornadas históricas son datos de referencia reales del territorio y
+--   son apropiados TANTO para staging COMO para producción. NO trae reportes ni
+--   pedidos demo: esa actividad fabricada es solo de staging y vive en `db:seed`.
+--
+--   IDEMPOTENTE / RE-EJECUTABLE. Cada inserción usa UUIDs fijos o `on conflict`
+--   sobre su clave natural (regiones.id, organizaciones.id, catalogo_items.codigo,
+--   comunidades.codigo, nodos (comunidad_id, nombre), rutas (origen_id, destino_id,
+--   modo, temporada), jornadas.codigo, jornada_paradas (jornada_id, orden)), así
+--   que volver a correr el seed no duplica el registro. Cárguelo con
+--   `pnpm sembrar:territorio` (scripts/sembrar-territorio.ts).
 -- ============================================================================
 
 create extension if not exists postgis;
@@ -21,21 +33,41 @@ create extension if not exists pgcrypto;
 insert into regiones (id, nombre, departamento, tipo, activa) values
   ('11111111-0000-0000-0000-000000000001', 'Chocó',             'Chocó', 'mixta', true),
   ('11111111-0000-0000-0000-000000000002', 'Pacífico caucano',  'Cauca', 'rural', true),
-  ('11111111-0000-0000-0000-000000000003', 'Valle del Cauca',   'Valle del Cauca', 'mixta', true);
+  ('11111111-0000-0000-0000-000000000003', 'Valle del Cauca',   'Valle del Cauca', 'mixta', true)
+on conflict (id) do nothing;
 
 -- ---------------------------------------------------------------------------
 -- ORGANIZACIONES
 -- techo_permisos se define en el acuerdo con cada organización; acá va mínimo.
+--
+-- estado_aprobacion queda en su default ('pendiente'): una organización del
+-- registro no cuenta como aprobada para operar hasta que la plataforma lo diga
+-- (§2.4). En producción quien las aprueba es el equipo Alisio desde el panel de
+-- plataforma; en staging el `db:seed` demo aprueba a la que opera para poder
+-- recorrer el panel. Nada aquí se auto-aprueba.
+--
+-- Se insertan en dos sentencias con clock_timestamp() a propósito: ASOREDIPARCHOCÓ
+-- queda con un creado_en estrictamente anterior al de Herencia, para que el
+-- resolvedor «la organización activa más antigua» (scripts/seed.ts,
+-- sembrar-staff.ts, sembrar-plataforma.ts) caiga siempre en la red ancla del
+-- Chocó y nunca, de forma no determinista, en la fundación. Ambas quedan después
+-- de cualquier organización de plataforma que ya exista (en prod «Alisio» se crea
+-- antes, en su propio arranque), así que el equipo de plataforma sigue aterrizando
+-- en «Alisio». Idempotente por id.
 -- ---------------------------------------------------------------------------
-insert into organizaciones (id, nombre, tipo, activo, techo_permisos, aval_motivo) values
+insert into organizaciones (id, nombre, tipo, activo, techo_permisos, aval_motivo, creado_en) values
   ('22222222-0000-0000-0000-000000000001',
    'ASOREDIPARCHOCÓ', 'red_comunitaria', true,
    '{"direcciones_hogar": false, "inventario_nodo": true, "despacho": false}',
-   'Semilla inicial. Techo pendiente de acuerdo.'),
+   'Semilla inicial. Techo pendiente de acuerdo.', clock_timestamp())
+on conflict (id) do nothing;
+
+insert into organizaciones (id, nombre, tipo, activo, techo_permisos, aval_motivo, creado_en) values
   ('22222222-0000-0000-0000-000000000002',
    'Fundación Herencia de Timbiquí', 'fundacion', true,
    '{"direcciones_hogar": false, "inventario_nodo": true, "despacho": false}',
-   'Semilla inicial. Techo pendiente de acuerdo.');
+   'Semilla inicial. Techo pendiente de acuerdo.', clock_timestamp())
+on conflict (id) do nothing;
 
 -- ---------------------------------------------------------------------------
 -- CATÁLOGO
@@ -43,40 +75,41 @@ insert into organizaciones (id, nombre, tipo, activo, techo_permisos, aval_motiv
 -- Tomado del plan de respuesta de ASOREDIPARCHOCÓ.
 -- ---------------------------------------------------------------------------
 insert into catalogo_items (codigo, familia, familia_label, item_label, tipo, pide_detalle, urgencia_min, entregable, orden) values
-  ('11','1','Alimentos y agua','Mercado y alimentos secos','necesidad',false,null,true,10),
-  ('12','1','Alimentos y agua','Agua potable','necesidad',false,null,true,20),
-  ('13','1','Alimentos y agua','Alimentación infantil','necesidad',false,null,true,30),
-  ('21','2','Salud','Medicamento general','necesidad',false,null,true,40),
-  ('22','2','Salud','Medicamento crónico','necesidad',true,null,true,50),
+  ('11','1','Alimentos y agua','Mercado y alimentos secos','necesidad',false,1,true,10),
+  ('12','1','Alimentos y agua','Agua potable','necesidad',false,1,true,20),
+  ('13','1','Alimentos y agua','Alimentación infantil','necesidad',false,1,true,30),
+  ('21','2','Salud','Medicamento general','necesidad',false,1,true,40),
+  ('22','2','Salud','Medicamento crónico','necesidad',true,1,true,50),
   ('23','2','Salud','Atención médica o traslado','necesidad',false,3,true,60),
-  ('24','2','Salud','Insumos de curación','necesidad',false,null,true,70),
-  ('25','2','Salud','Insumos de diabetes','necesidad',true,null,true,75),
-  ('31','3','Abrigo y albergue','Cobijas, hamacas, toldillos','necesidad',false,null,true,80),
-  ('32','3','Abrigo y albergue','Colchonetas','necesidad',false,null,true,90),
-  ('33','3','Abrigo y albergue','Plásticos y tejas','necesidad',false,null,true,100),
-  ('34','3','Abrigo y albergue','Kit de cocina','necesidad',false,null,true,110),
-  ('41','4','Higiene','Kit de aseo personal','necesidad',false,null,true,120),
-  ('42','4','Higiene','Pañales','necesidad',true,null,true,130),
-  ('43','4','Higiene','Salud menstrual','necesidad',false,null,true,140),
-  ('44','4','Higiene','Tratamiento de agua','necesidad',false,null,true,150),
-  ('51','5','Niñez y educación','Ropa infantil','necesidad',false,null,true,160),
-  ('52','5','Niñez y educación','Kit escolar','necesidad',false,null,true,170),
-  ('53','5','Niñez y educación','Apoyo psicosocial','necesidad',false,null,false,180),
-  ('61','6','Partería','Kit de control prenatal','necesidad',false,null,true,190),
-  ('62','6','Partería','Kit de atención de parto','necesidad',false,null,true,200),
-  ('71','7','Vivienda','Láminas de zinc','necesidad',false,null,true,210),
-  ('72','7','Vivienda','Madera y tablones','necesidad',false,null,true,220),
-  ('73','7','Vivienda','Cemento, arena y grava','necesidad',false,null,true,230),
-  ('74','7','Vivienda','Clavos, tornillos y alambre','necesidad',false,null,true,240),
-  ('75','7','Vivienda','Herramientas básicas','necesidad',false,null,true,250),
-  ('76','7','Vivienda','Material eléctrico','necesidad',false,null,true,260),
-  ('77','7','Vivienda','Tuberías y accesorios hidráulicos','necesidad',false,null,true,270),
-  ('91','9','Daños','Vía o camino bloqueado','dano',false,null,false,280),
-  ('92','9','Daños','Puente o paso fluvial','dano',false,null,false,290),
-  ('93','9','Daños','Vivienda afectada','dano',false,null,false,300),
-  ('94','9','Daños','Acueducto o pozo','dano',false,null,false,310),
-  ('95','9','Daños','Escuela o puesto de salud','dano',false,null,false,320),
-  ('96','9','Daños','Cultivo o medio de vida','dano',false,null,false,330);
+  ('24','2','Salud','Insumos de curación','necesidad',false,1,true,70),
+  ('25','2','Salud','Insumos de diabetes','necesidad',true,1,true,75),
+  ('31','3','Abrigo y albergue','Cobijas, hamacas, toldillos','necesidad',false,1,true,80),
+  ('32','3','Abrigo y albergue','Colchonetas','necesidad',false,1,true,90),
+  ('33','3','Abrigo y albergue','Plásticos y tejas','necesidad',false,1,true,100),
+  ('34','3','Abrigo y albergue','Kit de cocina','necesidad',false,1,true,110),
+  ('41','4','Higiene','Kit de aseo personal','necesidad',false,1,true,120),
+  ('42','4','Higiene','Pañales','necesidad',true,1,true,130),
+  ('43','4','Higiene','Salud menstrual','necesidad',false,1,true,140),
+  ('44','4','Higiene','Tratamiento de agua','necesidad',false,1,true,150),
+  ('51','5','Niñez y educación','Ropa infantil','necesidad',false,1,true,160),
+  ('52','5','Niñez y educación','Kit escolar','necesidad',false,1,true,170),
+  ('53','5','Niñez y educación','Apoyo psicosocial','necesidad',false,1,false,180),
+  ('61','6','Partería','Kit de control prenatal','necesidad',false,1,true,190),
+  ('62','6','Partería','Kit de atención de parto','necesidad',false,1,true,200),
+  ('71','7','Vivienda','Láminas de zinc','necesidad',false,1,true,210),
+  ('72','7','Vivienda','Madera y tablones','necesidad',false,1,true,220),
+  ('73','7','Vivienda','Cemento, arena y grava','necesidad',false,1,true,230),
+  ('74','7','Vivienda','Clavos, tornillos y alambre','necesidad',false,1,true,240),
+  ('75','7','Vivienda','Herramientas básicas','necesidad',false,1,true,250),
+  ('76','7','Vivienda','Material eléctrico','necesidad',false,1,true,260),
+  ('77','7','Vivienda','Tuberías y accesorios hidráulicos','necesidad',false,1,true,270),
+  ('91','9','Daños','Vía o camino bloqueado','dano',false,1,false,280),
+  ('92','9','Daños','Puente o paso fluvial','dano',false,1,false,290),
+  ('93','9','Daños','Vivienda afectada','dano',false,1,false,300),
+  ('94','9','Daños','Acueducto o pozo','dano',false,1,false,310),
+  ('95','9','Daños','Escuela o puesto de salud','dano',false,1,false,320),
+  ('96','9','Daños','Cultivo o medio de vida','dano',false,1,false,330)
+on conflict (codigo) do nothing;
 
 -- ---------------------------------------------------------------------------
 -- CHOCÓ — 31 CABECERAS MUNICIPALES
@@ -117,7 +150,8 @@ values
   ('CH-MBA','Boca de Pepé','cabecera','Medio Baudó','Baudó','11111111-0000-0000-0000-000000000001','22222222-0000-0000-0000-000000000001', st_setsrid(st_makepoint(-76.950, 5.200),4326), 3, 21, true),
   ('CH-BBA','Pizarro','cabecera','Bajo Baudó','Baudó','11111111-0000-0000-0000-000000000001','22222222-0000-0000-0000-000000000001', st_setsrid(st_makepoint(-77.366, 4.284),4326), 3, 21, true),
   ('CH-CAT','El Carmen de Atrato','cabecera','El Carmen de Atrato','Alto Atrato','11111111-0000-0000-0000-000000000001','22222222-0000-0000-0000-000000000001', st_setsrid(st_makepoint(-76.142, 5.899),4326), 2, 14, true),
-  ('CH-SJP','San José del Palmar','cabecera','San José del Palmar','San Juan alto','11111111-0000-0000-0000-000000000001','22222222-0000-0000-0000-000000000001', st_setsrid(st_makepoint(-76.235, 4.895),4326), 3, 14, true);
+  ('CH-SJP','San José del Palmar','cabecera','San José del Palmar','San Juan alto','11111111-0000-0000-0000-000000000001','22222222-0000-0000-0000-000000000001', st_setsrid(st_makepoint(-76.235, 4.895),4326), 3, 14, true)
+on conflict (codigo) do nothing;
 
 -- ---------------------------------------------------------------------------
 -- CHOCÓ — CORREGIMIENTOS DE QUIBDÓ (para el mapa del piloto)
@@ -138,7 +172,8 @@ values
   ('CH-QUI-WIN','Winandó','corregimiento','Quibdó','Medio Atrato','11111111-0000-0000-0000-000000000001','22222222-0000-0000-0000-000000000001', st_setsrid(st_makepoint(-76.760, 5.480),4326), 21, 4, 30, true),
   ('CH-QUI-ROS','Villa del Rosario','corregimiento','Quibdó','Medio Atrato','11111111-0000-0000-0000-000000000001','22222222-0000-0000-0000-000000000001', st_setsrid(st_makepoint(-76.590, 5.540),4326), 18, 3, 21, true),
   ('CH-QUI-TAN','Boca de Tanandó','corregimiento','Quibdó','Medio Atrato','11111111-0000-0000-0000-000000000001','22222222-0000-0000-0000-000000000001', st_setsrid(st_makepoint(-76.700, 5.450),4326), 25, 4, 30, true),
-  ('CH-QUI-MUR','Puerto Murillo','corregimiento','Quibdó','Medio Atrato','11111111-0000-0000-0000-000000000001','22222222-0000-0000-0000-000000000001', st_setsrid(st_makepoint(-76.800, 5.620),4326), 14, 4, 30, true);
+  ('CH-QUI-MUR','Puerto Murillo','corregimiento','Quibdó','Medio Atrato','11111111-0000-0000-0000-000000000001','22222222-0000-0000-0000-000000000001', st_setsrid(st_makepoint(-76.800, 5.620),4326), 14, 4, 30, true)
+on conflict (codigo) do nothing;
 
 -- ---------------------------------------------------------------------------
 -- PACÍFICO CAUCANO — CABECERAS
@@ -151,7 +186,8 @@ insert into comunidades
 values
   ('CA-TIM','Santa Bárbara de Timbiquí','cabecera','Timbiquí','Río Timbiquí','11111111-0000-0000-0000-000000000002','22222222-0000-0000-0000-000000000002', st_setsrid(st_makepoint(-77.667, 2.772),4326), 2, 14, true),
   ('CA-GUA','Guapi','cabecera','Guapi','Río Guapi','11111111-0000-0000-0000-000000000002','22222222-0000-0000-0000-000000000002', st_setsrid(st_makepoint(-77.893, 2.570),4326), 2, 14, true),
-  ('CA-LOP','López de Micay','cabecera','López de Micay','Río Micay','11111111-0000-0000-0000-000000000002','22222222-0000-0000-0000-000000000002', st_setsrid(st_makepoint(-77.100, 2.850),4326), 3, 21, true);
+  ('CA-LOP','López de Micay','cabecera','López de Micay','Río Micay','11111111-0000-0000-0000-000000000002','22222222-0000-0000-0000-000000000002', st_setsrid(st_makepoint(-77.100, 2.850),4326), 3, 21, true)
+on conflict (codigo) do nothing;
 
 -- ---------------------------------------------------------------------------
 -- PACÍFICO CAUCANO — COMUNIDADES DE RÍO
@@ -178,21 +214,27 @@ values
   ('CA-LOP-ZAR','Zaragoza','corregimiento','López de Micay','Río Micay','11111111-0000-0000-0000-000000000002','22222222-0000-0000-0000-000000000002', st_setsrid(st_makepoint(-77.190, 2.900),4326), 4, 30, true),
   ('CA-LOP-NOA','Noanamito','corregimiento','López de Micay','Río Micay','11111111-0000-0000-0000-000000000002','22222222-0000-0000-0000-000000000002', st_setsrid(st_makepoint(-77.230, 2.820),4326), 4, 30, true),
   ('CA-LOP-BOC','Boca de Micay','corregimiento','López de Micay','Río Micay','11111111-0000-0000-0000-000000000002','22222222-0000-0000-0000-000000000002', st_setsrid(st_makepoint(-77.290, 2.760),4326), 4, 30, true),
-  ('CA-LOP-TAP','Taparal','corregimiento','López de Micay','Río Naya','11111111-0000-0000-0000-000000000002','22222222-0000-0000-0000-000000000002', st_setsrid(st_makepoint(-77.150, 3.010),4326), 4, 30, true);
+  ('CA-LOP-TAP','Taparal','corregimiento','López de Micay','Río Naya','11111111-0000-0000-0000-000000000002','22222222-0000-0000-0000-000000000002', st_setsrid(st_makepoint(-77.150, 3.010),4326), 4, 30, true)
+on conflict (codigo) do nothing;
 
 -- ---------------------------------------------------------------------------
 -- NODOS — bodegas y puntos de acopio
 -- ---------------------------------------------------------------------------
 insert into nodos (nombre, tipo, comunidad_id, activo)
-select 'Bodega Quibdó', 'bodega', id, true from comunidades where codigo = 'CH-QUI';
+select 'Bodega Quibdó', 'bodega', id, true from comunidades where codigo = 'CH-QUI'
+on conflict (comunidad_id, nombre) do nothing;
 insert into nodos (nombre, tipo, comunidad_id, activo)
-select 'Acopio Pie de Pató', 'acopio', id, true from comunidades where codigo = 'CH-ABA';
+select 'Acopio Pie de Pató', 'acopio', id, true from comunidades where codigo = 'CH-ABA'
+on conflict (comunidad_id, nombre) do nothing;
 insert into nodos (nombre, tipo, comunidad_id, activo)
-select 'Acopio Istmina', 'acopio', id, true from comunidades where codigo = 'CH-IST';
+select 'Acopio Istmina', 'acopio', id, true from comunidades where codigo = 'CH-IST'
+on conflict (comunidad_id, nombre) do nothing;
 insert into nodos (nombre, tipo, comunidad_id, activo)
-select 'Acopio Timbiquí', 'acopio', id, true from comunidades where codigo = 'CA-TIM';
+select 'Acopio Timbiquí', 'acopio', id, true from comunidades where codigo = 'CA-TIM'
+on conflict (comunidad_id, nombre) do nothing;
 insert into nodos (nombre, tipo, comunidad_id, activo)
-select 'Acopio Guapi', 'acopio', id, true from comunidades where codigo = 'CA-GUA';
+select 'Acopio Guapi', 'acopio', id, true from comunidades where codigo = 'CA-GUA'
+on conflict (comunidad_id, nombre) do nothing;
 
 -- ---------------------------------------------------------------------------
 -- RUTAS
@@ -242,7 +284,8 @@ from (values
   ('CA-LOP','CA-LOP-BOC','lancha',    40,'todo_el_ano','Suposición.')
 ) as m(origen, destino, modo, minutos, temporada, notas)
 join comunidades o on o.codigo = m.origen
-join comunidades d on d.codigo = m.destino;
+join comunidades d on d.codigo = m.destino
+on conflict (origen_id, destino_id, modo, temporada) do nothing;
 
 -- ---------------------------------------------------------------------------
 -- NADA DE ESTO ESTÁ VERIFICADO.
@@ -290,7 +333,8 @@ values
    '11111111-0000-0000-0000-000000000002',
    null, null, 'historico', 630,
    'Entrega de regalos a niñas y niños de 0 a 12 años en Guapi y Timbiquí. '
-   'Más de 630 niños. Se ha repetido en varias navidades.');
+   'Más de 630 niños. Se ha repetido en varias navidades.')
+on conflict (codigo) do nothing;
 
 insert into jornada_paradas (jornada_id, comunidad_id, orden, notas)
 select j.id, c.id, p.orden, 'Parada supuesta — corregir con la fundación.'
@@ -303,11 +347,13 @@ from (values
   ('J-HDT-REGALOS','CA-TIM',2)
 ) as p(jornada, comunidad, orden)
 join jornadas j on j.codigo = p.jornada
-join comunidades c on c.codigo = p.comunidad;
+join comunidades c on c.codigo = p.comunidad
+on conflict (jornada_id, orden) do nothing;
 
 -- Nodos que probablemente usaron como acopio. Suposición.
 insert into nodos (nombre, tipo, comunidad_id, activo)
-select 'Acopio López de Micay', 'acopio', id, true from comunidades where codigo = 'CA-LOP';
+select 'Acopio López de Micay', 'acopio', id, true from comunidades where codigo = 'CA-LOP'
+on conflict (comunidad_id, nombre) do nothing;
 
 -- ---------------------------------------------------------------------------
 -- Pregunta para la reunión, sobre estas mismas filas:

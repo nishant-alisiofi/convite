@@ -124,11 +124,35 @@ async function clasificar(): Promise<void> {
 // ── Blocks ────────────────────────────────────────────────────────────────────────────
 
 async function sembrarOrganizacion(client: PoolClient): Promise<string> {
-  // `estado_aprobacion` is 'aprobada': the seeded centre is a partner already operating, so
-  // the panel is not gated behind the «en revisión» screen (§2.4, app/(panel)/layout.tsx).
-  // Without this the demo signs in to a waiting room and no screen shows any data. The insert
-  // defaults the column to 'pendiente', and 0034 only backfills organisations that predate it,
-  // never one the seed inserts afterwards — so it is set explicitly here.
+  // The demo operates AS the earliest-created active organisation — the same «organización
+  // activa más antigua» convention sembrar-staff.ts and sembrar-plataforma.ts use, so every
+  // bootstrap and all the demo activity converge on ONE org. When the real registry has been
+  // planted first (`pnpm sembrar:territorio`, staging boot order) that is ASOREDIPARCHOCÓ, the
+  // anchor Chocó network: the demo reports/pedidos/offers become ITS daily work, and staff sign
+  // in to it. On a bare `pnpm db:reset` (local, no registry) there is no active org yet, so we
+  // fall back to creating the demo org — keeping local dev and the .db tests unchanged.
+  const activa = await client.query<{ id: string }>(
+    'select id from organizaciones where activo order by creado_en limit 1',
+  )
+  if (activa.rows[0]) {
+    const id = activa.rows[0].id
+    // `estado_aprobacion` -> 'aprobada' so the panel is not gated behind the «en revisión»
+    // screen (§2.4). This is a STAGING-only flip: the registry leaves partner orgs 'pendiente'
+    // (only a platform admin approves them, and `db:seed` never runs on production). WABA ids are
+    // filled from env only if still empty, never overwriting a real one already configured.
+    await client.query(
+      `update organizaciones set
+         estado_aprobacion = 'aprobada',
+         waba_phone_number_id = coalesce(waba_phone_number_id, $2),
+         waba_id = coalesce(waba_id, $3)
+       where id = $1`,
+      [id, process.env.WHATSAPP_PHONE_NUMBER_ID ?? null, process.env.WHATSAPP_BUSINESS_ACCOUNT_ID ?? null],
+    )
+    return id
+  }
+
+  // No active organisation (bare local reset). Create the demo centre, already 'aprobada' so the
+  // panel renders without a platform approval step — see the note above.
   const { rows } = await client.query<{ id: string }>(
     `insert into organizaciones (nombre, waba_phone_number_id, waba_id, estado_aprobacion)
        values ($1, $2, $3, 'aprobada')
