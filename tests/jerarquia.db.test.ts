@@ -288,11 +288,11 @@ conBase('un admin de centro no puede escalar al tier de plataforma (§2.5)', () 
   })
 })
 
-conBase('la invariante de autenticación se mantiene con el tier de plataforma (§4)', () => {
-  it('crear un admin de plataforma también exige invitación Y posesión probada', async () => {
+conBase('el tier de plataforma sigue exigiendo invitación, aunque el ingreso sea abierto (§2.5/§4)', () => {
+  it('un admin de plataforma solo nace de una invitación que lleve el flag', async () => {
     const uid = randomUUID()
     await comoNuevoIngreso(uid, CORREO.plataformaNueva, async () => {
-      // Probó posesión (hay claims) y estaba invitado: se crea la fila, con el flag puesto.
+      // Probó posesión y su invitación lleva es_plataforma: se crea la fila con el flag puesto.
       const { rows } = await client.query<{ vincular_usuario_staff: string }>(
         'select vincular_usuario_staff()',
       )
@@ -306,16 +306,25 @@ conBase('la invariante de autenticación se mantiene con el tier de plataforma (
     })
   })
 
-  it('sin invitación no hay fila, aunque haya probado posesión', async () => {
+  it('sin invitación ahora hay fila, pero es un admin normal y NUNCA plataforma (ingreso abierto)', async () => {
     const uid = randomUUID()
     await comoNuevoIngreso(uid, 'nadie-jerarquia@convite.test', async () => {
       const { rows } = await client.query<{ vincular_usuario_staff: string }>(
         'select vincular_usuario_staff()',
       )
-      expect(rows[0]!.vincular_usuario_staff).toBe('sin_invitacion')
+      expect(rows[0]!.vincular_usuario_staff).toBe('creado')
 
-      const { rows: u } = await client.query('select 1 from usuarios where id = $1', [uid])
-      expect(u.length).toBe(0)
+      const { rows: u } = await client.query<{
+        rol_staff: string
+        es_plataforma: boolean
+        organizacion_id: string
+      }>('select rol_staff, es_plataforma, organizacion_id from usuarios where id = $1', [uid])
+      // El ingreso abierto crea un admin por defecto...
+      expect(u[0]?.rol_staff).toBe('admin')
+      // ...pero el tier de plataforma es una elevación, jamás el valor por defecto.
+      expect(u[0]?.es_plataforma).toBe(false)
+      // ...y cae en la organización activa más antigua (ORG.a, la semilla aprobada por 0034).
+      expect(u[0]?.organizacion_id).toBe(ORG.a)
     })
   })
 })

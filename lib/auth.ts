@@ -4,7 +4,7 @@ import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { nextCookies } from 'better-auth/next-js'
 import { magicLink } from 'better-auth/plugins/magic-link'
 import { phoneNumber } from 'better-auth/plugins/phone-number'
-import { getDb, getPool } from '@/db/client'
+import { getDb } from '@/db/client'
 import { autenticacion } from '@/db/schema/autenticacion'
 import { enviarCodigo } from '@/lib/codigo-whatsapp'
 import { enviarCorreo, plantillaEnlace, plantillaRestablecer } from '@/lib/correo'
@@ -20,14 +20,20 @@ import { env } from '@/lib/env'
  * now lives in the same database as everything else, so a deploy that has DATABASE_URL has
  * a working sign-in.
  *
- * What deliberately did NOT change is the security model, which is the part that matters:
+ * Sign-in is OPEN (founder decision, migration 0035). Proving you control an address or a
+ * number is enough to get a working staff record — there is no invitation gate anywhere:
  *
- *   - Signing in still only proves you own an address. It does not make you staff.
- *     `invitaciones_staff` is still the allowlist and `vincular_usuario_staff()` is still
- *     the only thing that writes a `usuarios` row (non-negotiable 2.10).
+ *   - Signing in proves possession, and possession is now sufficient. `vincular_usuario_staff()`
+ *     writes a `usuarios` row for anyone who proves it: from a matching invitation when one
+ *     exists, or as a default `admin` in the earliest active organisation when none does.
+ *     `invitaciones_staff` is no longer an allowlist — it is an OPTIONAL pre-assignment of
+ *     role/org/platform.
+ *   - The platform tier stays an elevation, never a default: `es_plataforma` is set only from
+ *     an invitation that carries it, never granted to an uninvited signup.
  *   - RLS is still the boundary. `conSesion()` sets `request.jwt.claims` and assumes the
  *     `authenticated` role exactly as before; the policies in 0017 never learn that the
- *     identity provider changed.
+ *     identity provider changed. An uninvited admin is scoped to its (default) organisation by
+ *     those same policies — open sign-in widens who gets a row, never what a row may read.
  *
  * The one thing that makes both of those keep working is the id: `usuarios.id` is a uuid
  * and `auth.uid()` casts the `sub` claim to one, so the user ids this issues must be uuids
@@ -107,36 +113,6 @@ export function urlBase(): string {
 }
 
 /**
- * Whether an admin has put this address on the staff allowlist (2.10).
- *
- * Asked twice, in two different places, on purpose — and this is the only implementation of
- * the question so the two answers cannot drift:
- *
- *   1. Before sending. Better Auth creates the user when the link is *clicked*, so without
- *      a check at send time a stranger who guesses at the form receives a real sign-in
- *      email that merely happens to fail later. Nobody uninvited should get mail from us.
- *   2. Before the row is written, in `databaseHooks.user.create.before`. That is the one
- *      that cannot be gone around: it holds even if some future caller reaches
- *      `signInMagicLink` without asking first.
- */
-export async function correoInvitado(correo: string): Promise<boolean> {
-  const { rows } = await getPool().query(
-    'select 1 from invitaciones_staff where correo = $1 limit 1',
-    [correo.trim().toLowerCase()],
-  )
-  return rows.length > 0
-}
-
-/** The same question for the other door. E.164, exactly as the allowlist stores it. */
-export async function telefonoInvitado(telefono: string): Promise<boolean> {
-  const { rows } = await getPool().query(
-    'select 1 from invitaciones_staff where telefono = $1 limit 1',
-    [telefono.trim()],
-  )
-  return rows.length > 0
-}
-
-/**
  * Builds the instance. Not exported — call `getAuth()`.
  *
  * The return type is deliberately left to inference rather than annotated. Writing
@@ -201,11 +177,11 @@ function construir() {
     /**
      * A password, but never as a way *in* for the first time.
      *
-     * This is the door that can quietly break the rule the other two enforce, so it is worth
-     * being explicit about the rule first: an account is usable only if the address was
-     * invited **and** somebody proved they control it. An allowlist alone is not enough —
-     * plenty of people know a colleague's work address, and a list of invited addresses is
-     * exactly the sort of thing that gets forwarded.
+     * Open sign-in (0035) means possession is enough to get an account — but a password is not
+     * proof of possession, it is a secret somebody chose, so it must never be the *first* thing
+     * that mints an account. The rule this door keeps is: an account comes into existence only
+     * after its owner proved they can receive something (the magic link or the WhatsApp code).
+     * A password is only ever a faster *return* trip for an account that already exists.
      *
      * So a password cannot create anything. Two structural guarantees, not one:
      *
@@ -218,8 +194,8 @@ function construir() {
      *      account whose owner has already proved ownership and is signed in.
      *
      * The alternative — let somebody sign up with a password and gate it behind an email
-     * verification link — was rejected. It has a real pre-hijacking attack: whoever knows an
-     * invited address registers it first with a password of their choosing, the genuine
+     * verification link — was rejected. It has a real pre-hijacking attack: whoever knows
+     * someone else's address registers it first with a password of their choosing, the genuine
      * person receives a verification mail they did not ask for, and if they click it (people
      * click) the attacker's credential goes live on their account. The shape above cannot
      * express that attack.
@@ -315,7 +291,7 @@ function construir() {
       /**
        * The second door: a six-digit code over WhatsApp.
        *
-       * Same allowlist, same `usuarios` row, same RLS. What changes is only how somebody
+       * Same `usuarios` row, same RLS, same open sign-in. What changes is only how somebody
        * proves they are reachable — and in the Atrato that matters, because a coordinator has
        * WhatsApp working before they have email working. It is the channel the entire intake
        * side of this product already runs on.
@@ -328,7 +304,7 @@ function construir() {
         expiresIn: 60 * MINUTOS_CODIGO,
         allowedAttempts: INTENTOS_CODIGO,
 
-        /** E.164 only, the same shape `contactos` is constrained to and the allowlist stores. */
+        /** E.164 only, the same shape `contactos` is constrained to and invitations store. */
         phoneNumberValidator: (telefono) => /^\+[1-9][0-9]{7,14}$/.test(telefono),
 
         sendOTP: async ({ phoneNumber: telefono, code }) => {
@@ -338,10 +314,10 @@ function construir() {
         /**
          * A first sign-in creates the identity, exactly as the magic link does.
          *
-         * The allowlist still decides who gets one — `databaseHooks.user.create.before` below
-         * runs on this path too, and Better Auth passes the phone number into `createUser`,
-         * so the hook can see it and refuse. Without that, this option would be an open
-         * signup door standing next to a closed one.
+         * Open sign-in (0035): verifying a code proves possession of the number, and possession
+         * is enough. Better Auth creates the `auth_user`; the staff `usuarios` row is then written
+         * by `vincular_usuario_staff()` in the callback — from an invitation if the number has one,
+         * otherwise as a default admin. There is no gate here to refuse an uninvited number.
          */
         signUpOnVerification: {
           getTempEmail: correoMarcador,
@@ -360,43 +336,10 @@ function construir() {
       nextCookies(),
     ],
 
-    databaseHooks: {
-      user: {
-        create: {
-          /**
-           * The allowlist, enforced before a row exists.
-           *
-           * Section 2.10 says only an address an admin invited may become staff, and
-           * `vincular_usuario_staff()` already refuses to create a `usuarios` row without
-           * an invitation. This is the same rule one step earlier: without it, anybody who
-           * can type an email address gets an `auth_user` row and a valid session — no
-           * access to any data, because RLS holds, but an unbounded table of strangers and
-           * a sign-in that appears to succeed.
-           *
-           * Returns `false` rather than throwing: Better Auth reads that as «do not create
-           * this row» and the magic-link handler turns it into a redirect the sign-in page
-           * already knows how to render, whereas a thrown error surfaces as a 500 on a link
-           * somebody was told to click.
-           *
-           * The sign-in page shows the same «we sent you a link» either way. Whether an
-           * address belongs to staff is not something an unauthenticated form gets to tell
-           * you.
-           *
-           * Both doors come through here. A WhatsApp sign-in arrives carrying a placeholder
-           * address (see `correoMarcador`) that is deliberately in nobody's allowlist, so the
-           * number is what has to be checked — and Better Auth does pass it into `createUser`
-           * on the phone path, which is the only reason this can be one hook instead of two.
-           */
-          before: async (usuario) => {
-            const telefono = (usuario as { phoneNumber?: unknown }).phoneNumber
-            if (typeof telefono === 'string' && telefono.length > 0) {
-              return telefonoInvitado(telefono)
-            }
-            return correoInvitado(usuario.email)
-          },
-        },
-      },
-    },
+    // No `databaseHooks.user.create.before` gate: open sign-in (0035) creates the `auth_user`
+    // for anyone who proves possession. Access is still governed downstream — the staff
+    // `usuarios` row is written by `vincular_usuario_staff()` and RLS is the data boundary — so
+    // an `auth_user` alone grants nothing until that row exists.
   })
 }
 

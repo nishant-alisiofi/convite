@@ -11,11 +11,11 @@ import { rutaInterna, vincularStaff } from '@/lib/sesion'
  * sets the cookie, then sends the browser here. By the time this runs the person is signed
  * in — so all that is left is the question this route existed to answer in the first place.
  *
- * Being signed in only proves you own that address. It does not make you staff.
- * `vincular_usuario_staff()` creates the `usuarios` row only if an admin put the address on
- * the allowlist first (2.10), and without that row every policy in 0017 returns nothing.
- * Somebody who reaches this point uninvited is signed out again rather than left staring at
- * a panel with no data in it, which would look like a bug instead of an answer.
+ * Being signed in proves you own that address or number, and open sign-in (0035) makes that
+ * enough: `vincular_usuario_staff()` writes the `usuarios` row for everyone who reaches here —
+ * from a matching invitation if one exists, otherwise as a default admin in the earliest active
+ * organisation. The one refusal left is `ya_vinculada`: one person invited by both an address
+ * and a number must not end up with two staff records (0029), so the second door is bounced.
  */
 
 export const dynamic = 'force-dynamic'
@@ -74,11 +74,6 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     // placeholder that is in nobody's list by design.
     telefono: (sesion.user as { phoneNumber?: string | null }).phoneNumber ?? null,
   })
-
-  if (resultado === 'sin_invitacion') {
-    await getAuth().api.signOut({ headers: await headers() })
-    return NextResponse.redirect(aRuta('/entrar', { motivo: 'sin_invitacion' }))
-  }
 
   if (resultado === 'ya_vinculada') {
     // Invited with both an address and a number, and the other door was used first. Letting
