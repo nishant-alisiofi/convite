@@ -72,6 +72,10 @@ const POLITICA: Record<string, 'publica' | 'autenticada'> = {
   // PRD-11 radio ingestion: attestation management and the manual relay intake. Behind a
   // session; radio is off per community until a coordinator attests, and RLS is the boundary.
   '/radio': 'autenticada',
+  // PRD-8 transport of people + PRD-9 funded local purchase. Behind a session; RLS is the
+  // boundary (traslados carries PII behind the floor; local purchase is a traceability chain).
+  '/traslados': 'autenticada',
+  '/compra-local': 'autenticada',
   '/apadrinar': 'autenticada',
   // PRD-29 assessments & recovery (levels 2–4, coverage, bill of materials). Behind a session;
   // RLS is the boundary, and it refuses the wrong role with a legible note like the rest of the panel.
