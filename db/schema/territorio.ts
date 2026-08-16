@@ -68,6 +68,13 @@ export const jornadas = pgTable(
     regionId: uuid('region_id')
       .notNull()
       .references(() => regiones.id),
+    /**
+     * PRD-31 (§21b): the programa a jornada realises, when it belongs to one — «not everything
+     * belongs to a programa» (an emergency shipment does not), so it is nullable. Declared as a
+     * plain uuid with the FK added in migration 0045, keeping the import one-way (programas.ts →
+     * territorio.ts) rather than a cycle — the same trick comunidades.region_id uses (0042).
+     */
+    programaId: uuid('programa_id'),
     fechaInicio: date('fecha_inicio'),
     fechaFin: date('fecha_fin'),
     estado: text('estado').notNull().default('borrador'),
@@ -81,6 +88,7 @@ export const jornadas = pgTable(
     index('jornadas_organizacion_idx').on(t.organizacionId),
     index('jornadas_region_idx').on(t.regionId),
     index('jornadas_estado_idx').on(t.estado),
+    index('jornadas_programa_idx').on(t.programaId),
     check('jornadas_tipo_check', enLista('tipo', TIPOS_JORNADA)),
     check('jornadas_estado_check', enLista('estado', ESTADOS_JORNADA)),
     check('jornadas_familias_check', sql`familias_atendidas is null or familias_atendidas >= 0`),

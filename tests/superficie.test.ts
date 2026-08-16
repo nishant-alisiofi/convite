@@ -76,6 +76,9 @@ const POLITICA: Record<string, 'publica' | 'autenticada'> = {
   // boundary (traslados carries PII behind the floor; local purchase is a traceability chain).
   '/traslados': 'autenticada',
   '/compra-local': 'autenticada',
+  // Agenda scheduling (PRD-30/31): programas + jornadas. Behind a session; RLS-scoped.
+  '/programas': 'autenticada',
+  '/jornadas': 'autenticada',
   '/apadrinar': 'autenticada',
   // PRD-29 assessments & recovery (levels 2–4, coverage, bill of materials). Behind a session;
   // RLS is the boundary, and it refuses the wrong role with a legible note like the rest of the panel.
