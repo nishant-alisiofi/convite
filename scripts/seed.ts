@@ -33,6 +33,31 @@ import { RUTAS_DEMO, RUTAS_SEMILLA } from '@/db/seed/rutas'
 import { PUNTOS_CONEXION_DEMO } from '@/db/seed/conexion'
 import { APADRINAMIENTOS_DEMO } from '@/db/seed/apadrinamiento'
 import { CENTRO_PENDIENTE_DEMO } from '@/db/seed/centros'
+import {
+  EVALUACIONES_DEMO,
+  HALLAZGO_BOM_DEMO,
+  HALLAZGOS_EVALUACION_DEMO,
+  PLANTILLAS_EVALUACION_DEMO,
+} from '@/db/seed/evaluaciones'
+import {
+  JORNADAS_DEMO,
+  PROGRAMA_APLICACIONES_DEMO,
+  PROGRAMAS_DEMO,
+} from '@/db/seed/programas'
+import { TRASLADOS_DEMO } from '@/db/seed/traslados'
+import {
+  COMPRAS_LOCALES_DEMO,
+  FONDOS_COMPRA_DEMO,
+  PROVEEDORES_LOCALES_DEMO,
+} from '@/db/seed/compra-local'
+import { ATESTACIONES_RADIO_DEMO, RELEVOS_RADIO_DEMO } from '@/db/seed/radio'
+import {
+  NODOS_FRIO_DEMO,
+  REQUISITOS_ALMACENAMIENTO_DEMO,
+  RUTAS_FRIO_DEMO,
+  SUMINISTROS_ANTICIPADOS_DEMO,
+} from '@/db/seed/cadena-frio'
+import { AVALES_ORGANIZACION_DEMO, MEMBRESIAS_DEMO } from '@/db/seed/membresias'
 import { aplicarFondos, crearApadrinamiento } from '@/lib/apadrinamiento'
 import { crearEnvio, despachar, ordenarPorRecorrido, ponerParada } from '@/lib/despacho/plan'
 import { emparejar } from '@/lib/matching/persistencia'
@@ -47,6 +72,15 @@ import { temporadaVigente } from '@/lib/temporada'
  */
 
 const ORGANIZACION = 'Convite — Chocó (organización aliada)'
+
+/** The seeded staff ids, by role — used to sign the who-decided columns of the PRD-v3 demo data. */
+const ID_COORDINADOR = USUARIOS_SEMILLA.find((u) => u.rolStaff === 'coordinador')!.id
+const ID_VERIFICADORA = USUARIOS_SEMILLA.find((u) => u.rolStaff === 'verificador')!.id
+const ID_DESPACHADOR = USUARIOS_SEMILLA.find((u) => u.rolStaff === 'despachador')!.id
+const ID_ADMIN = USUARIOS_SEMILLA.find((u) => u.rolStaff === 'admin')!.id
+
+/** The two real registry organisations planted by `sembrar:territorio` (db/seed/territorio.sql). */
+const ORG_HERENCIA = '22222222-0000-0000-0000-000000000002'
 
 /** Communities the seeded verificadora is scoped to (Section 11 / M3 RLS tests). */
 const COMUNIDADES_DE_LA_VERIFICADORA = ['BTA', 'MER', 'WIN', 'TAG', 'BET', 'BLL']
@@ -75,6 +109,18 @@ async function main() {
     await sembrarPuntosConexion(client, organizacionId, comunidades)
     await sembrarApadrinamientos(client, organizacionId, comunidades)
     await sembrarCentroPendiente(client)
+
+    // ── PRD v3 features (STAGING ONLY) ───────────────────────────────────────────────────
+    // Each lands on the same demo org so the panel, signed in as ASOREDIPARCHOCÓ, sees them.
+    // Cold chain runs before the matcher's clasificar() so item 22's constraint is in place when
+    // the Beté pedido is reclassified. Radio attestations run before their relay so the gate passes.
+    await sembrarEvaluaciones(client, organizacionId, comunidades)
+    await sembrarAgenda(client, organizacionId, comunidades)
+    await sembrarTraslados(client, organizacionId, comunidades)
+    await sembrarCompraLocal(client, organizacionId, comunidades, contactos)
+    await sembrarCadenaFrio(client, organizacionId, comunidades, nodos)
+    await sembrarRadio(client, organizacionId, comunidades)
+    await sembrarMembresias(client)
 
     await client.query('commit')
   } catch (error) {
@@ -991,6 +1037,569 @@ async function sembrarCentroPendiente(client: PoolClient): Promise<void> {
 }
 
 /**
+ * PRD-29 «Evaluaciones y recuperación». STAGING ONLY.
+ *
+ * Templates, assessment sweeps, findings routed by `via_de_respuesta`, and one costed bill of
+ * materials — so /evaluaciones shows coverage, findings and a fundable balance instead of empty
+ * states. Signed against the seeded coordinador; the audit trigger (0044) records each insert.
+ * Idempotent: fixed ids / the template's (org, codigo) key.
+ */
+async function sembrarEvaluaciones(
+  client: PoolClient,
+  organizacionId: string,
+  comunidades: Map<string, string>,
+): Promise<void> {
+  for (const p of PLANTILLAS_EVALUACION_DEMO) {
+    await client.query(
+      `insert into plantillas_evaluacion (
+         id, organizacion_id, dominio, codigo, nombre, descripcion,
+         materiales_cop, transporte_cop, asistencia_tecnica_cop, mano_de_obra_dias, creado_por
+       ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+       on conflict (organizacion_id, codigo) do nothing`,
+      [
+        p.id, organizacionId, p.dominio, p.codigo, marcado(p.nombre),
+        p.descripcion ? marcado(p.descripcion) : null,
+        p.materialesCop, p.transporteCop, p.asistenciaTecnicaCop, p.manoDeObraDias, ID_COORDINADOR,
+      ],
+    )
+  }
+
+  for (const e of EVALUACIONES_DEMO) {
+    const comunidadId = comunidades.get(e.comunidad)
+    if (!comunidadId) throw new Error(`Evaluación ${e.id}: comunidad ${e.comunidad} desconocida.`)
+    await client.query(
+      `insert into evaluaciones (
+         id, organizacion_id, comunidad_id, dominio, evaluador_nombre, fecha_visita,
+         total_estimado, vence_en, registrado_por, notas
+       ) values (
+         $1,$2,$3,$4,$5,(now() - make_interval(days => $6::int))::date,
+         $7,
+         case when $8::int is null then null else (now() + make_interval(days => $8::int))::date end,
+         $9,$10
+       )
+       on conflict (id) do nothing`,
+      [
+        e.id, organizacionId, comunidadId, e.dominio, marcado(e.evaluadorNombre),
+        e.fechaVisitaDiasAtras, e.totalEstimado, e.venceEnEnDias, ID_COORDINADOR,
+        e.notas ? marcado(e.notas) : null,
+      ],
+    )
+  }
+
+  for (const h of HALLAZGOS_EVALUACION_DEMO) {
+    const comunidadId = comunidades.get(h.comunidad)
+    if (!comunidadId) throw new Error(`Hallazgo ${h.id}: comunidad ${h.comunidad} desconocida.`)
+    await client.query(
+      `insert into evaluacion_hallazgos (
+         id, organizacion_id, evaluacion_id, comunidad_id, dominio, descripcion,
+         severidad, via_de_respuesta, derivacion_destino, registrado_por
+       ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+       on conflict (id) do nothing`,
+      [
+        h.id, organizacionId, h.evaluacion, comunidadId, h.dominio, marcado(h.descripcion),
+        h.severidad, h.viaDeRespuesta, h.derivacionDestino ? marcado(h.derivacionDestino) : null,
+        ID_COORDINADOR,
+      ],
+    )
+  }
+
+  for (const b of HALLAZGO_BOM_DEMO) {
+    await client.query(
+      `insert into hallazgo_bom (
+         id, hallazgo_id, organizacion_id, origen, plantilla_id,
+         materiales_cop, transporte_cop, asistencia_tecnica_cop, mano_de_obra_dias,
+         materiales_cubierto_cop, transporte_cubierto_cop, asistencia_tecnica_cubierto_cop,
+         mano_de_obra_cubierta_dias, editado_por
+       ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+       on conflict (id) do nothing`,
+      [
+        b.id, b.hallazgo, organizacionId, b.origen, b.plantilla,
+        b.materialesCop, b.transporteCop, b.asistenciaTecnicaCop, b.manoDeObraDias,
+        b.materialesCubiertoCop, b.transporteCubiertoCop, b.asistenciaTecnicaCubiertoCop,
+        b.manoDeObraCubiertaDias, ID_COORDINADOR,
+      ],
+    )
+  }
+}
+
+/**
+ * PRD-30 / PRD-31 «Agenda › Programas y Jornadas». STAGING ONLY.
+ *
+ * Programas with budget, cadence, target communities, a persistent roster, programa-level
+ * sponsorship and a spend ledger; the jornadas that realise them, with ordered stops and per-session
+ * attendance. One target community (Winandó) is reachable only in `lluvias`, so the feasibility
+ * calendar shows the seasonal gap. Jornadas need the Chocó region planted by `sembrar:territorio`.
+ * Idempotent: programa/jornada on their `codigo`, join rows on their natural keys, the rest on fixed ids.
+ */
+async function sembrarAgenda(
+  client: PoolClient,
+  organizacionId: string,
+  comunidades: Map<string, string>,
+): Promise<void> {
+  const { rows: reg } = await client.query<{ id: string }>(
+    `select id from regiones where nombre = 'Chocó' limit 1`,
+  )
+  const regionId = reg[0]?.id
+  if (!regionId) {
+    throw new Error(
+      "Agenda demo: no existe la región 'Chocó'. Corra 'pnpm sembrar:territorio' antes de 'pnpm db:seed'.",
+    )
+  }
+
+  for (const p of PROGRAMAS_DEMO) {
+    await client.query(
+      `insert into programas (
+         id, codigo, organizacion_id, titulo, objetivo, poblacion_objetivo, familias_objetivo,
+         cadencia, fecha_inicio, fecha_fin, renueva, estado, presupuesto_comprometido_cop,
+         financiador, financiador_reporte, notas, creado_por
+       ) values (
+         $1,$2,$3,$4,$5,$6,$7,$8,
+         case when $9::int is null then null else (now() - make_interval(days => $9::int))::date end,
+         case when $10::int is null then null else (now() + make_interval(days => $10::int))::date end,
+         $11,$12,$13,$14,$15,$16,$17
+       )
+       on conflict (codigo) do nothing`,
+      [
+        p.id, p.codigo, organizacionId, marcado(p.titulo), marcado(p.objetivo),
+        p.poblacionObjetivo ? marcado(p.poblacionObjetivo) : null, p.familiasObjetivo,
+        p.cadencia, p.fechaInicioDiasAtras, p.fechaFinEnDias, p.renueva, p.estado,
+        p.presupuestoComprometidoCop,
+        p.financiador ? marcado(p.financiador) : null,
+        p.financiadorReporte ? marcado(p.financiadorReporte) : null,
+        p.notas ? marcado(p.notas) : null, ID_COORDINADOR,
+      ],
+    )
+
+    for (const c of p.comunidades) {
+      const comunidadId = comunidades.get(c.codigo)
+      if (!comunidadId) throw new Error(`Programa ${p.codigo}: comunidad ${c.codigo} desconocida.`)
+      await client.query(
+        `insert into programa_comunidades (programa_id, comunidad_id, familias_estimadas)
+           values ($1,$2,$3)
+         on conflict (programa_id, comunidad_id) do nothing`,
+        [p.id, comunidadId, c.familiasEstimadas],
+      )
+    }
+
+    for (const pt of p.participantes) {
+      await client.query(
+        `insert into programa_participantes (id, programa_id, nombre, contacto, completado, completado_en)
+           values (
+             $1,$2,$3,$4,$5,
+             case when $6::int is null then null else now() - make_interval(days => $6::int) end
+           )
+         on conflict (id) do nothing`,
+        [pt.id, p.id, marcado(pt.nombre), pt.contacto ? marcado(pt.contacto) : null, pt.completado, pt.completadoDiasAtras],
+      )
+    }
+
+    for (const a of p.apadrinamientos) {
+      await client.query(
+        `insert into programa_apadrinamientos (
+           id, programa_id, etiqueta, padrino_nombre, padrino_contacto, padrino_tipo,
+           monto_cop, recurrencia, estado, consentimiento,
+           consentimiento_en, creado_por
+         ) values (
+           $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,
+           case when $10 then now() else null end,
+           $11
+         )
+         on conflict (id) do nothing`,
+        [
+          a.id, p.id, marcado(a.etiqueta), marcado(a.padrinoNombre), a.padrinoContacto,
+          a.padrinoTipo, a.montoCop, a.recurrencia, a.estado, a.consentimiento, ID_COORDINADOR,
+        ],
+      )
+    }
+  }
+
+  for (const j of JORNADAS_DEMO) {
+    await client.query(
+      `insert into jornadas (
+         id, codigo, tipo, organizacion_id, titulo, region_id, programa_id,
+         fecha_inicio, fecha_fin, estado, familias_atendidas, notas
+       ) values (
+         $1,$2,$3,$4,$5,$6,$7,
+         case when $8::int is null then null else (now() - make_interval(days => $8::int))::date end,
+         case when $9::int is null then null else (now() - make_interval(days => $9::int))::date end,
+         $10,$11,$12
+       )
+       on conflict (codigo) do nothing`,
+      [
+        j.id, j.codigo, j.tipo, organizacionId, marcado(j.titulo), regionId, j.programa,
+        j.fechaInicioDiasAtras, j.fechaFinDiasAtras, j.estado, j.familiasAtendidas,
+        j.notas ? marcado(j.notas) : null,
+      ],
+    )
+
+    for (const pa of j.paradas) {
+      const comunidadId = comunidades.get(pa.codigo)
+      if (!comunidadId) throw new Error(`Jornada ${j.codigo}: comunidad ${pa.codigo} desconocida.`)
+      await client.query(
+        `insert into jornada_paradas (jornada_id, comunidad_id, orden, notas)
+           values ($1,$2,$3,$4)
+         on conflict (jornada_id, orden) do nothing`,
+        [j.id, comunidadId, pa.orden, pa.notas ? marcado(pa.notas) : null],
+      )
+    }
+
+    for (const participanteId of j.asistieron) {
+      await client.query(
+        `insert into programa_asistencias (participante_id, jornada_id, asistio)
+           values ($1,$2,true)
+         on conflict (participante_id, jornada_id) do nothing`,
+        [participanteId, j.id],
+      )
+    }
+  }
+
+  for (const ap of PROGRAMA_APLICACIONES_DEMO) {
+    await client.query(
+      `insert into programa_aplicaciones (
+         id, programa_id, apadrinamiento_id, jornada_id, monto_aplicado_cop, concepto, aplicado_por
+       ) values ($1,$2,$3,$4,$5,$6,$7)
+       on conflict (id) do nothing`,
+      [
+        ap.id, ap.programa, ap.apadrinamiento, ap.jornada, ap.montoAplicadoCop,
+        ap.concepto ? marcado(ap.concepto) : null, ID_COORDINADOR,
+      ],
+    )
+  }
+}
+
+/**
+ * PRD-8 «Traslado de personas». STAGING ONLY.
+ *
+ * Two person-transport records — one DESPACHADO with its 4-digit arrival code and a return leg, one
+ * stuck at SIN_CAPACIDAD — so /traslados shows the seats, the §25 needs and the PII posture. States
+ * are set directly (the person-transport matcher is not run by the seed). Idempotent on fixed ids.
+ */
+async function sembrarTraslados(
+  client: PoolClient,
+  organizacionId: string,
+  comunidades: Map<string, string>,
+): Promise<void> {
+  for (const t of TRASLADOS_DEMO) {
+    const origen = comunidades.get(t.origen)
+    const destino = comunidades.get(t.destino)
+    if (!origen || !destino) throw new Error(`Traslado ${t.id}: comunidad de origen o destino desconocida.`)
+    await client.query(
+      `insert into traslados_persona (
+         id, organizacion_id, persona_etiqueta, persona_nombre, persona_telefono, personas,
+         motivo_categoria, motivo_detalle, necesidad_accesibilidad,
+         origen_comunidad_id, destino_comunidad_id, ventana_desde, ventana_hasta,
+         requiere_alojamiento, requiere_alimentacion, requiere_acompanamiento, requiere_regreso,
+         regreso_ventana_desde, regreso_ventana_hasta, estado, motivo,
+         despachado_por, despachado_en, codigo_llegada, creado_por, notas
+       ) values (
+         $1,$2,$3,$4,$5,$6,
+         $7,$8,$9,
+         $10,$11,
+         now() - make_interval(days => $12::int),
+         now() - make_interval(days => $13::int),
+         $14,$15,$16,$17,
+         case when $18::int is null then null else now() + make_interval(days => $18::int) end,
+         case when $19::int is null then null else now() + make_interval(days => $19::int) end,
+         $20,$21,
+         case when $22::int is null then null else $23::uuid end,
+         case when $22::int is null then null else now() - make_interval(days => $22::int) end,
+         $24,$25,$26
+       )
+       on conflict (id) do nothing`,
+      [
+        t.id, organizacionId, marcado(t.personaEtiqueta),
+        t.personaNombre ? marcado(t.personaNombre) : null, t.personaTelefono, t.personas,
+        t.motivoCategoria, t.motivoDetalle ? marcado(t.motivoDetalle) : null,
+        t.necesidadAccesibilidad ? marcado(t.necesidadAccesibilidad) : null,
+        origen, destino, t.ventanaDesdeDiasAtras, t.ventanaHastaDiasAtras,
+        t.requiereAlojamiento, t.requiereAlimentacion, t.requiereAcompanamiento, t.requiereRegreso,
+        t.regresoVentanaDesdeEnDias, t.regresoVentanaHastaEnDias, t.estado,
+        t.motivo ? marcado(t.motivo) : null,
+        t.despachadoDiasAtras, ID_DESPACHADOR, t.codigoLlegada, ID_COORDINADOR,
+        t.notas ? marcado(t.notas) : null,
+      ],
+    )
+  }
+}
+
+/**
+ * PRD-9 «Compra local financiada». STAGING ONLY.
+ *
+ * One funding pool with a ceiling, two vendors and two purchases at different points of the six-step
+ * chain (one COMPRADA, one DISTRIBUIDA with evidence). Each purchase is inserted directly at its
+ * target state with every earlier step filled (the authorisation core is immutable after recording),
+ * and pre-checked by id so the ceiling guardrail never double-counts on a re-run.
+ */
+async function sembrarCompraLocal(
+  client: PoolClient,
+  organizacionId: string,
+  comunidades: Map<string, string>,
+  contactos: Map<string, string>,
+): Promise<void> {
+  for (const f of FONDOS_COMPRA_DEMO) {
+    await client.query(
+      `insert into fondos_compra (id, organizacion_id, nombre, techo_cop, umbral_alerta_cop, activo, creado_por)
+         values ($1,$2,$3,$4,$5,true,$6)
+       on conflict (id) do nothing`,
+      [f.id, organizacionId, marcado(f.nombre), f.techoCop, f.umbralAlertaCop, ID_COORDINADOR],
+    )
+  }
+
+  for (const p of PROVEEDORES_LOCALES_DEMO) {
+    const comunidadId = p.comunidad ? (comunidades.get(p.comunidad) ?? null) : null
+    await client.query(
+      `insert into proveedores_locales (
+         id, organizacion_id, nombre, comunidad_id, municipio, suministra, contacto, activo, creado_por
+       ) values ($1,$2,$3,$4,$5,$6,$7,true,$8)
+       on conflict (id) do nothing`,
+      [
+        p.id, organizacionId, marcado(p.nombre), comunidadId, p.municipio,
+        p.suministra ? marcado(p.suministra) : null, p.contacto, ID_COORDINADOR,
+      ],
+    )
+  }
+
+  for (const c of COMPRAS_LOCALES_DEMO) {
+    // Pre-check by id so the BEFORE INSERT ceiling guardrail never double-counts on a re-run.
+    const { rowCount } = await client.query('select 1 from compras_locales where id = $1', [c.id])
+    if (rowCount) continue
+
+    const responsableId = contactos.get(c.responsableTelefono)
+    if (!responsableId) {
+      throw new Error(`Compra ${c.id}: responsable ${c.responsableTelefono} desconocido.`)
+    }
+    const comunidadId = c.comunidad ? (comunidades.get(c.comunidad) ?? null) : null
+
+    await client.query(
+      `insert into compras_locales (
+         id, organizacion_id, fondo_id, pedido_id, proveedor_id, responsable_id, comunidad_id,
+         concepto, monto_autorizado_cop, monto_real_cop, estado,
+         autorizado_por, autorizado_en, recibo_ref,
+         comprado_por, comprado_en, verificado_por, verificado_en,
+         distribuido_por, distribuido_en, cerrado_por, cerrado_en, notas
+       ) values (
+         $1,$2,$3,null,$4,$5,$6,
+         $7,$8,$9,$10,
+         $11::uuid, now() - make_interval(days => $12::int), $13,
+         case when $14::int is null then null else $11::uuid end,
+         case when $14::int is null then null else now() - make_interval(days => $14::int) end,
+         case when $15::int is null then null else $11::uuid end,
+         case when $15::int is null then null else now() - make_interval(days => $15::int) end,
+         case when $16::int is null then null else $11::uuid end,
+         case when $16::int is null then null else now() - make_interval(days => $16::int) end,
+         case when $17::int is null then null else $11::uuid end,
+         case when $17::int is null then null else now() - make_interval(days => $17::int) end,
+         $18
+       )`,
+      [
+        c.id, organizacionId, c.fondo, c.proveedor, responsableId, comunidadId,
+        marcado(c.concepto), c.montoAutorizadoCop, c.montoRealCop, c.estado,
+        ID_COORDINADOR, c.autorizadoDiasAtras, c.reciboRef,
+        c.compradoDiasAtras, c.verificadoDiasAtras, c.distribuidoDiasAtras, c.cerradoDiasAtras,
+        c.notas ? marcado(c.notas) : null,
+      ],
+    )
+
+    for (const it of c.items) {
+      await client.query(
+        `insert into compra_local_items (compra_id, codigo_item, cantidad, costo_cop)
+           values ($1,$2,$3,$4)`,
+        [c.id, it.codigoItem, it.cantidad, it.costoCop],
+      )
+    }
+    for (const ev of c.evidencias) {
+      await client.query(
+        `insert into compra_local_evidencias (compra_id, tipo, referencia, descripcion, subido_por)
+           values ($1,$2,$3,$4,$5)`,
+        [c.id, ev.tipo, ev.referencia, ev.descripcion ? marcado(ev.descripcion) : null, ID_COORDINADOR],
+      )
+    }
+  }
+}
+
+/**
+ * PRD-33 «Cadena de frío y suministro anticipado». STAGING ONLY.
+ *
+ * Marks item 22 (chronic meds / insulin) as cold-chain, leaves the open-boat leg into Beté
+ * explicitly not apt and the Quibdó warehouse cold-holding — so the matcher's later clasificar()
+ * sweep reclassifies the real Beté chronic-meds pedido to SIN_RUTA with a cold-chain motivo. One
+ * anticipatory subscription is added for the anticipatory side of §24. Runs BEFORE clasificar().
+ */
+async function sembrarCadenaFrio(
+  client: PoolClient,
+  organizacionId: string,
+  comunidades: Map<string, string>,
+  nodos: Map<string, string>,
+): Promise<void> {
+  for (const r of REQUISITOS_ALMACENAMIENTO_DEMO) {
+    await client.query(
+      `insert into catalogo_requisitos_almacenamiento (
+         codigo_item, cadena_frio, sensible_luz, max_minutos_transito, notas
+       ) values ($1,$2,$3,$4,$5)
+       on conflict (codigo_item) do update set
+         cadena_frio = excluded.cadena_frio,
+         sensible_luz = excluded.sensible_luz,
+         max_minutos_transito = excluded.max_minutos_transito,
+         notas = excluded.notas`,
+      [r.codigoItem, r.cadenaFrio, r.sensibleLuz, r.maxMinutosTransito, r.notas ? marcado(r.notas) : null],
+    )
+  }
+
+  for (const rf of RUTAS_FRIO_DEMO) {
+    const comunidadId = comunidades.get(rf.destino)
+    if (!comunidadId) continue
+    const { rows } = await client.query<{ id: string }>(
+      `select id from rutas where destino_id = $1 order by creado_en limit 1`,
+      [comunidadId],
+    )
+    const rutaId = rows[0]?.id
+    if (!rutaId) {
+      console.warn(`\n  ⚠️  Cadena de frío: sin ruta hacia ${rf.destino}; no se marca su aptitud.\n`)
+      continue
+    }
+    await client.query(
+      `insert into rutas_restriccion_cadena_frio (ruta_id, apta_cadena_frio, notas)
+         values ($1,$2,$3)
+       on conflict (ruta_id) do update set
+         apta_cadena_frio = excluded.apta_cadena_frio, notas = excluded.notas`,
+      [rutaId, rf.aptaCadenaFrio, rf.notas ? marcado(rf.notas) : null],
+    )
+  }
+
+  for (const nf of NODOS_FRIO_DEMO) {
+    const nodoId = nodos.get(nf.nodoClave)
+    if (!nodoId) {
+      console.warn(`\n  ⚠️  Cadena de frío: nodo ${nf.nodoClave} desconocido; no se marca su aptitud.\n`)
+      continue
+    }
+    await client.query(
+      `insert into nodos_almacenamiento_frio (nodo_id, apta_cadena_frio, notas)
+         values ($1,$2,$3)
+       on conflict (nodo_id) do update set
+         apta_cadena_frio = excluded.apta_cadena_frio, notas = excluded.notas`,
+      [nodoId, nf.aptaCadenaFrio, nf.notas ? marcado(nf.notas) : null],
+    )
+  }
+
+  for (const s of SUMINISTROS_ANTICIPADOS_DEMO) {
+    const comunidadId = comunidades.get(s.comunidad)
+    if (!comunidadId) throw new Error(`Suministro ${s.id}: comunidad ${s.comunidad} desconocida.`)
+    await client.query(
+      `insert into suministros_anticipados (
+         id, organizacion_id, comunidad_id, beneficiario_ref, codigo_item, familias,
+         cadencia_dias, dias_anticipacion, ultimo_suministro_en, creado_por, activo
+       ) values (
+         $1,$2,$3,$4,$5,$6,$7,$8, now() - make_interval(days => $9::int), $10, true
+       )
+       on conflict (id) do nothing`,
+      [
+        s.id, organizacionId, comunidadId, marcado(s.beneficiarioRef), s.codigoItem, s.familias,
+        s.cadenciaDias, s.diasAnticipacion, s.ultimoSuministroDiasAtras, ID_COORDINADOR,
+      ],
+    )
+  }
+}
+
+/**
+ * PRD-11 «Radio». STAGING ONLY.
+ *
+ * One VALID attestation (Docampadó) and one EXPIRED (Winandó), plus one relayed report on the valid
+ * community — second-hand, RECIBIDO, naming the speaker and the operator. The relay is inserted
+ * directly, so its community must already carry a live, safe attestation (the 0050 gate trigger
+ * enforces it); the attestations are seeded first. Idempotent on (org, comunidad) and the report semilla.
+ */
+async function sembrarRadio(
+  client: PoolClient,
+  organizacionId: string,
+  comunidades: Map<string, string>,
+): Promise<void> {
+  for (const a of ATESTACIONES_RADIO_DEMO) {
+    const comunidadId = comunidades.get(a.comunidad)
+    if (!comunidadId) throw new Error(`Radio: comunidad ${a.comunidad} desconocida.`)
+    await client.query(
+      `insert into radio_permitido (
+         organizacion_id, comunidad_id, atestado_por, red_descrita, uso_seguro,
+         atestado_en, expira_en, notas
+       ) values (
+         $1,$2,$3,$4,$5,
+         now() - make_interval(days => $6::int),
+         now() + make_interval(days => $7::int),
+         $8
+       )
+       on conflict (organizacion_id, comunidad_id) do nothing`,
+      [
+        organizacionId, comunidadId, ID_COORDINADOR, marcado(a.redDescrita), a.usoSeguro,
+        a.atestadoDiasAtras, a.expiraEnDias, a.notas ? marcado(a.notas) : null,
+      ],
+    )
+  }
+
+  for (const r of RELEVOS_RADIO_DEMO) {
+    if (await yaSembrado(client, r.semilla)) continue
+    const comunidadId = comunidades.get(r.comunidad)
+    if (!comunidadId) throw new Error(`Relevo de radio: comunidad ${r.comunidad} desconocida.`)
+
+    const { rows } = await client.query<{ id: string }>(
+      `insert into reportes (
+         organizacion_id, tipo, canal, comunidad_id, detalle_libre, estado, payload_crudo, creado_en
+       ) values (
+         $1, $2, 'radio', $3, $4, 'RECIBIDO', $5, now() - make_interval(days => $6::int)
+       )
+       returning id`,
+      [
+        organizacionId, r.tipo, comunidadId, marcado(r.detalle),
+        JSON.stringify({ semilla: r.semilla, segunda_mano: true, hablante: r.hablante, relatado_por: r.operador }),
+        r.diasAtras,
+      ],
+    )
+    const reporteId = rows[0]!.id
+
+    await client.query(
+      `insert into radio_relevos (reporte_id, organizacion_id, comunidad_id, hablante, operador, capturado_por)
+         values ($1,$2,$3,$4,$5,$6)`,
+      [reporteId, organizacionId, comunidadId, marcado(r.hablante), marcado(r.operador), ID_VERIFICADORA],
+    )
+  }
+}
+
+/**
+ * PRD-16 / PRD-35 «Membresías y admisión». STAGING ONLY.
+ *
+ * The home-org membership is created automatically by the 0047 trigger; this adds a SECOND
+ * membership (the same person, a second org, a different role) so the multi-org permissions story is
+ * concrete, and vouches one organisation into the `avalada` tier. Idempotent on the membership key
+ * and on the org not already being avalada.
+ */
+async function sembrarMembresias(client: PoolClient): Promise<void> {
+  const idPorTelefono = new Map(USUARIOS_SEMILLA.map((u) => [u.telefono, u.id]))
+
+  for (const m of MEMBRESIAS_DEMO) {
+    const usuarioId = idPorTelefono.get(m.usuarioTelefono)
+    if (!usuarioId) continue
+    const { rowCount } = await client.query('select 1 from organizaciones where id = $1', [m.organizacionId])
+    if (!rowCount) {
+      console.warn(`\n  ⚠️  Membresía demo omitida: la organización ${m.organizacionId} no existe.\n`)
+      continue
+    }
+    await client.query(
+      `insert into membresias (usuario_id, organizacion_id, rol, otorgado_por, estado)
+         values ($1,$2,$3,$4,'activa')
+       on conflict (usuario_id, organizacion_id, rol) do nothing`,
+      [usuarioId, m.organizacionId, m.rol, idPorTelefono.get(m.otorgadoPorTelefono) ?? null],
+    )
+  }
+
+  for (const a of AVALES_ORGANIZACION_DEMO) {
+    await client.query(
+      `update organizaciones
+          set nivel_admision = 'avalada', avalado_por = $2, aval_motivo = $3
+        where id = $1 and (nivel_admision is null or nivel_admision <> 'avalada')`,
+      [a.organizacionId, a.avaladoPorId, marcado(a.motivo)],
+    )
+  }
+}
+
+/**
  * The seed is realistic on purpose — real community names, real Chocoano phrasing — which is
  * exactly what makes it dangerous once it is sitting on a staging URL somebody from the
  * partner organisation might open. «Rosa Palacios, Tagachí, necesita mercados» reads as a
@@ -1223,6 +1832,35 @@ async function resumen(): Promise<void> {
   `)
   console.log('\nPaneles §5.9 / PRD-12 / plataforma:')
   for (const p of paneles) console.log(`  ${p.tabla.padEnd(24)} ${p.filas}`)
+
+  const { rows: prdv3 } = await pool.query<{ tabla: string; filas: string }>(`
+    select 'plantillas evaluación' as tabla, count(*)::text as filas from plantillas_evaluacion
+    union all select 'evaluaciones (barridos)', count(*)::text from evaluaciones
+    union all select 'hallazgos',              count(*)::text from evaluacion_hallazgos
+    union all select 'hallazgo BoM',           count(*)::text from hallazgo_bom
+    union all select 'programas',              count(*)::text from programas
+    union all select 'programa comunidades',   count(*)::text from programa_comunidades
+    union all select 'programa participantes', count(*)::text from programa_participantes
+    union all select 'programa asistencias',   count(*)::text from programa_asistencias
+    union all select 'programa apadrinam.',    count(*)::text from programa_apadrinamientos
+    union all select 'programa aplicaciones',  count(*)::text from programa_aplicaciones
+    union all select 'jornadas (org demo)',    count(*)::text from jornadas where organizacion_id = (
+      select id from organizaciones where activo order by creado_en limit 1)
+    union all select 'jornada paradas',        count(*)::text from jornada_paradas
+    union all select 'traslados de persona',   count(*)::text from traslados_persona
+    union all select 'fondos de compra',       count(*)::text from fondos_compra
+    union all select 'proveedores locales',    count(*)::text from proveedores_locales
+    union all select 'compras locales',        count(*)::text from compras_locales
+    union all select 'compra local ítems',     count(*)::text from compra_local_items
+    union all select 'compra local evidencia', count(*)::text from compra_local_evidencias
+    union all select 'ítems cadena de frío',   count(*)::text from catalogo_requisitos_almacenamiento where cadena_frio
+    union all select 'suministros anticipados', count(*)::text from suministros_anticipados
+    union all select 'radio permitido',        count(*)::text from radio_permitido
+    union all select 'radio relevos',          count(*)::text from radio_relevos
+    union all select 'membresías',             count(*)::text from membresias
+  `)
+  console.log('\nFunciones PRD v3 (evaluaciones, agenda, traslados, compra local, cadena de frío, radio, membresías):')
+  for (const r of prdv3) console.log(`  ${r.tabla.padEnd(26)} ${r.filas}`)
   console.log()
 }
 
