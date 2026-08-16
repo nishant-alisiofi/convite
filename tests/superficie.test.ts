@@ -50,6 +50,10 @@ const POLITICA: Record<string, 'publica' | 'autenticada'> = {
   '/api/salud': 'publica',
   '/api/webhooks/whatsapp': 'publica',
   '/api/jobs/correr': 'publica',
+  // §28.1 (PRD-34): the per-membership .ics Agenda feed. Reachable without a session (a calendar
+  // app holds no cookie) but authenticated by the token in the URL — a stranger with no valid
+  // token gets a 404, never a calendar. An authenticated surface, not a public one.
+  '/api/agenda/[token]': 'autenticada',
   '/tablero': 'autenticada',
   // Setting a password. Behind a session on purpose: that is the whole mechanism.
   '/clave': 'autenticada',
