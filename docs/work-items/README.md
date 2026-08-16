@@ -5,7 +5,7 @@ self-contained markdown. Each file carries its own acceptance criteria and, for 
 ordered **Codex validation** checklist that a validator runs on **`staging.convite.ai`**.
 
 **Numbering:** one shared sequence, type-prefixed (`PRD-` feature/scoped, `BUG-` defect,
-`FR-` open request). IDs are forever — never renumber. Highest allocated ID: **PRD-38**.
+`FR-` open request). IDs are forever — never renumber. Highest allocated ID: **BUG-41**.
 
 > **Governing spec:** `docs/PRD_Convite_v3.md` (v3.0, Aug 2026) **supersedes the earlier PRDs**
 > (`docs/PRD.md` and the v1.0/v2 vision) as the canonical product specification. v3 is written
@@ -69,6 +69,14 @@ Validate on `staging.convite.ai` (D7/D8 are on the public surface, no login).
 | [BUG-25](BUG-25-divulgacion-celda-pequena-respuesta.md) | Small-cell disclosure on `/respuesta` (k-anonymity) | BUG | v3 §D7 | P0 | Open |
 | [BUG-26](BUG-26-claim-zero-rating-landing.md) | Overstated zero-rating claim on the landing page | BUG | v3 §D8 | P1 | Open |
 | [BUG-27](BUG-27-codigo-catalogo-como-cantidad.md) | Catalogue code reads as a quantity in Inventario | BUG | v3 §D9 | P1 | Open |
+
+## Tier 1 — Defects found by Codex validation pass 1 (2026-08-16)
+
+| ID | Title | Type | Source | Priority | Status |
+|----|-------|------|--------|----------|--------|
+| [BUG-39](BUG-39-mapa-sin-capas-de-datos.md) | Map data overlays don't render over the OSM basemap | BUG | Codex pass 1 | P1 | Fix in progress |
+| [BUG-40](BUG-40-emparejador-no-corre-al-promover.md) | Matcher not run when a report is promoted to a pedido | BUG | Codex pass 1 | P1 | Fix in progress |
+| [BUG-41](BUG-41-produccion-sin-noindex.md) | Production missing the pre-launch noindex | BUG | Codex pass 1 | P1 | ✅ Fixed (config) |
 
 ## Tier 2 — Roadmap (from PRD v1.0, not this pass)
 
