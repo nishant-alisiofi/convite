@@ -51,6 +51,14 @@ export const organizaciones = pgTable(
      * «pending approval» screen, never a 500.
      */
     estadoAprobacion: text('estado_aprobacion').notNull().default('pendiente'),
+    /**
+     * §5.7: the centre's own point on the map, from which the Recogidas run is measured. Set
+     * via `convite_fijar_ubicacion_organizacion` (migration 0036), which is the only writer.
+     * Non-negotiable 2.2 — a stored point never travels without its declared source and radius.
+     */
+    ubicacion: punto('ubicacion'),
+    ubicacionFuente: text('ubicacion_fuente'),
+    ubicacionPrecisionM: integer('ubicacion_precision_m'),
     activo: boolean('activo').notNull().default(true),
     creadoEn: creadoEn(),
     actualizadoEn: actualizadoEn(),
@@ -61,6 +69,16 @@ export const organizaciones = pgTable(
       .on(t.wabaPhoneNumberId)
       .where(sql`waba_phone_number_id is not null`),
     check('organizaciones_estado_aprobacion_check', enLista('estado_aprobacion', ESTADOS_APROBACION)),
+    check(
+      'organizaciones_ubicacion_declarada_check',
+      sql`(ubicacion is null and ubicacion_fuente is null)
+          or (ubicacion is not null and ubicacion_fuente is not null and ubicacion_precision_m is not null)`,
+    ),
+    check(
+      'organizaciones_ubicacion_fuente_check',
+      sql`ubicacion_fuente is null or ${enLista('ubicacion_fuente', FUENTES_UBICACION)}`,
+    ),
+    check('organizaciones_ubicacion_precision_check', sql`ubicacion_precision_m is null or ubicacion_precision_m >= 0`),
   ],
 )
 
