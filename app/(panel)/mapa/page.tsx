@@ -3,6 +3,8 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { figurasDe } from '@/lib/mapa/capas'
 import { cargarMapa, etiquetaTramo } from '@/lib/mapa/datos'
+import type { Borrador, Fase } from '@/lib/mapa/planificacion'
+import { cargarPlanificacion } from '@/lib/mapa/planificacion-datos'
 import { representacionDe } from '@/lib/mapa/precision'
 import { conSesion, sesionActual } from '@/lib/sesion'
 import { temporadaVigente } from '@/lib/temporada'
@@ -43,25 +45,52 @@ const ETIQUETA_ESTADO: Record<string, string> = {
   EN_CAMINO: 'en camino',
 }
 
-type Params = Promise<{ ok?: string; error?: string }>
+type Params = Promise<{
+  ok?: string
+  error?: string
+  /** §18: the operational phase decides which layer the map opens on. */
+  fase?: string
+  /** Supply-first seed (§23.2): a draft handed over from «Planear este viaje». */
+  viaje?: string
+  cupo?: string
+  fecha?: string
+}>
+
+const FASES: Fase[] = ['impacto', 'emergencia', 'recuperacion', 'ordinario']
 
 export default async function Mapa({ searchParams }: { searchParams: Params }) {
   const sesion = await sesionActual()
   if (!sesion) redirect('/entrar')
 
-  const { ok, error } = await searchParams
+  const { ok, error, fase: faseParam, viaje, cupo, fecha } = await searchParams
   const esAdmin = sesion.rolStaff === 'admin'
+  const fase: Fase = FASES.includes(faseParam as Fase) ? (faseParam as Fase) : 'emergencia'
 
-  const { datos, ubicacionCentro } = await conSesion(sesion, async (client) => {
+  const { datos, planificacion, ubicacionCentro } = await conSesion(sesion, async (client) => {
     const datos = await cargarMapa(client, await temporadaVigente(client))
+    const planificacion = await cargarPlanificacion(client)
     const { rows } = await client.query<UbicacionCentro>(
       `select st_y(ubicacion) as lat, st_x(ubicacion) as lon,
               ubicacion_fuente as fuente, ubicacion_precision_m as "precisionM"
          from organizaciones
         where id = convite_organizacion()`,
     )
-    return { datos, ubicacionCentro: rows[0] ?? null }
+    return { datos, planificacion, ubicacionCentro: rows[0] ?? null }
   })
+
+  // Supply-first entry point (§23.2): a link from «Planear este viaje» lands here with a draft
+  // already carrying its destination, date and offered cupo — the same Borrador the map's own
+  // demand-first path produces. The two entry points, one draft.
+  const paradaViaje = viaje && planificacion.comunidades.some((c) => c.id === viaje) ? viaje : null
+  const borradorInicial: Borrador | undefined = paradaViaje
+    ? {
+        id: `viaje-${paradaViaje}`,
+        nombre: 'Viaje ofrecido',
+        fecha: fecha && /^\d{4}-\d{2}-\d{2}$/.test(fecha) ? fecha : new Date().toISOString().slice(0, 10),
+        paradas: [paradaViaje],
+        cupoOfrecido: cupo && Number.isFinite(Number(cupo)) ? Math.max(0, Number(cupo)) : null,
+      }
+    : undefined
 
   // Same helper the map draws from, so "not on the map" and "listed as unlocated" can never
   // disagree about which rows those are.
@@ -140,7 +169,12 @@ export default async function Mapa({ searchParams }: { searchParams: Params }) {
       </p>
 
       <div className="mt-4">
-        <MapaCuenca datos={datos} />
+        <MapaCuenca
+          datos={datos}
+          planificacion={planificacion}
+          fase={fase}
+          borradorInicial={borradorInicial}
+        />
       </div>
 
       <section className="mt-4 grid gap-3 sm:grid-cols-3">
