@@ -1,3 +1,4 @@
+import { fechaHoraCorta } from '@/lib/fechas'
 import type { Croquis, Manifiesto } from '@/lib/despacho/manifiesto'
 
 /**
@@ -49,7 +50,7 @@ export default function HojaManifiesto({
           </div>
           <div className="text-right text-sm text-stone-800">
             <p>Sale de {manifiesto.origenNodo}</p>
-            <p>{manifiesto.salidaProgramada?.toLocaleString('es-CO') ?? 'sin fecha'}</p>
+            <p>{manifiesto.salidaProgramada ? fechaHoraCorta(manifiesto.salidaProgramada) : 'sin fecha'}</p>
             <p>
               {asignadas} de {manifiesto.cupoFamilias} familias
             </p>

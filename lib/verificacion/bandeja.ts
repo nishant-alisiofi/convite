@@ -16,6 +16,20 @@ import { cargarCatalogo, extraer, type Catalogo } from '@/lib/normalizador'
  * `service_role` and `service_role` bypasses RLS.
  */
 
+/**
+ * Above this speech-to-text confidence the machine's transcript is worth offering as a
+ * starting point; below it, the correction field is left blank so a tired verifier has to
+ * transcribe what they actually hear instead of rubber-stamping a low-confidence guess
+ * (PRD v3 D2). One threshold for every audio channel — WhatsApp voice notes, IVR recordings,
+ * radio clips — because the risk is the same wherever a machine guessed at Chocoano.
+ */
+export const UMBRAL_CONFIANZA_TRANSCRIPCION = 0.75
+
+/** Whether a transcript is confident enough to pre-fill the correction field (PRD v3 D2). */
+export function confianzaAlta(confianza: number | null): boolean {
+  return confianza !== null && confianza >= UMBRAL_CONFIANZA_TRANSCRIPCION
+}
+
 export type AdjuntoBandeja = {
   id: string
   tipo: string
@@ -382,12 +396,19 @@ export async function corregirTranscripcion(
 }
 
 /**
- * Classifies a report nobody could classify on arrival.
+ * Sets — or corrects — a report's proposed classification.
  *
- * `sin_clasificar` is a first-class state, not an error (0021) — «Muchas cosas!! De todo!!!»
- * is a phone call somebody makes. This is where that call ends: a person says what it turned
- * out to be. `tipo` comes from the catalogue rather than the form, because knowing the item
- * is knowing the type and letting them disagree writes half a classification.
+ * Two jobs, one path (PRD v3 D3). `sin_clasificar` is a first-class state, not an error (0021)
+ * — «Muchas cosas!! De todo!!!» is a phone call somebody makes, and this is where that call
+ * ends: a person says what it turned out to be. But a *classified* report can also carry the
+ * wrong category — a perfect transcript with a medicine code on an «agua potable» note — and
+ * the verifier has to be able to fix that too, independently of the transcript.
+ *
+ * `tipo` comes from the catalogue rather than the form, because knowing the item is knowing the
+ * type and letting them disagree writes half a classification. The machine's original proposal
+ * is never lost: it is re-derivable at read time from the raw text by `extraer` (the same way
+ * the classifier's reasoning is), and the previous code is recorded in `auditoria` with the
+ * name of whoever changed it (Section 6, 11).
  */
 export async function clasificar(
   client: PoolClient,
@@ -396,18 +417,29 @@ export async function clasificar(
   usuarioId: string,
 ): Promise<Resultado> {
   try {
-    const { rowCount } = await client.query(
-      `update reportes r
+    const { rows } = await client.query<{ codigo_item_anterior: string | null }>(
+      // `antes` reads the row as it stood at the start of the statement, so it captures the
+      // previously-proposed code before the update overwrites it — that is what gets logged.
+      `with antes as (select codigo_item from reportes where id = $1)
+       update reportes r
           set codigo_item = ci.codigo,
               tipo = ci.tipo,
               urgencia = greatest(coalesce(r.urgencia, 1), ci.urgencia_min)
-         from catalogo_items ci
-        where r.id = $1 and ci.codigo = $2 and r.estado = 'RECIBIDO'`,
+         from catalogo_items ci, antes
+        where r.id = $1 and ci.codigo = $2 and r.estado = 'RECIBIDO'
+       returning antes.codigo_item as codigo_item_anterior`,
       [reporteId, codigoItem],
     )
-    if (rowCount === 0) return { ok: false, error: 'No se pudo clasificar ese reporte.' }
+    if (rows.length === 0) return { ok: false, error: 'No se pudo clasificar ese reporte.' }
 
-    await auditar(client, usuarioId, 'reporte.clasificado', reporteId, { codigoItem })
+    await auditar(
+      client,
+      usuarioId,
+      'reporte.clasificado',
+      reporteId,
+      { codigoItem },
+      { codigoItem: rows[0]!.codigo_item_anterior },
+    )
     return { ok: true }
   } catch (error) {
     return { ok: false, error: traducirError(error) }
@@ -485,11 +517,18 @@ async function auditar(
   accion: string,
   entidadId: string,
   despues: unknown,
+  antes: unknown = null,
 ): Promise<void> {
   await client.query(
-    `insert into auditoria (actor_id, accion, entidad, entidad_id, despues)
-     values ($1, $2, 'reportes', $3, $4)`,
-    [actorId, accion, entidadId, despues ? JSON.stringify(despues) : null],
+    `insert into auditoria (actor_id, accion, entidad, entidad_id, antes, despues)
+     values ($1, $2, 'reportes', $3, $4, $5)`,
+    [
+      actorId,
+      accion,
+      entidadId,
+      antes ? JSON.stringify(antes) : null,
+      despues ? JSON.stringify(despues) : null,
+    ],
   )
 }
 

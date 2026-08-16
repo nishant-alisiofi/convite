@@ -1,5 +1,5 @@
 import { Droplets, HandHeart, Home, HeartPulse, Package, ShieldCheck, Utensils } from 'lucide-react'
-import type { FilaPublica } from '@/lib/publico'
+import { agregarPublico, K_MINIMO_PUBLICO, type FilaPublica } from '@/lib/publico'
 import { Marca } from '@/components/marca'
 
 /**
@@ -30,36 +30,13 @@ function iconoFamilia(label: string) {
   return Package
 }
 
-type Zona = {
-  municipio: string
-  items: FilaPublica[]
-  pendientes: number
-  atendidos: number
-}
-
 export default function VistaPublica({ filas }: { filas: FilaPublica[] }) {
-  // A row with nothing in either column says nothing: there are pedidos in that municipality
-  // and family, but none in a state the public view counts. Dropping them here makes the
-  // headline and the breakdown agree by construction — both are derived from this one filtered
-  // set, so the page can never print «no hay solicitudes» above a list of them.
-  const conDatos = filas.filter((f) => f.pendientes > 0 || f.atendidos > 0)
-
-  const totalPendientes = conDatos.reduce((n, f) => n + f.pendientes, 0)
-  const totalAtendidos = conDatos.reduce((n, f) => n + f.atendidos, 0)
-
-  const zonas: Zona[] = []
-  for (const f of conDatos) {
-    let z = zonas.find((z) => z.municipio === f.municipio)
-    if (!z) {
-      z = { municipio: f.municipio, items: [], pendientes: 0, atendidos: 0 }
-      zonas.push(z)
-    }
-    z.items.push(f)
-    z.pendientes += f.pendientes
-    z.atendidos += f.atendidos
-  }
-
-  const hayDatos = conDatos.length > 0
+  // Aggregated with small-cell disclosure suppressed (D7): rows with nothing in either column
+  // are dropped so the headline and the breakdown agree, and any zone×category pending count
+  // below the threshold is rolled into an «Otras» row so no single household can be inferred.
+  const { zonas, totalPendientes, totalAtendidos } = agregarPublico(filas)
+  const hayDatos = zonas.length > 0
+  const hayOtras = zonas.some((z) => z.items.some((i) => i.esOtras))
 
   return (
     <div className="min-h-dvh bg-barro-50">
@@ -130,6 +107,12 @@ export default function VistaPublica({ filas }: { filas: FilaPublica[] }) {
               >
                 Por zona y tipo de ayuda
               </h2>
+              {hayOtras && (
+                <p className="mt-2 max-w-2xl text-sm text-barro-600">
+                  Los conteos muy pequeños van juntos en «Otras», para que una zona y un tipo de
+                  ayuda no alcancen a señalar a un hogar.
+                </p>
+              )}
               <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 {zonas.map((z) => (
                   <div
@@ -144,12 +127,19 @@ export default function VistaPublica({ filas }: { filas: FilaPublica[] }) {
                     </div>
                     <ul className="divide-y divide-barro-100">
                       {z.items.map((f) => {
-                        const Icono = iconoFamilia(f.familiaLabel)
+                        const Icono = f.esOtras ? Package : iconoFamilia(f.familiaLabel)
                         return (
                           <li key={f.familiaLabel} className="flex items-start gap-2.5 py-2.5">
                             <Icono className="mt-0.5 size-4 shrink-0 text-barro-400" aria-hidden />
                             <div className="min-w-0 flex-1">
-                              <p className="text-barro-900">{f.familiaLabel}</p>
+                              <p className="text-barro-900">
+                                {f.familiaLabel}
+                                {f.esOtras && (
+                                  <span className="ml-1.5 text-sm text-barro-500">
+                                    (conteos pequeños, agrupados)
+                                  </span>
+                                )}
+                              </p>
                               <p className="mt-0.5 text-sm tabular-nums">
                                 <span
                                   className={
@@ -158,13 +148,13 @@ export default function VistaPublica({ filas }: { filas: FilaPublica[] }) {
                                       : 'text-barro-400'
                                   }
                                 >
-                                  {f.pendientes} en espera
+                                  {f.pendientesTexto} en espera
                                 </span>
                                 <span className="text-barro-300"> · </span>
                                 <span
                                   className={f.atendidos > 0 ? 'text-selva-700' : 'text-barro-400'}
                                 >
-                                  {f.atendidos} {f.atendidos === 1 ? 'atendida' : 'atendidas'}
+                                  {f.atendidosTexto} {f.atendidos === 1 ? 'atendida' : 'atendidas'}
                                 </span>
                               </p>
                             </div>
@@ -197,10 +187,12 @@ export default function VistaPublica({ filas }: { filas: FilaPublica[] }) {
           </h2>
           <p className="mt-3 max-w-2xl text-barro-700">
             No publicamos nombres de comunidades, ubicaciones ni teléfonos, y agrupamos las zonas
-            para que ninguna fila hable de un solo pueblo. Saber qué vereda se quedó sin comida y
-            no tiene cómo salir es información que puede usarse en contra de quien vive ahí. Los
-            conteos alcanzan para ver el tamaño de la respuesta; lo demás se queda del otro lado
-            de una sesión.
+            para que ninguna fila hable de un solo pueblo. Cuando un conteo por zona y tipo de
+            ayuda es muy pequeño —menos de {K_MINIMO_PUBLICO}— no lo mostramos aparte: lo juntamos
+            en una fila «Otras» para que no se pueda deducir un hogar. Saber qué vereda se quedó
+            sin comida y no tiene cómo salir es información que puede usarse en contra de quien
+            vive ahí. Los conteos alcanzan para ver el tamaño de la respuesta; lo demás se queda
+            del otro lado de una sesión.
           </p>
         </section>
       </main>

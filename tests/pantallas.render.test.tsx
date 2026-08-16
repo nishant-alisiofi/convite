@@ -298,6 +298,22 @@ conBase('cada pantalla del panel se dibuja con datos reales', () => {
     sinEntrañas(marcado, 'envios')
   })
 
+  it('el inventario', async () => {
+    const { default: Inventario } = await import('@/app/(panel)/inventario/page')
+    const marcado = await pintar('inventario', Inventario as never)
+    expect(marcado).toContain('Inventario')
+    // D9: the catalogue code carries a «cód.» prefix so it cannot be read as a quantity.
+    expect(marcado).toContain('cód.')
+    sinEntrañas(marcado, 'inventario')
+  })
+
+  it('las comunidades', async () => {
+    const { default: Comunidades } = await import('@/app/(panel)/comunidades/page')
+    const marcado = await pintar('comunidades', Comunidades as never)
+    expect(marcado).toContain('Comunidades')
+    sinEntrañas(marcado, 'comunidades')
+  })
+
   it('el plan de un envío', async () => {
     const { default: Envio } = await import('@/app/(panel)/envios/[id]/page')
     const marcado = await pintar('envio-plan', Envio as never, {

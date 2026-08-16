@@ -1,4 +1,4 @@
-import { EarOff, MapPin, MapPinOff, Radio } from 'lucide-react'
+import { EarOff, MapPin, MapPinOff, PhoneOff, Radio } from 'lucide-react'
 import { redirect } from 'next/navigation'
 import { conSesion, sesionActual } from '@/lib/sesion'
 
@@ -113,6 +113,10 @@ export default async function Comunidades() {
 
   const enSilencio = filas.filter((f) => f.dias !== null && f.dias > f.intervalo).length
   const nuncaVistas = filas.filter((f) => f.dias === null).length
+  // D6: a never-seen tier-1/2 community is not the benign «no baseline yet» of a river vereda.
+  // A well-connected cabecera we have never heard from almost always means the contact is
+  // wrong, not that it is fine — so it is counted and surfaced as a contact problem to act on.
+  const sinContacto = filas.filter((f) => f.dias === null && f.tier <= 2).length
 
   // Group by municipality — the one place name that is safe to show, and how the field team
   // reads the basin.
@@ -136,6 +140,12 @@ export default async function Comunidades() {
             </>
           )}
           {nuncaVistas > 0 && <> · {nuncaVistas} nunca vistas</>}
+          {sinContacto > 0 && (
+            <>
+              {' · '}
+              <span className="text-atrato-700">{sinContacto} sin contacto (revisar número)</span>
+            </>
+          )}
         </p>
       </div>
 
@@ -167,6 +177,10 @@ export default async function Comunidades() {
 function ComunidadFila({ c }: { c: Fila }) {
   const silencio = c.dias !== null && c.dias > c.intervalo
   const nuncaVista = c.dias === null
+  // D6: never-seen splits by tier. A tier-1/2 cabecera that has never reached us is a broken
+  // pipe — the number is probably wrong — and reads as something to act on; a tier-3/4 river
+  // vereda keeps the honest «alta, no alarma» framing.
+  const contactoRoto = nuncaVista && c.tier <= 2
 
   return (
     <li className="px-4 py-3">
@@ -213,8 +227,15 @@ function ComunidadFila({ c }: { c: Fila }) {
         {!c.activa && <span className="text-barro-400">inactiva</span>}
       </div>
 
-      {/* Contact status: silence is loud, never-seen is quiet, everyone else is a plain fact. */}
-      {nuncaVista ? (
+      {/* Contact status: silence is loud, a well-connected never-seen is loud too (a wrong
+          number, D6), a tier-3/4 never-seen is quiet, everyone else is a plain fact. */}
+      {contactoRoto ? (
+        <p className="mt-1 flex flex-wrap items-center gap-1 text-sm font-medium text-atrato-700">
+          <PhoneOff className="size-3.5 shrink-0" aria-hidden />
+          Bien conectada y sin contacto — probablemente falta o está mal el número. Conviene
+          conseguirlo.
+        </p>
+      ) : nuncaVista ? (
         <p className="mt-1 text-sm text-barro-500">
           Nunca hemos sabido nada de ella — es alta, no alarma.
         </p>

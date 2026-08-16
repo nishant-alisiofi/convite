@@ -172,6 +172,34 @@ export function motivoSinCapacidad(
   )
 }
 
+/**
+ * The request is on the boat. A different sentence from every other state because it is a
+ * different phone call: not «confirme para despachar» but «ya salió» — who is carrying it and
+ * from when, so a coordinator can ring the community to expect it or the transporter to check
+ * on it.
+ *
+ * State-dependent copy has to be regenerated on the transition, not only when the row is first
+ * written in `LISTO` (2.x, PRD v3 D1). The matcher never revisits a request once it leaves the
+ * open states, so the dispatch path calls this and overwrites the stored motivo — otherwise a
+ * row sitting under «En camino» keeps saying «Confirme para despachar», and the board
+ * contradicts itself.
+ */
+export function motivoEnCamino(datos: {
+  comunidad: string
+  familias: number
+  itemLabel: string
+  transportista: string | null
+  salida: Date | null
+}): string {
+  const fam = `${numero.format(datos.familias)} familia${datos.familias === 1 ? '' : 's'}`
+  const quien = datos.transportista ? ` con ${datos.transportista}` : ''
+  const cuando = datos.salida ? ` Salió el ${fechaLarga(datos.salida)}.` : ''
+  return (
+    `Ya salió para ${datos.comunidad}: ${fam} de ` +
+    `${datos.itemLabel.toLocaleLowerCase('es-CO')}${quien}.${cuando}`
+  )
+}
+
 export function motivoListo(
   fuente: Fuente,
   ctx: ContextoFrase,

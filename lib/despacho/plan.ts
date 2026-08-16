@@ -2,6 +2,7 @@ import type { PoolClient } from 'pg'
 import { z } from 'zod'
 import { MODOS } from '@/db/schema/vocabulario'
 import { alcanzables, cargarCuenca, grafoDe } from '@/lib/alcance'
+import { motivoEnCamino } from '@/lib/matching/motivos'
 import type { TemporadaActual } from '@/lib/matching/tipos'
 
 /**
@@ -500,6 +501,45 @@ export async function despachar(
         where id in (select pedido_id from envio_items where envio_id = $1)`,
       [envioId],
     )
+
+    // D1: `motivo` is state-dependent, and the matcher never revisits a request once it leaves
+    // the open states. Regenerate it on the transition so an «En camino» row shows an en-camino
+    // sentence instead of keeping the stale `LISTO` «Confirme para despachar».
+    const { rows: enCamino } = await client.query<{
+      pedido_id: string
+      comunidad: string
+      familias: number
+      item_label: string
+      transportista: string | null
+      salida: Date | null
+    }>(
+      `select ei.pedido_id,
+              com.nombre                       as comunidad,
+              ei.familias_asignadas            as familias,
+              ci.item_label,
+              coalesce(ct.nombre, ct.telefono) as transportista,
+              coalesce(e.salida_real, e.salida_programada) as salida
+         from envio_items ei
+         join envios e            on e.id = ei.envio_id
+         join pedidos p           on p.id = ei.pedido_id
+         join comunidades com     on com.id = p.comunidad_id
+         join catalogo_items ci   on ci.codigo = p.codigo_item
+         join contactos ct        on ct.id = e.responsable_id
+        where ei.envio_id = $1`,
+      [envioId],
+    )
+    for (const fila of enCamino) {
+      await client.query(`update pedidos set motivo = $2 where id = $1`, [
+        fila.pedido_id,
+        motivoEnCamino({
+          comunidad: fila.comunidad,
+          familias: fila.familias,
+          itemLabel: fila.item_label,
+          transportista: fila.transportista,
+          salida: fila.salida,
+        }),
+      ])
+    }
 
     await client.query('release savepoint despachar')
     return { ok: true }

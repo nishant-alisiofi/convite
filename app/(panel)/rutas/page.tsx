@@ -16,7 +16,7 @@ import {
   type FilaRuta,
 } from '@/lib/rutas/editor'
 import { conSesion, sesionActual } from '@/lib/sesion'
-import { temporadaVigente } from '@/lib/temporada'
+import { etiquetaTemporada, temporadaVigente } from '@/lib/temporada'
 
 export const dynamic = 'force-dynamic'
 
@@ -154,7 +154,7 @@ export default async function Rutas({ searchParams }: { searchParams: Params }) 
             Cerrar {aCerrar.origen} → {aCerrar.destino}
           </h2>
           <p className="mt-1 text-sm text-barro-800">
-            {aCerrar.modo} · {aCerrar.temporada}
+            {aCerrar.modo} · {etiquetaTemporada(aCerrar.temporada)}
             {aCerrar.minutos !== null && ` · ${aCerrar.minutos} min`}
           </p>
 
@@ -253,7 +253,7 @@ export default async function Rutas({ searchParams }: { searchParams: Params }) 
               >
                 {TEMPORADAS.map((t) => (
                   <option key={t} value={t}>
-                    {t}
+                    {etiquetaTemporada(t)}
                   </option>
                 ))}
               </select>
@@ -361,7 +361,7 @@ function Tabla({
                 {r.origen} → {r.destino}
               </span>
               <span className="text-barro-600">{r.modo}</span>
-              <span className="text-barro-500">{r.temporada}</span>
+              <span className="text-barro-500">{etiquetaTemporada(r.temporada)}</span>
               <span className="text-barro-600">
                 {r.minutos === null ? 'sin tiempo' : `${r.minutos} min`}
               </span>

@@ -1,6 +1,7 @@
 import { Clock, MapPinOff, PackageCheck, Truck } from 'lucide-react'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { vencimientoAproximado } from '@/lib/fechas'
 import { nodosParaRecogida, planearRecogida, RADIO_BARRIO_M } from '@/lib/recogidas/plan'
 import { conSesion, sesionActual } from '@/lib/sesion'
 
@@ -150,12 +151,9 @@ export default async function Recogidas({ searchParams }: { searchParams: Params
                     {p.perecedero && (
                       <span className="flex items-center gap-1 rounded bg-atrato-100 px-1.5 py-0.5 text-xs font-medium text-atrato-700">
                         <Clock className="size-3" aria-hidden />
-                        vence{' '}
-                        {p.venceEn?.toLocaleString('es-CO', {
-                          weekday: 'short',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
+                        {/* D5: día + franja del día, never a computed clock time — nobody
+                            promised 4:23, and 4:23 invites treating it as a hard cutoff. */}
+                        vence {p.venceEn && vencimientoAproximado(p.venceEn)}
                       </span>
                     )}
                     <span className="ml-auto text-barro-500">

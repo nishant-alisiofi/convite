@@ -10,6 +10,7 @@ import {
   registrarCapacidad,
 } from '@/lib/despacho/plan'
 import { MODOS } from '@/db/schema/vocabulario'
+import { fechaCorta } from '@/lib/fechas'
 import { conSesion, sesionActual } from '@/lib/sesion'
 
 export const dynamic = 'force-dynamic'
@@ -184,7 +185,14 @@ export default async function Envios({
 
             <label className="block text-sm">
               <span className="font-medium text-barro-800">Sale</span>
-              <input type="datetime-local" name="saleEn" required className={CLASE_CAMPO} />
+              <input
+                type="datetime-local"
+                name="saleEn"
+                required
+                lang="es-CO"
+                className={CLASE_CAMPO}
+              />
+              <span className="mt-1 block text-xs text-barro-500">Fecha y hora (dd/mm/aaaa).</span>
             </label>
 
             <label className="block text-sm">
@@ -289,7 +297,7 @@ export default async function Envios({
                   </span>
                 )}
                 <span className="ml-auto text-barro-500">
-                  {e.salida_programada?.toLocaleDateString('es-CO') ?? 'sin fecha'}
+                  {e.salida_programada ? fechaCorta(e.salida_programada) : 'sin fecha'}
                 </span>
               </li>
             ))}

@@ -226,6 +226,34 @@ conBase('el racionamiento se registra o el envío no sale', () => {
     })
   })
 
+  it('regenera el motivo al pasar a EN_CAMINO — no deja «Confirme para despachar» (D1)', async () => {
+    await client.query('savepoint caso')
+    const capacidad = await laCapacidad()
+    const tag = await pedidoEn('TAG')
+
+    const { rows: antes } = await client.query<{ estado: string; motivo: string | null }>(
+      `select estado, motivo from pedidos where id = $1`,
+      [tag.id],
+    )
+
+    await como(DESPACHADOR, async () => {
+      const envio = await crearEnvio(client, capacidad, DESPACHADOR)
+      const envioId = (envio as { id: string }).id
+      await ponerParada(client, envioId, tag.id, tag.familias)
+      expect(await despachar(client, envioId, DESPACHADOR)).toEqual({ ok: true })
+    })
+
+    const { rows: despues } = await client.query<{ estado: string; motivo: string | null }>(
+      `select estado, motivo from pedidos where id = $1`,
+      [tag.id],
+    )
+    expect(despues[0]!.estado).toBe('EN_CAMINO')
+    // The board must not contradict itself: the sentence follows the bucket.
+    expect(despues[0]!.motivo).not.toBe(antes[0]!.motivo)
+    expect(despues[0]!.motivo).not.toContain('Confirme para despachar')
+    expect(despues[0]!.motivo).toContain('Ya salió')
+  })
+
   it('el bote no crece porque la cola sea larga', async () => {
     await client.query('savepoint caso')
     const capacidad = await laCapacidad()
