@@ -1,6 +1,7 @@
 import type { PoolClient } from 'pg'
 import { Pool } from 'pg'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { emparejar } from '@/lib/matching/persistencia'
 import {
   cargarBandeja,
   clasificar,
@@ -186,7 +187,9 @@ conBase('nada llega a pedidos sin que una persona lo ponga ahí', () => {
     const antes = await cuentaPedidos()
 
     await como(VERIFICADORA, async () => {
-      expect(await promoverAPedido(client, reporte.id, VERIFICADORA, 12)).toEqual({ ok: true })
+      expect(await promoverAPedido(client, reporte.id, VERIFICADORA, 12)).toMatchObject({
+        ok: true,
+      })
     })
 
     expect(await cuentaPedidos()).toBe(antes + 1)
@@ -507,8 +510,48 @@ conBase('un ítem que pide detalle y no lo trae está incompleto', () => {
       [id],
     )
     await como(VERIFICADORA, async () => {
-      expect(await promoverAPedido(client, id, VERIFICADORA, 8)).toEqual({ ok: true })
+      expect(await promoverAPedido(client, id, VERIFICADORA, 8)).toMatchObject({ ok: true })
     })
+  })
+})
+
+conBase('un pedido recién promovido aparece en un grupo del Tablero', () => {
+  const ESTADOS_TABLERO = ['SIN_RUTA', 'SIN_EXISTENCIA', 'SIN_CAPACIDAD', 'LISTO', 'EN_CAMINO']
+
+  it('nace ABIERTO sin motivo, y el emparejador lo clasifica en un grupo con su frase', async () => {
+    await client.query('savepoint caso')
+    const reporte = await reporteEnCola()
+
+    let pedidoId = ''
+    await como(VERIFICADORA, async () => {
+      const res = await promoverAPedido(client, reporte.id, VERIFICADORA, 6)
+      expect(res.ok).toBe(true)
+      if (res.ok) pedidoId = res.pedidoId
+    })
+    expect(pedidoId).not.toBe('')
+
+    // El defecto: apenas promovido el pedido está ABIERTO y sin motivo, así que el Tablero lo
+    // suma al total pero no lo pinta en ninguno de los cinco grupos.
+    const { rows: antes } = await client.query<{ estado: string; motivo: string | null }>(
+      `select estado, motivo from pedidos where id = $1`,
+      [pedidoId],
+    )
+    expect(antes[0]!.estado).toBe('ABIERTO')
+    expect(antes[0]!.motivo).toBeNull()
+
+    // La corrección: correr el emparejador para ese pedido — la misma ruta que la promoción
+    // dispara ahora (`emparejarPedido` → `emparejar({ pedidoId })`), aquí como dueño porque el
+    // harness es una sola conexión — le da estado y motivo.
+    await emparejar(client, { temporada: 'lluvias', pedidoId })
+
+    const { rows: despues } = await client.query<{ estado: string; motivo: string | null }>(
+      `select estado, motivo from pedidos where id = $1`,
+      [pedidoId],
+    )
+    // Todo pedido promovido es «entregable» (la promoción lo exige), así que el resolver nunca
+    // lo deja en ABIERTO: cae en uno de los grupos del Tablero, con la frase que es la llamada.
+    expect(ESTADOS_TABLERO).toContain(despues[0]!.estado)
+    expect(despues[0]!.motivo).toBeTruthy()
   })
 })
 

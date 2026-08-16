@@ -6,6 +6,7 @@ import {
   cargarBandeja,
   clasificar,
   corregirTranscripcion,
+  emparejarPedido,
   itemsDelCatalogo,
   marcarDuplicado,
   posiblesDuplicados,
@@ -129,6 +130,22 @@ export default async function Verificacion({ searchParams }: { searchParams: Par
     if (!resultado.ok) {
       redirect(`/verificacion?tipo=${filtro}&error=${encodeURIComponent(resultado.error)}`)
     }
+
+    // A promoted report becomes a pedido born `ABIERTO` with no motivo: the Tablero counts it
+    // in the total but shows it in no bucket, so the coordinator sees the number tick up and
+    // nothing to act on. Classify it now — for this one pedido — so the card lands where the
+    // work is, with its motivo. This is the immediacy the `emparejar_pedido` job was written
+    // for, taken on the spot. Best-effort: the human decision (the pedido) is already
+    // committed and durable; a matcher hiccup must not fail the action, and the next full
+    // sweep would catch it anyway.
+    if (que === 'promover' && 'pedidoId' in resultado && typeof resultado.pedidoId === 'string') {
+      try {
+        await emparejarPedido(resultado.pedidoId)
+      } catch (error) {
+        console.error('No se pudo emparejar el pedido recién promovido:', error)
+      }
+    }
+
     revalidatePath('/verificacion')
     redirect(`/verificacion?tipo=${filtro}`)
   }
