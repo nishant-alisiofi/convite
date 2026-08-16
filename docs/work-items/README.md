@@ -32,13 +32,13 @@ there. Test accounts and how to fetch magic links: `docs/validacion-codex-0a1.md
 
 | ID | Title | Type | Source | Priority | Demo/Roadmap | Status |
 |----|-------|------|--------|----------|--------------|--------|
-| [PRD-1](PRD-1-seed-multicanal.md) | Multi-channel AI-ingestion demo seed (staging) | PRD | Jam A + Jam B + eng-in-flight | P0 | Demo | In progress (eng) |
-| [PRD-2](PRD-2-mapa-openstreetmap.md) | Real OpenStreetMap panel map + geolocation + pin-drop + center-location capture | PRD | Jam A + Jam B + eng-in-flight | P0 | Demo | In progress (eng) |
-| [PRD-3](PRD-3-visualizacion-canal-transcripcion.md) | Panel UI pass: channel/source + transcription visualization on cards | PRD | Jam B + planned UI pass | P0 | Demo | Planned |
-| [PRD-4](PRD-4-auditoria-paginas-panel.md) | Panel page audit: every page populated & correct (per-page acceptance) | PRD | Jam A | P0 | Demo | Planned |
-| [BUG-5](BUG-5-paginas-vacias-org.md) | Panel pages empty for the logged-in org despite an approved center + members | BUG | Jam A | P0 | Demo | Open |
-| [BUG-6](BUG-6-mapa-en-blanco.md) | Mapa renders blank / schematic with no basemap | BUG | Jam A | P0 | Demo | Open |
-| [BUG-7](BUG-7-recogidas-sin-ubicacion.md) | Recogidas: centers have no location ("Ningún centro tiene ubicación") | BUG | Jam A | P1 | Demo | Open |
+| [PRD-1](PRD-1-seed-multicanal.md) | Multi-channel AI-ingestion demo seed (staging) | PRD | Jam A + Jam B | P0 | Demo | ✅ Done — on staging (pending Codex) |
+| [PRD-2](PRD-2-mapa-openstreetmap.md) | Real OpenStreetMap panel map + geolocation + pin-drop + center-location capture | PRD | Jam A + Jam B | P0 | Demo | ✅ Done — on staging (pending Codex) |
+| [PRD-3](PRD-3-visualizacion-canal-transcripcion.md) | Panel UI pass: channel/source + transcription visualization on cards | PRD | Jam B | P0 | Demo | ✅ Done — on staging (pending Codex) |
+| [PRD-4](PRD-4-auditoria-paginas-panel.md) | Panel page audit + build Inventario/Comunidades/Catálogo | PRD | Jam A | P0 | Demo | ✅ Done — on staging (pending Codex) |
+| [BUG-5](BUG-5-paginas-vacias-org.md) | Panel pages empty for the logged-in org despite an approved center + members | BUG | Jam A | P0 | Demo | ✅ Fixed (seed org now `aprobada`) |
+| [BUG-6](BUG-6-mapa-en-blanco.md) | Mapa renders blank / schematic with no basemap | BUG | Jam A | P0 | Demo | ✅ Fixed (real OSM base) |
+| [BUG-7](BUG-7-recogidas-sin-ubicacion.md) | Recogidas: centers have no location ("Ningún centro tiene ubicación") | BUG | Jam A | P1 | Demo | ✅ Fixed (offer + center locations) |
 
 ## Tier 2 — Roadmap (from PRD v1.0, not this pass)
 
@@ -46,9 +46,9 @@ there. Test accounts and how to fetch magic links: `docs/validacion-codex-0a1.md
 |----|-------|------|--------|----------|--------------|--------|
 | [PRD-8](PRD-8-transporte-de-personas.md) | Transport of people (not just goods) | PRD | PRD v1.0 | P2 | Roadmap | Backlog |
 | [PRD-9](PRD-9-compra-local-financiada.md) | Funded local purchase (third supply mode) | PRD | PRD v1.0 | P2 | Roadmap | Backlog |
-| [PRD-10](PRD-10-puntos-de-conexion.md) | Connection points (puntos de conexión) | PRD | PRD v1.0 | P2 | Roadmap | Backlog |
+| [PRD-10](PRD-10-puntos-de-conexion.md) | Connection points (puntos de conexión) | PRD | PRD v1.0 | P2 | Built early | ✅ Done — on staging (pending Codex) |
 | [PRD-11](PRD-11-ingesta-de-radio.md) | Real radio ingestion (fourth channel) | PRD | PRD v1.0 + Jam B | P2 | Roadmap | Backlog |
-| [PRD-12](PRD-12-apadrina-una-partera.md) | Sponsorship: "apadrina una partera" | PRD | PRD v1.0 | P2 | Roadmap | Backlog |
+| [PRD-12](PRD-12-apadrina-una-partera.md) | Sponsorship: "apadrina una partera" | PRD | PRD v1.0 | P2 | Built early | ✅ Done — on staging (pending Codex) |
 | [PRD-13](PRD-13-mapas-offline-pmtiles.md) | Offline PMTiles map bundles | PRD | PRD v1.0 | P2 | Roadmap | Backlog |
 | [PRD-14](PRD-14-whisper-autohospedado.md) | Self-hosted Whisper transcription (D8) | PRD | PRD v1.0 + PRD §D8 | P1 | Roadmap | Backlog |
 | [PRD-15](PRD-15-gateways-sms-voz.md) | Live SMS + voice-callback gateways (D1/D2) | PRD | PRD v1.0 + PRD §D1/D2 | P1 | Roadmap | Backlog |
