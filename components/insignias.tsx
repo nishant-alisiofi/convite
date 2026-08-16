@@ -4,6 +4,7 @@ import {
   Globe,
   MessageCircle,
   MessageSquare,
+  PencilLine,
   PhoneMissed,
   Radio,
   TriangleAlert,
@@ -28,7 +29,7 @@ import type { Canal } from '@/db/schema/vocabulario'
  * time.
  */
 
-/** The single source of truth for how a channel is drawn. `web` is staff-only intake. */
+/** The single source of truth for how a channel is drawn. `web` and `manual` are staff-only intake. */
 export const CANAL_META: Record<Canal, { etiqueta: string; Icono: LucideIcon }> = {
   whatsapp: { etiqueta: 'WhatsApp', Icono: MessageCircle },
   sms: { etiqueta: 'SMS', Icono: MessageSquare },
@@ -36,6 +37,8 @@ export const CANAL_META: Record<Canal, { etiqueta: string; Icono: LucideIcon }> 
   radio: { etiqueta: 'radio', Icono: Radio },
   papel: { etiqueta: 'papel', Icono: FileText },
   web: { etiqueta: 'web', Icono: Globe },
+  // PRD-35 (§29.3b): the zeroth channel — a report a coordinator typed in before any channel existed.
+  manual: { etiqueta: 'manual', Icono: PencilLine },
 }
 
 /**
