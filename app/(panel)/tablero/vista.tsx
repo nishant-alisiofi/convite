@@ -1,4 +1,5 @@
 import { TriangleAlert } from 'lucide-react'
+import { InsigniaCanal, InsigniaTranscrito } from '@/components/insignias'
 
 /**
  * The Tablero's markup, kept out of the route so it renders without a signed-in session.
@@ -11,6 +12,10 @@ import { TriangleAlert } from 'lucide-react'
  * coordinator scanning down the page sees which pile a card is in before reading a word — and
  * the `motivo` sentence is set as the body of each row, because that sentence is the phone
  * call, not a tooltip.
+ *
+ * Each row also carries how the underlying report arrived (`canal`) and whether it came in as
+ * a transcribed voice note, so the classified end of the raw → triage → categorized flow shows
+ * that these numbers began as a message somebody sent from a phone (Jam B, PRD §5.1).
  */
 
 export type Fila = {
@@ -23,6 +28,10 @@ export type Fila = {
   municipio: string
   item: string
   dias: number
+  /** How the originating report reached us. Null only if its report row is not readable. */
+  canal: string | null
+  /** The report arrived as a voice note a machine transcribed. */
+  transcrito: boolean
 }
 
 const BUCKETS = [
@@ -105,12 +114,17 @@ export default function TableroVista({ filas }: { filas: Fila[] }) {
                       {fila.dias === 0 ? 'hoy' : `hace ${fila.dias} d`}
                     </span>
                   </div>
-                  {/* Line 2: what and how many, flowing and wrapping cleanly. */}
-                  <p className="mt-0.5 text-sm text-barro-600">
-                    {fila.item}
-                    <span className="text-barro-300"> · </span>
-                    {fila.familias} familia{fila.familias === 1 ? '' : 's'}
-                  </p>
+                  {/* Line 2: what and how many, then how it came in — flowing and wrapping
+                      cleanly so the channel badge never pushes the count off the row. */}
+                  <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-barro-600">
+                    <span>
+                      {fila.item}
+                      <span className="text-barro-300"> · </span>
+                      {fila.familias} familia{fila.familias === 1 ? '' : 's'}
+                    </span>
+                    <InsigniaCanal canal={fila.canal} />
+                    {fila.transcrito && <InsigniaTranscrito />}
+                  </div>
                   {/* The sentence the matcher wrote. This is the phone call. */}
                   <p className="mt-1.5 text-barro-800">{fila.motivo}</p>
                 </li>
