@@ -12,6 +12,7 @@ import {
   quitarParada,
   registrarDecision,
 } from '@/lib/despacho/plan'
+import { fechaHoraCorta } from '@/lib/fechas'
 import { conSesion, sesionActual } from '@/lib/sesion'
 import { temporadaVigente } from '@/lib/temporada'
 
@@ -161,7 +162,8 @@ export default async function Envio({
 
       <p className="mt-1 text-sm text-barro-700">
         {manifiesto.modo} · {manifiesto.transportista} · desde {manifiesto.origenNodo} · sale{' '}
-        {manifiesto.salidaProgramada?.toLocaleString('es-CO') ?? 'sin fecha'} · cupo{' '}
+        {manifiesto.salidaProgramada ? fechaHoraCorta(manifiesto.salidaProgramada) : 'sin fecha'} ·
+        cupo{' '}
         {manifiesto.cupoFamilias} familias · <span className="font-medium">{manifiesto.estado.toLowerCase()}</span>
       </p>
 

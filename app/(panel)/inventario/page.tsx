@@ -224,7 +224,12 @@ function ArticuloFila({ articulo: a }: { articulo: Articulo }) {
   return (
     <li className="rounded-lg border border-barro-200 bg-white px-4 py-3">
       <div className="flex flex-wrap items-baseline gap-x-2">
-        <span className="font-mono text-sm text-barro-500">{a.codigo}</span>
+        {/* D9: a bare two-digit code beside PIDEN/EXISTENCIAS counts reads as a quantity
+            («12 Agua potable» → «12 units»). A bordered chip with a «cód.» prefix makes it
+            unmistakably the catalogue code, not a number. The code itself is unchanged. */}
+        <span className="self-center rounded border border-barro-200 bg-barro-50 px-1.5 py-0.5 font-mono text-xs text-barro-500">
+          cód. {a.codigo}
+        </span>
         <span className="font-medium text-barro-900">{a.etiqueta}</span>
         <span className="text-sm text-barro-500">{a.familia}</span>
         {a.urgencia === 3 && a.familias > 0 && (

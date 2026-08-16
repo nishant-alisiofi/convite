@@ -1,5 +1,5 @@
 import type { PoolClient } from 'pg'
-import { TEMPORADAS_OPERATIVAS } from '@/db/schema/vocabulario'
+import { TEMPORADAS, TEMPORADAS_OPERATIVAS } from '@/db/schema/vocabulario'
 import type { TemporadaActual } from '@/lib/matching/tipos'
 
 /**
@@ -19,6 +19,21 @@ import type { TemporadaActual } from '@/lib/matching/tipos'
  */
 
 export const CLAVE_TEMPORADA = 'temporada'
+
+/**
+ * Human labels for the season enum. The stored values are code (`todo_el_ano`, `lluvias`,
+ * `seca`); a coordinator should never see the raw enum in a control or a list (PRD v3 D4).
+ */
+export const ETIQUETA_TEMPORADA: Record<(typeof TEMPORADAS)[number], string> = {
+  todo_el_ano: 'Todo el año',
+  lluvias: 'Lluvias',
+  seca: 'Seca',
+}
+
+/** «Todo el año» for `todo_el_ano`, etc.; falls back to the raw value rather than crashing. */
+export function etiquetaTemporada(valor: string): string {
+  return ETIQUETA_TEMPORADA[valor as (typeof TEMPORADAS)[number]] ?? valor
+}
 
 function esTemporada(valor: string | undefined): valor is TemporadaActual {
   return TEMPORADAS_OPERATIVAS.includes(valor as TemporadaActual)

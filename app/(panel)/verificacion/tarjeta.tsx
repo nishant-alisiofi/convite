@@ -6,7 +6,7 @@ import {
   InsigniaSinClasificar,
   InsigniaTranscrito,
 } from '@/components/insignias'
-import type { FiltroTipo, FilaBandeja } from '@/lib/verificacion/bandeja'
+import { confianzaAlta, type FiltroTipo, type FilaBandeja } from '@/lib/verificacion/bandeja'
 import type { RutaAfectada } from '@/lib/verificacion/danos'
 
 /**
@@ -156,7 +156,18 @@ export default function Tarjeta({
                   <span className="text-barro-700">¿Qué dice en realidad?</span>
                   <input
                     name="texto"
-                    defaultValue={a.transcripcionCorregida ?? a.transcripcion ?? ''}
+                    // D2: only pre-fill the machine's guess when it is confident enough to be a
+                    // starting point. Below the threshold the field is left blank so a tired
+                    // verifier transcribes what they hear instead of signing the guess.
+                    defaultValue={
+                      a.transcripcionCorregida ??
+                      (confianzaAlta(a.transcripcionConfianza) ? (a.transcripcion ?? '') : '')
+                    }
+                    placeholder={
+                      a.transcripcionCorregida || confianzaAlta(a.transcripcionConfianza)
+                        ? undefined
+                        : 'Escriba lo que oiga: la máquina no está segura.'
+                    }
                     className="mt-1 w-full rounded border border-barro-200 bg-white px-2 py-1.5 text-sm"
                   />
                 </label>
@@ -243,6 +254,7 @@ export default function Tarjeta({
               </button>
             </form>
           ) : (
+            <>
             <div className="flex flex-wrap items-end gap-3">
               {r.tipo === 'necesidad' && r.entregable && !faltaDetalle && (
                 <form action={accion} className="flex flex-wrap items-end gap-2">
@@ -287,6 +299,44 @@ export default function Tarjeta({
                 Marcar duplicado
               </Link>
             </div>
+
+            {/* D3: the proposed category is a separate error from the transcript — a perfect
+                transcript can still carry the wrong codigo_item — so it is correctable on its
+                own. `clasificar` sets it and keeps the machine's original read aside. */}
+            <details className="mt-3 text-sm">
+              <summary className="cursor-pointer text-barro-600">¿La categoría está mal?</summary>
+              <form action={accion} className="mt-2 flex flex-wrap items-end gap-2">
+                <input type="hidden" name="accion" value="clasificar" />
+                <input type="hidden" name="reporteId" value={r.id} />
+                <label className="text-sm">
+                  <span className="text-barro-700">Corregir a</span>
+                  <select
+                    name="codigoItem"
+                    required
+                    defaultValue={r.codigoItem ?? ''}
+                    className="mt-1 block rounded border border-barro-200 bg-white px-2 py-1.5 text-sm"
+                  >
+                    <option value="">…</option>
+                    {catalogo.map((ci) => (
+                      <option key={ci.codigo} value={ci.codigo}>
+                        {ci.codigo} · {ci.item_label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button
+                  type="submit"
+                  className="rounded border border-barro-200 bg-white px-3 py-1.5 text-sm text-barro-800"
+                >
+                  Corregir categoría
+                </button>
+              </form>
+              <p className="mt-1 text-xs text-barro-500">
+                La máquina propuso «{r.item ?? r.codigoItem ?? 'sin ítem'}». Corregir la categoría
+                no toca la transcripción, y la propuesta original queda registrada.
+              </p>
+            </details>
+            </>
           )}
 
           {abriendoDuplicado && (

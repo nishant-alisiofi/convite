@@ -41,7 +41,7 @@ const CANALES = [
     titulo: 'WhatsApp',
     condicion: 'Donde hay datos',
     texto:
-      'Lista de opciones, notas de voz, foto y ubicación. En los planes prepago del país no consume saldo.',
+      'Lista de opciones, notas de voz, foto y ubicación. En la mayoría de los paquetes prepago del país, los mensajes de WhatsApp no consumen datos. Si no hay paquete activo, la llamada perdida siempre funciona.',
   },
   {
     icono: Smartphone,
@@ -55,7 +55,7 @@ const CANALES = [
     titulo: 'Llamada perdida',
     condicion: 'Con cero saldo',
     texto:
-      'La persona marca y cuelga; el sistema devuelve la llamada. Sin saldo y con una raya de señal, se puede pedir ayuda. También sirve a quien no lee.',
+      'La persona solo marca; el sistema devuelve la llamada. Sin saldo y con una raya de señal, se puede pedir ayuda. También sirve a quien no lee.',
   },
   {
     icono: Radio,
