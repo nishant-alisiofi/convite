@@ -206,7 +206,7 @@ export async function middleware(request: NextRequest) {
     const destino = request.nextUrl.clone()
     destino.pathname = '/entrar'
     destino.searchParams.set('desde', ruta)
-    return NextResponse.redirect(destino)
+    return marcarNoIndexable(NextResponse.redirect(destino))
   }
 
   // Nothing behind a session is ever cached: a shared cache holding a coordinator's screen is
@@ -217,7 +217,11 @@ export async function middleware(request: NextRequest) {
     respuesta.headers.set('Cache-Control', 'private, no-store')
   }
 
-  return respuesta
+  // Pre-launch / staging: keep the whole surface out of search indexes when
+  // CONVITE_NOINDEX=1. This has to run on the NORMAL path too — not only the
+  // auth-not-configured branch above — or a healthy deploy never sends the header
+  // (BUG-41: the landing at `/` was indexable on production).
+  return marcarNoIndexable(respuesta)
 }
 
 export const config = {
