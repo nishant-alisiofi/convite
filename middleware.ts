@@ -39,6 +39,12 @@ export const PUBLICAS = [
   '/api/webhooks',
   '/api/jobs',
   '/api/salud',
+  // §28.1 (PRD-34): the .ics Agenda feed. A calendar app subscribing to it holds no session
+  // cookie, so gating it behind one would 307 the subscription to a login page it cannot use.
+  // The per-membership token in the URL is the access control — the handler fails closed (404)
+  // on a missing, tampered, expired or offboarded token — so opening the door here opens nothing
+  // behind it. Classified `autenticada` in tests/superficie.test.ts: a stranger gets no data.
+  '/api/agenda',
   // The aggregate response page. The landing at `/` is public via the `ruta === '/'` clause
   // below; this covers the page it links to.
   '/respuesta',
