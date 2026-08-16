@@ -61,3 +61,38 @@ PRD v3 **§26** ("Offline") reframes this specifically as **transporter bundles*
 Add to scope: **run-scoped, encrypted, expiring bundles** (manifest + ordered stops + confirmation
 codes + corridor tiles), distinct from the general per-territory basemap bundle already scoped above.
 Cross-ref PRD-16 (§29.6 offboarding cancels the run), PRD-32 (the run/manifest comes from planning).
+
+---
+
+## Implementation — first version (2026-08-16)
+
+Ships the **basemap half** (the per-territory offline basemap), honest about what is deferred.
+
+**In this version**
+- **PMTiles basemap MapLibre reads offline.** `lib/mapa/pmtiles.ts` registers the `pmtiles://`
+  protocol and composes a **label-free vector** style (water/land/roads/boundaries — no symbol
+  layers, so no glyph server, matching the existing constraint) UNDER the honest geometry, exactly
+  like `basemap.ts` does with OSM. The pure, tested `lib/mapa/capas.ts` is untouched, so the "no
+  tile source in the pure layer" invariant (`tests/mapa.test.ts`) still holds.
+- **Offline-capable view.** `app/(panel)/mapa-offline/` + a service worker (`public/sw.js`) that
+  caches the shell, static assets and the PMTiles archive — answering each `Range` request from
+  the cached whole file so the basemap draws with no connection. Manifest at
+  `public/manifest.webmanifest`.
+- **GPS dot with «buscando señal».** `watchPosition` paints a live blue dot + a real-radius
+  accuracy halo; the first-fix state reads «Buscando señal…». GPS needs no connection.
+- **Build script + artifact location.** `scripts/construir-pmtiles.sh` builds a per-territory
+  extract from the free Protomaps/OSM build into `$DATA_DIR/pmtiles/` (operational data, gitignored)
+  and copies to `public/mapa/` (gitignored). No paid provider, no key. Config via
+  `NEXT_PUBLIC_PMTILES_URL`. Full guide: `docs/mapas-offline.md`. **No migration** (no manifest
+  table needed yet).
+- Online panel map unchanged where no bundle is configured (default): `estiloDeMapa` falls back to
+  OSM raster, so precision honesty and the online map are byte-for-byte as before.
+
+**Deferred (noted, not faked) — needs device work + follow-up (§26):** run-scoped bundle
+(manifest + ordered stops + confirmation codes + corridor tiles), encryption at rest, expiry on
+completion, remote wipe. `/mapa-offline` states this on screen.
+
+**Verification:** typecheck clean; `pnpm build` compiles; new `tests/mapa-offline.test.ts`
+(basemap composition + honesty invariant + OSM fallback) and existing `tests/mapa.test.ts` green;
+SW range-slice math verified. Full offline PMTiles render needs a built `.pmtiles` artifact (the
+`pmtiles` CLI) + a device/DevTools-offline pass — steps in `docs/mapas-offline.md`.

@@ -1,0 +1,11 @@
+{
+  "name": "Convite — Mapa sin conexión",
+  "short_name": "Convite Mapa",
+  "description": "El mapa del territorio para usar en campo sin señal.",
+  "start_url": "/mapa-offline",
+  "scope": "/mapa-offline",
+  "display": "standalone",
+  "background_color": "#f2efe9",
+  "theme_color": "#1f5c4a",
+  "lang": "es-CO"
+}

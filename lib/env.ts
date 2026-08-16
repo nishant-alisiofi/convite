@@ -51,6 +51,15 @@ const schema = z.object({
   /** Root for downloaded media. Falls back to ./.data; never inside the repo in production. */
   DATA_DIR: z.string().min(1).optional(),
 
+  /**
+   * Where the offline PMTiles basemap archive is served from (PRD-13 / §26), e.g.
+   * `/mapa/choco.pmtiles`. Absent: the map uses the online OSM raster and there is no offline
+   * basemap. Set it once a bundle is built (`scripts/construir-pmtiles.sh`) and placed under
+   * `public/mapa/`. `NEXT_PUBLIC_` because the map reads it in the browser; the archive is a
+   * public static file with no key, so exposing the path is fine.
+   */
+  NEXT_PUBLIC_PMTILES_URL: z.string().min(1).optional(),
+
   APP_BASE_URL: z.string().url().default('http://localhost:3000'),
 })
 

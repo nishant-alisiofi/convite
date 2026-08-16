@@ -36,3 +36,7 @@ supabase/.temp/
 
 # Local media store fallback when DATA_DIR is unset
 .data/
+
+# Offline basemap archives (PRD-13): operational data, built by scripts/construir-pmtiles.sh
+# and copied here for local serving. Never versioned — can be tens of MB. See docs/mapas-offline.md
+/public/mapa/*.pmtiles

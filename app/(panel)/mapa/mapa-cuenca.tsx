@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type { DatosMapa } from '@/lib/mapa/datos'
 import { etiquetaTramo } from '@/lib/mapa/datos'
-import { estiloConBasemap } from '@/lib/mapa/basemap'
+import { estiloDeMapa, registrarProtocoloPmtiles } from '@/lib/mapa/pmtiles'
 import { figurasDe, fuentesYCapas, limitesDe } from '@/lib/mapa/capas'
 import {
   agregarSeleccion,
@@ -259,6 +259,9 @@ export default function MapaCuenca({ datos, planificacion, fase = 'emergencia', 
     let cancelado = false
 
     async function iniciar() {
+      // Registers the pmtiles:// protocol only when an offline bundle is configured; a no-op
+      // otherwise, so the online OSM path is unchanged where no bundle exists (PRD-13).
+      await registrarProtocoloPmtiles()
       const {
         Map: MapaGL,
         Marker,
@@ -271,9 +274,10 @@ export default function MapaCuenca({ datos, planificacion, fase = 'emergencia', 
 
       const figuras = figurasDe(datos)
       const limites = limitesDe(figuras, datos.tramos)
-      // Data sources and layers come from lib/mapa/capas.ts (pure, tile-free). The OSM
-      // basemap is composed on top of that here, slipped UNDER the circles and connectors.
-      const estilo = estiloConBasemap(fuentesYCapas(figuras, datos.tramos))
+      // Data sources and layers come from lib/mapa/capas.ts (pure, tile-free). The basemap is
+      // composed on top of that here, slipped UNDER the circles and connectors: the offline
+      // PMTiles bundle when one is configured, the online OSM raster otherwise (PRD-13).
+      const estilo = estiloDeMapa(fuentesYCapas(figuras, datos.tramos))
 
       const m = new MapaGL({
         container: contenedor.current,
