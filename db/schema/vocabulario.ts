@@ -51,9 +51,17 @@ export const TIPOS_COMUNIDAD = [
   'consejo_comunitario',
 ] as const
 
-export const CANALES = ['whatsapp', 'sms', 'ivr', 'radio', 'papel', 'web'] as const
+/**
+ * §29.3b: `manual` is the zeroth channel (PRD-35). Stage-0 setup must work with no channel
+ * at all — once the data agreement is signed, a coordinator types in reports they are already
+ * receiving by phone, on paper, or in their own WhatsApp group. Every such record carries
+ * `canal = 'manual'` with the person who entered it (in `reportes.payload_crudo`); a live
+ * channel attaches later as verification clears, and nothing already entered changes. Like
+ * `web`, it is a staff-only channel, so it is not a contact preference.
+ */
+export const CANALES = ['whatsapp', 'sms', 'ivr', 'radio', 'papel', 'web', 'manual'] as const
 
-/** Channels a contact can be reached on. `web` is staff-only, so it is not a preference. */
+/** Channels a contact can be reached on. `web` and `manual` are staff-only, not preferences. */
 export const CANALES_PREFERIDOS = ['whatsapp', 'sms', 'ivr', 'radio', 'papel'] as const
 
 export const TIPOS_REPORTE = ['necesidad', 'dano'] as const

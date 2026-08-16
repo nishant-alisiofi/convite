@@ -82,6 +82,13 @@ const POLITICA: Record<string, 'publica' | 'autenticada'> = {
   // PRD-11 radio ingestion: attestation management and the manual relay intake. Behind a
   // session; radio is off per community until a coordinator attests, and RLS is the boundary.
   '/radio': 'autenticada',
+  // PRD-35 (§29.3b) the three deferred pieces. The manual zeroth channel (keying in reports
+  // before any channel exists), the shared-gazetteer correction desk, and the aggregate
+  // coordination read layer. All behind a session; each writes through a gated SECURITY DEFINER
+  // door or reads aggregate-only facts, and RLS is the boundary like the rest of the panel.
+  '/manual': 'autenticada',
+  '/registro': 'autenticada',
+  '/coordinacion': 'autenticada',
   // PRD-8 transport of people + PRD-9 funded local purchase. Behind a session; RLS is the
   // boundary (traslados carries PII behind the floor; local purchase is a traceability chain).
   '/traslados': 'autenticada',
