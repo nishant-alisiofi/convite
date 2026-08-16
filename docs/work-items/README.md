@@ -74,10 +74,10 @@ Validate on `staging.convite.ai` (D7/D8 are on the public surface, no login).
 
 | ID | Title | Type | Source | Priority | Status |
 |----|-------|------|--------|----------|--------|
-| [BUG-39](BUG-39-mapa-sin-capas-de-datos.md) | Map data overlays don't render over the OSM basemap | BUG | Codex pass 1 | P1 | Fix in progress |
-| [BUG-40](BUG-40-emparejador-no-corre-al-promover.md) | Matcher not run when a report is promoted to a pedido | BUG | Codex pass 1 | P1 | Fix in progress |
+| [BUG-39](BUG-39-mapa-sin-capas-de-datos.md) | Map data overlays don't render over the OSM basemap | BUG | Codex pass 1 | P1 | ✅ Fixed (white casings) |
+| [BUG-40](BUG-40-emparejador-no-corre-al-promover.md) | Matcher not run when a report is promoted to a pedido | BUG | Codex pass 1 | P1 | ✅ Fixed (emparejarPedido on promotion) |
 | [BUG-41](BUG-41-produccion-sin-noindex.md) | Production missing the pre-launch noindex | BUG | Codex pass 1 | P1 | ✅ Fixed (config) |
-| [PRD-39](PRD-39-unificar-comunidades-demo-registro.md) | Unify demo activity onto the real registry (dedup staging communities) | PRD | PRD-38 gap | P1 | Fix in progress |
+| [PRD-39](PRD-39-unificar-comunidades-demo-registro.md) | Unify demo activity onto the real registry (dedup staging communities) | PRD | PRD-38 gap | P1 | ✅ Done (82→68, no dupes) |
 
 ## Tier 2 — Roadmap (from PRD v1.0, not this pass)
 
