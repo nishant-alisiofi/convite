@@ -54,12 +54,22 @@ const POLITICA: Record<string, 'publica' | 'autenticada'> = {
   // Setting a password. Behind a session on purpose: that is the whole mechanism.
   '/clave': 'autenticada',
   '/mapa': 'autenticada',
+  // The three panel read views: demand-vs-stock, the community registry, and the item
+  // catalogue. All behind a session; RLS is the boundary, and each refuses the wrong role
+  // with a legible note rather than a leak.
+  '/inventario': 'autenticada',
+  '/comunidades': 'autenticada',
+  '/catalogo': 'autenticada',
   // The centre-admin team screen (§2.4) and the platform approval screen (§2.5). Both behind a
   // session; RLS is the boundary, and each also refuses the wrong role with a legible note.
   '/equipo': 'autenticada',
   '/centros': 'autenticada',
   '/rutas': 'autenticada',
   '/recogidas': 'autenticada',
+  // The first-mile pickup planner (PRD-10) and the earmarked-sponsorship desk (PRD-12). Both
+  // behind a session; each refuses the wrong role rather than leaking, like the rest of the panel.
+  '/conexion': 'autenticada',
+  '/apadrinar': 'autenticada',
   '/ajustes': 'autenticada',
   '/estado': 'autenticada',
   '/verificacion': 'autenticada',
