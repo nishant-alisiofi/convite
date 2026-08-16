@@ -43,3 +43,23 @@ Submit a voice note through the pipeline; confirm it is transcribed with no outb
 external transcription API (network egress check), the original is preserved, and it appears in
 Verificación with the transcript. Confirm the data-processor list / privacy policy no longer names
 an external transcription vendor. Never validate on production.
+
+---
+
+## PRD v3 update (2026-08-15) — §4.1.7 recording pipeline: two non-relaxable rules
+
+PRD v3 **§4.1.7** places Whisper inside the voice recording pipeline and adds **two rules that must not
+be relaxed** — add both to acceptance:
+- **Delete from the provider once we hold it.** The Ley 1581 position is that audio lives in
+  infrastructure the alliance controls; copies left on a vendor platform quietly make them a **second
+  processor** holding health-adjacent recordings. Pipeline: recording event → `GET` the file
+  (**bytestream, not a signed URL** — server-to-server, never a leakable link) → store in our storage +
+  keep the key → **`DELETE` from the provider** → **self-hosted Whisper** → transcript + confidence →
+  normalizer → `RECIBIDO` → human verification queue.
+- **Provider-side transcription stays OFF wherever it is offered.** Whisper self-hosted is the whole
+  privacy answer (§7); using the provider's transcription undoes it.
+
+Also: **multichannel recording / speaker diarization is not needed** for a single reporter speaking
+alone — it becomes relevant later for **radio nets** (PRD-11) or any call carrying a coordinator + a
+reportante together. Cross-ref **PRD-15** (§4.1 Infobip recording pipeline that hands audio to this
+engine).

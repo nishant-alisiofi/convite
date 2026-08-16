@@ -44,3 +44,18 @@ human-decided allocation model.
 Seed a funding pool + a local vendor; as coordinador/despachador, resolve a `SIN_EXISTENCIA`
 demand via a funded purchase, confirm the order + receipt, confirm the decision is logged and
 immutable, and confirm the pool ceiling/alert behaves. Never validate on production.
+
+---
+
+## PRD v3 update (2026-08-15) — §24 names this the third supply mode
+
+PRD v3 **§24** ("Supply modes and cold chain") confirms **funded local purchase** as the third supply
+mode and is ASOREDIPARCHOCÓ's **third strategy** (§30): it inverts the default — **allocate funds to a
+territorial responsible who buys near the municipality**. Less time, lower cost, local economies
+strengthened. Add its explicit **traceability chain** to acceptance: **autorización → responsable →
+recibo → verificación → distribución → evidencia fotográfica**. This matches this WI's existing
+audit/immutability requirements; make the six-step chain the concrete shape of that audit trail.
+
+Note: the other two §24 capabilities — **cold chain** (structured route constraints + a Catálogo
+storage field) and **anticipatory supply** — are a separate WI, **PRD-33**. This WI remains scoped to
+funded local purchase only.

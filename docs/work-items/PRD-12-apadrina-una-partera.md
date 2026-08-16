@@ -46,3 +46,26 @@ As an unauthenticated visitor, walk the sponsorship surface; confirm no PII/coor
 exposed (adversarial probe as with the M12 public view); commit a test sponsorship; confirm it
 lands in the funding pool and that impact is shown only in aggregate. Never validate on
 production.
+
+---
+
+## PRD v3 update (2026-08-15) — §13 (built, canonical) + two gaps (§21b.4, §21)
+
+**§13 records Apadrinar as BUILT and canonical** — this is the current behaviour, not a spec to
+re-derive: the padrino sees **a label, never the name/phone/location**; a named partera appears **only
+after consent**; **three totals** (comprometido · aplicado · disponible para compras); registration
+takes a beneficiary **label** («Partera del Atrato medio»), optional community, sponsor, type,
+recurrence, purpose, amount, and a **consent checkbox mandatory when a named community is selected**;
+**empty community = fondo común** (the correct default). Preserve all of this exactly.
+
+**Two gaps remain (v3), both dependencies, not core Apadrinar:**
+- **§21b.4 — sponsor a *programa*, not only a beneficiary.** Apadrinamientos must also fund a
+  **programa** — how «apadrina una partera y su casa» scales into «financia el banco de medicamentos
+  por seis meses». Same consent rules (label + programa, never a name); programa-level totals mirror
+  the three already built. Built in **PRD-31** (programas); this WI's funding model feeds it.
+- **§21 — nothing to price yet.** A sponsor cannot fund a house until someone has **costed** it: level
+  2 (bill of materials, **PRD-29**) is the missing link. Apadrinar is otherwise built; §21 level 2
+  unblocks «apadrina una partera y su casa».
+
+Status: core sponsorship built; **programa-funding (PRD-31)** and **house-pricing via §21 (PRD-29)**
+are the outstanding pieces. Cross-ref PRD-9 (funding pool), PRD-29, PRD-31.

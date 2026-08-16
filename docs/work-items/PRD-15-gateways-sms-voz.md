@@ -52,3 +52,68 @@ With the live aggregator configured on staging, send a real SMS and place a real
 a test handset; confirm each lands normalized with the right channel tag, replies work, and the
 spend caps trip correctly. Never validate on production. (Live traffic requires the entity/number/
 provider decisions D2/D3.)
+
+---
+
+## PRD v3 update (2026-08-15) — §4.1 + §20: provider decision, missed-call callback, adaptive layer
+
+PRD v3 makes the provider and callback decisions this WI left open, and elevates the missed-call
+callback to **non-negotiable, in-pilot, not deferred** (§4.1: "without it, Convite is a WhatsApp
+bot"). Fold the following into scope/acceptance.
+
+**Provider (§4.1.6):** **Voice + SMS → Infobip**, **WhatsApp → Meta Cloud API direct** under the
+partner's own WABA with us as Tech Provider.
+- Infobip because **early media is supported** (an announcement audible *during ringing, before answer
+  supervision*, so the caller hears «lo llamamos ya» and is **never billed** — Twilio's `<Reject>`
+  cannot do this) and **missed-call handling is a named setting**. Recordings/dialogs/media streaming
+  must be **activated by an account manager** (raise with early media + Colombian termination rates).
+- WhatsApp direct because the data-protection story rests on the partner being **responsable del
+  tratamiento** and us **encargado** (§23); a BSP inserts a third party and a per-message margin
+  (matters once service messages bill from **1 Oct 2026**). **Numbers cannot be consolidated** — a
+  WhatsApp-registered number can't be used for voice/SMS, so they are separate numbers regardless.
+
+**Missed-call callback (§4.1.1–4.1.4):** respond to the inbound leg with **busy before answer
+supervision** → the call never completes → the caller is never charged. **Copy: «solo marque», never
+«marque y cuelgue»** (see BUG-26). This is the ZipDial pattern; **the system disconnects, not the
+caller.** It is **outbound-initiated recording**, not voicemail. Callback = **one short prompt then
+record**, **at most one menu level** (zero is acceptable), **prompts recorded in a local voice, not
+TTS**, folio read back **digit by digit**; the registration number is **never behind an IVR**.
+
+**Spend caps *before* the first live call (§4.1.5):** **2 callbacks/number/30 min · 5/day · a global
+daily minute ceiling with automatic shutoff · coordinator alert at 70%.** Enforce the ceiling as a
+**platform backstop** underneath our own per-number caps (on Infobip's equivalent of Twilio Usage
+Triggers) so a bug in our queue cannot run an unbounded bill.
+
+**Recording pipeline (§4.1.7):** `CALL_RECEIVED → reject before answer` → callback → prompt → record →
+recording event → `GET` bytestream (not a URL) → store + key → **`DELETE` from provider** → **self-
+hosted Whisper (PRD-14)** → normalizer → `RECIBIDO` → verification queue. Provider-side transcription
+**off**. (See PRD-14 for the two non-relaxable rules.)
+
+**Adaptive link quality (§20 + §4.1.2):** a **per-contact profile** from delivery callbacks, media
+success rate, receipt lag and hour-of-day, driving **two policy functions — what to invite, and how to
+reply**. **The confirmation channel need not be the intake channel.** Reply routing: SMS-history/reads
+→ **SMS reply** (fractions of a cent); no literacy or no SMS reply → **voice callback** (expensive, the
+reason the channel exists); unknown/first contact → **SMS first, callback if no reply within a window**.
+This cuts the voice bill while keeping the guarantee for those who need voice.
+
+**Discretion in outbound (§20):** the **default confirmation carries the folio and nothing else** — no
+condition, no cita type on a screen someone else may see.
+
+**"Verify what is real" (§20) — a pre-pilot acceptance gate:** channel tags (`SMS`, `llamada perdida`,
+`radio`) appear on **seeded** records; before the pilot, **confirm which are actually wired end to
+end.** Steps 5–8 of the sequence (§32) are the ingestion core and **ship together** — a deployment
+with only WhatsApp reaches tier 1 and stops. Add an explicit **channel-reality checklist** as a gate:
+each claimed channel is either genuinely wired or clearly marked seed-only.
+
+**Also add:** **SMS long code** from an aggregator (most robust under weak signal; the adaptive layer
+depends on it) and **AMD on the outbound leg**.
+
+**Pilot prerequisites (§32), dependency-ordered:** Meta business-portfolio verification (**longest
+pole**; unverified caps at 250 unique contacts/24h) · **a new SIM, never an existing staff line**
+(registration deletes the existing profile; no trial) · utility templates submitted · **a Colombian
+voice number + regulatory bundle from Infobip** with recordings + early media activated by their
+account team (started in parallel with the Meta trámite).
+
+Cross-ref **PRD-14** (Whisper in the pipeline), **PRD-11** (radio audio through the same pipeline),
+**PRD-10** (connection-point origin informs reply routing), **FR-17** (§27b.2 reachability window
+reuses the learned activity profile).
