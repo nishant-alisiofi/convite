@@ -6,6 +6,8 @@ import { cargarMapa, etiquetaTramo } from '@/lib/mapa/datos'
 import type { Borrador, Fase } from '@/lib/mapa/planificacion'
 import { cargarPlanificacion } from '@/lib/mapa/planificacion-datos'
 import { representacionDe } from '@/lib/mapa/precision'
+import { EstadoVacio } from '@/components/estado-vacio'
+import { IntroColapsable } from '@/components/intro-colapsable'
 import { conSesion, sesionActual } from '@/lib/sesion'
 import { temporadaVigente } from '@/lib/temporada'
 import MapaCuenca from './mapa-cuenca'
@@ -162,11 +164,27 @@ export default async function Mapa({ searchParams }: { searchParams: Params }) {
         </p>
       )}
 
-      <p className="mt-2 max-w-3xl text-sm text-barro-700">
+      <IntroColapsable
+        id="mapa"
+        unaLinea="Los círculos son el margen de error, no el tamaño de la comunidad."
+      >
         Los círculos son el margen de error de cada ubicación, no el tamaño de la comunidad.
         Hoy {conPin === 0 ? 'ninguna comunidad tiene punto exacto' : `${conPin} tienen punto exacto`}:
         el resto son centroides de gazetteer y se dibujan como tales.
-      </p>
+      </IntroColapsable>
+
+      {datos.comunidades.length === 0 && (
+        <div className="mt-4">
+          <EstadoVacio
+            titulo="No hay comunidades registradas todavía"
+            href="/comunidades"
+            accion="Registrar la primera comunidad"
+          >
+            El mapa dibuja las comunidades y los tramos entre ellas. Sin ninguna registrada no hay
+            nada que ubicar — empiece por registrarlas.
+          </EstadoVacio>
+        </div>
+      )}
 
       <div className="mt-4">
         <MapaCuenca

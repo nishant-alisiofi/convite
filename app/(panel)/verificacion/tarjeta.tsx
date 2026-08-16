@@ -6,6 +6,7 @@ import {
   InsigniaSinClasificar,
   InsigniaTranscrito,
 } from '@/components/insignias'
+import { Termino } from '@/components/termino'
 import { confianzaAlta, type FiltroTipo, type FilaBandeja } from '@/lib/verificacion/bandeja'
 import type { RutaAfectada } from '@/lib/verificacion/danos'
 
@@ -299,6 +300,13 @@ export default function Tarjeta({
                 Marcar duplicado
               </Link>
             </div>
+
+            {/* §29b.6: the one disambiguation nothing on this screen explains — when to pick the
+                first button over the second. One sentence each, on the term itself. */}
+            <p className="mt-2 text-xs text-barro-500">
+              ¿Cuándo <Termino clave="solo_verificar">Solo verificar</Termino> y cuándo{' '}
+              <Termino clave="verificar_y_crear_pedido">Verificar y crear pedido</Termino>?
+            </p>
 
             {/* D3: the proposed category is a separate error from the transcript — a perfect
                 transcript can still carry the wrong codigo_item — so it is correctable on its

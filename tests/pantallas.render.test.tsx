@@ -356,6 +356,21 @@ conBase('cada pantalla del panel se dibuja con datos reales', () => {
     sinEntrañas(marcado, 'estado')
   })
 
+  it('la configuración inicial', async () => {
+    const { default: Configuracion } = await import('@/app/(panel)/configuracion-inicial/page')
+    const marcado = await pintar('configuracion-inicial', Configuracion as never, {
+      searchParams: Promise.resolve({}),
+    })
+    expect(marcado).toContain('Configuración inicial')
+    // The three contexts and the sentence-based role model are always on the page.
+    expect(marcado).toContain('Operar')
+    expect(marcado).toContain('Quién ve qué')
+    // The seed leaves the two acknowledgements unset, so their steps render pending — proof the
+    // checklist derives state rather than assuming it.
+    expect(marcado).toContain('Acuerdo de datos firmado')
+    sinEntrañas(marcado, 'configuracion-inicial')
+  })
+
   it('el mapa', async () => {
     const { default: Mapa } = await import('@/app/(panel)/mapa/page')
     const marcado = await pintar('mapa', Mapa as never, { searchParams: Promise.resolve({}) })
