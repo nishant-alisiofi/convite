@@ -124,15 +124,27 @@ export function fuentesYCapas(figuras: Figuras, tramos: readonly TramoMapa[]) {
 
   const capas: Record<string, unknown>[] = [
     { id: 'fondo', type: 'background', paint: { 'background-color': '#f2efe9' } },
+    // A light casing UNDER the connector so it reads over the OSM basemap — a road, a river,
+    // dark forest — instead of dissolving into it. The tint-and-thin overlays were drawn for
+    // the old flat background; once real tiles sit below them (basemap.ts), a 1.5 px muted
+    // dashed line is invisible, and the screen looks like it lost its own data. Casings fix
+    // that without a colour becoming a claim: they are white, not a fifth state hue.
+    {
+      id: 'tramos-casing',
+      type: 'line',
+      source: 'tramos',
+      paint: { 'line-color': '#ffffff', 'line-width': 4, 'line-opacity': 0.9 },
+    },
     {
       id: 'tramos-linea',
       type: 'line',
       source: 'tramos',
       // Schematic, and drawn to look it. Section 7.3: we hold no channel geometry, so a
-      // solid line would be a claim about the path that we cannot make.
+      // solid line would be a claim about the path that we cannot make. Kept dashed; only
+      // widened so the schematic connector is legible on top of the basemap.
       paint: {
         'line-color': ['case', ['get', 'activa'], '#8a6229', '#c9c2b8'],
-        'line-width': 1.5,
+        'line-width': 2,
         'line-dasharray': [3, 2],
       },
     },
@@ -149,15 +161,30 @@ export function fuentesYCapas(figuras: Figuras, tramos: readonly TramoMapa[]) {
         id: `circulos-${trazo}-relleno`,
         type: 'fill',
         source: `circulos-${trazo}`,
-        paint: { 'fill-color': ['get', 'color'], 'fill-opacity': 0.12 },
+        // Raised from 0.12: over the OSM basemap a 12% tint is invisible. 0.2 still reads as
+        // a translucent margin-of-error area you can see the ground through — not a solid
+        // footprint (2.2: the circle is uncertainty, not the size of the place).
+        paint: { 'fill-color': ['get', 'color'], 'fill-opacity': 0.2 },
+      },
+      // A white casing under the coloured ring. Solid (no dash) on purpose: the gaps in the
+      // dashed/dotted ring above then fall on white, which is what keeps a dashed ring
+      // readable over a photographic tile. It lifts the ring off the basemap without adding
+      // a colour that could be mistaken for a state.
+      {
+        id: `circulos-${trazo}-casing`,
+        type: 'line',
+        source: `circulos-${trazo}`,
+        paint: { 'line-color': '#ffffff', 'line-width': 3.5, 'line-opacity': 0.9 },
       },
       {
         id: `circulos-${trazo}-borde`,
         type: 'line',
         source: `circulos-${trazo}`,
+        // The dash pattern still carries the confidence (solid → dashed → dotted); only the
+        // width grew so the ring holds up against the basemap detail beneath it.
         paint: {
           'line-color': ['get', 'color'],
-          'line-width': 1.5,
+          'line-width': 2,
           ...(guion ? { 'line-dasharray': guion } : {}),
         },
       },
@@ -170,10 +197,12 @@ export function fuentesYCapas(figuras: Figuras, tramos: readonly TramoMapa[]) {
       id: 'pines-punto',
       type: 'circle',
       source: 'pines',
+      // The exact fix is the one shape allowed to be a dot (2.2). A slightly wider white ring
+      // keeps that dot legible on top of the basemap, the same casing idea as the circles.
       paint: {
         'circle-radius': 5,
         'circle-color': ['get', 'color'],
-        'circle-stroke-width': 1.5,
+        'circle-stroke-width': 2,
         'circle-stroke-color': '#ffffff',
       },
     })

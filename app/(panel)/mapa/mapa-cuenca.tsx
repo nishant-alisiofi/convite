@@ -95,8 +95,11 @@ export default function MapaCuenca({ datos }: Props) {
           if (c.lat === null || c.lon === null) continue
           const el = document.createElement('span')
           el.textContent = c.nombre
+          // Opaque enough, and lifted with a hairline ring + shadow, so the name reads on top
+          // of the OSM basemap instead of washing into it. The tile detail below is why the
+          // old bg-white/85 label needed strengthening once a real basemap sat under it.
           el.className =
-            'pointer-events-none rounded bg-white/85 px-1 text-[11px] font-medium text-barro-800'
+            'pointer-events-none rounded bg-white/95 px-1 text-[11px] font-medium text-barro-900 shadow-sm ring-1 ring-black/10'
           // Hung below the point: centred, the label box is wider than a 1000 m circle at
           // basin zoom and hides the very thing the circle is there to show.
           new Marker({ element: el, anchor: 'top', offset: [0, 7] })
@@ -107,7 +110,10 @@ export default function MapaCuenca({ datos }: Props) {
         for (const t of datos.tramos) {
           const el = document.createElement('span')
           el.textContent = etiquetaTramo(t)
-          el.className = 'pointer-events-none rounded bg-barro-50/80 px-1 text-[10px] text-barro-600'
+          // Same treatment as the community labels, kept barro-tinted so a connector's time
+          // still reads as a different kind of label from a community's name.
+          el.className =
+            'pointer-events-none rounded bg-barro-50/95 px-1 text-[10px] text-barro-700 shadow-sm ring-1 ring-black/10'
           new Marker({ element: el })
             .setLngLat([(t.origenLon + t.destinoLon) / 2, (t.origenLat + t.destinoLat) / 2])
             .addTo(m)
