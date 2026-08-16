@@ -30,6 +30,10 @@ import {
   type NecesidadSemilla,
 } from '@/db/seed/operacion'
 import { RUTAS_DEMO, RUTAS_SEMILLA } from '@/db/seed/rutas'
+import { PUNTOS_CONEXION_DEMO } from '@/db/seed/conexion'
+import { APADRINAMIENTOS_DEMO } from '@/db/seed/apadrinamiento'
+import { CENTRO_PENDIENTE_DEMO } from '@/db/seed/centros'
+import { aplicarFondos, crearApadrinamiento } from '@/lib/apadrinamiento'
 import { crearEnvio, despachar, ordenarPorRecorrido, ponerParada } from '@/lib/despacho/plan'
 import { emparejar } from '@/lib/matching/persistencia'
 import { temporadaVigente } from '@/lib/temporada'
@@ -67,6 +71,10 @@ async function main() {
     await sembrarCapacidades(client, contactos, nodos, comunidades)
     await sembrarOfertas(client, contactos)
     await sembrarVoluntarios(client, contactos, nodos)
+    // Runs after sembrarReportes: the sponsorships apply funds to pedidos it created.
+    await sembrarPuntosConexion(client, organizacionId, comunidades)
+    await sembrarApadrinamientos(client, organizacionId, comunidades)
+    await sembrarCentroPendiente(client)
 
     await client.query('commit')
   } catch (error) {
@@ -749,6 +757,235 @@ async function sembrarVoluntarios(
 }
 
 /**
+ * §5.9 — Connection points, the "where can I go" surface. STAGING ONLY.
+ *
+ * Kept SEPARATE from `nodos` on purpose (§5.9): supply and connectivity never merge, so the one
+ * place a person runs both never hides it. Each point declares its own location source and radius
+ * (2.2) — a GPS pin, a staff-placed radius, or no location at all when it is known by name before
+ * anyone pinned it. Name and note are marked so a partner walking staging cannot mistake a demo
+ * point for a surveyed one. Idempotent on (organizacion_id, nombre).
+ */
+async function sembrarPuntosConexion(
+  client: PoolClient,
+  organizacionId: string,
+  comunidades: Map<string, string>,
+): Promise<void> {
+  for (const p of PUNTOS_CONEXION_DEMO) {
+    const tieneUbicacion = p.lat !== undefined && p.lon !== undefined
+    const { rows } = await client.query<{ id: string }>(
+      `insert into puntos_conexion (
+         organizacion_id, nombre, tipo,
+         ubicacion, ubicacion_fuente, ubicacion_precision_m,
+         tiene_senal, internet_disponible, vende_pines, atendido,
+         seguridad, privacidad, permanencia, accesibilidad, energia, costo,
+         notas
+       ) values (
+         $1, $2, $3,
+         case when $4::double precision is null then null
+              else st_setsrid(st_makepoint($4, $5), 4326) end,
+         $6, $7,
+         $8, $9, $10, $11,
+         $12, $13, $14, $15, $16, $17,
+         $18
+       )
+       on conflict (organizacion_id, nombre) do update set
+         tipo = excluded.tipo,
+         ubicacion = excluded.ubicacion,
+         ubicacion_fuente = excluded.ubicacion_fuente,
+         ubicacion_precision_m = excluded.ubicacion_precision_m,
+         tiene_senal = excluded.tiene_senal,
+         internet_disponible = excluded.internet_disponible,
+         vende_pines = excluded.vende_pines,
+         atendido = excluded.atendido,
+         seguridad = excluded.seguridad,
+         privacidad = excluded.privacidad,
+         permanencia = excluded.permanencia,
+         accesibilidad = excluded.accesibilidad,
+         energia = excluded.energia,
+         costo = excluded.costo,
+         notas = excluded.notas
+       returning id`,
+      [
+        organizacionId,
+        marcado(p.nombre),
+        p.tipo,
+        tieneUbicacion ? p.lon : null,
+        tieneUbicacion ? p.lat : null,
+        tieneUbicacion ? (p.ubicacionFuente ?? null) : null,
+        tieneUbicacion ? (p.ubicacionPrecisionM ?? null) : null,
+        p.tieneSenal,
+        p.internetDisponible,
+        p.vendePines,
+        p.atendido,
+        p.seguridad,
+        p.privacidad,
+        p.permanencia,
+        p.accesibilidad,
+        p.energia,
+        p.costo,
+        marcado(p.notas),
+      ],
+    )
+    const puntoId = rows[0]!.id
+
+    for (const codigo of p.comunidades) {
+      const comunidadId = comunidades.get(codigo)
+      if (!comunidadId) throw new Error(`Punto ${p.nombre}: comunidad ${codigo} desconocida.`)
+      await client.query(
+        `insert into puntos_conexion_comunidades (punto_id, comunidad_id)
+           values ($1, $2)
+         on conflict (punto_id, comunidad_id) do nothing`,
+        [puntoId, comunidadId],
+      )
+    }
+  }
+}
+
+/**
+ * PRD-12 «Apadrina una partera». STAGING ONLY.
+ *
+ * Records the demo sponsorships and their funding trace through the real lib helpers, so the
+ * insert path (and the RLS-signed `creado_por` / `aplicado_por`) is the same one the panel uses.
+ * `creado_por` is the seeded coordinador. Idempotent: the seed key lives in `notas`, and if a
+ * sponsorship is already present its assignments are too (both are written in one transaction).
+ *
+ * The consent invariant (a named community cannot be `activo` without consent) is satisfied by
+ * `consentimiento: true` on every named-community row; the pool carries no community and needs
+ * none. The database enforces it regardless (apadrinamientos_consentida_check).
+ */
+async function sembrarApadrinamientos(
+  client: PoolClient,
+  organizacionId: string,
+  comunidades: Map<string, string>,
+): Promise<void> {
+  const { rows: coord } = await client.query<{ id: string }>(
+    `select id from usuarios where rol_staff = 'coordinador' order by creado_en limit 1`,
+  )
+  const actorId = coord[0]?.id
+  if (!actorId) {
+    console.warn('\n  ⚠️  Apadrinamientos demo omitidos: no hay un coordinador sembrado.\n')
+    return
+  }
+
+  for (const a of APADRINAMIENTOS_DEMO) {
+    const notas = `${MARCA_PRUEBA} semilla:apadrinamiento-${a.semilla}`
+    const { rowCount } = await client.query(
+      'select 1 from apadrinamientos where organizacion_id = $1 and notas = $2',
+      [organizacionId, notas],
+    )
+    if (rowCount) continue
+
+    const comunidadId = a.comunidad ? (comunidades.get(a.comunidad) ?? null) : null
+    if (a.comunidad && !comunidadId) {
+      throw new Error(`Apadrinamiento ${a.semilla}: comunidad ${a.comunidad} desconocida.`)
+    }
+
+    const apadrinamientoId = await crearApadrinamiento(
+      client,
+      {
+        organizacionId,
+        comunidadId,
+        beneficiarioEtiqueta: marcado(a.beneficiarioEtiqueta),
+        padrinoNombre: marcado(a.padrinoNombre),
+        padrinoContacto: a.padrinoContacto ?? null,
+        padrinoTipo: a.padrinoTipo,
+        proposito: marcado(a.proposito),
+        montoCop: a.montoCop,
+        recurrencia: a.recurrencia,
+        consentimientoBeneficiario: a.consentimiento,
+        notas,
+      },
+      actorId,
+    )
+
+    for (const asig of a.asignaciones ?? []) {
+      const { rows: peds } = await client.query<{ id: string }>(
+        `select p.id
+           from pedidos p
+           join comunidades c on c.id = p.comunidad_id
+          where c.codigo = $1 and p.codigo_item = $2
+          order by p.creado_en
+          limit 1`,
+        [asig.comunidadPedido, asig.codigoItem],
+      )
+      const pedidoId = peds[0]?.id
+      if (!pedidoId) {
+        throw new Error(
+          `Apadrinamiento ${a.semilla}: no hay pedido ${asig.comunidadPedido}/${asig.codigoItem} que financiar.`,
+        )
+      }
+      await aplicarFondos(
+        client,
+        { apadrinamientoId, pedidoId, montoAplicadoCop: asig.montoCop, concepto: marcado(asig.concepto) },
+        actorId,
+      )
+    }
+  }
+}
+
+/**
+ * §2.4 / §4 — one centre waiting for platform approval, for the /centros screen. STAGING ONLY.
+ *
+ * A DISTINCT organisation (a community council asking to operate) in `estado_aprobacion =
+ * 'pendiente'`, its pending center-admin invitation, and the `centro.solicitado` audit row the
+ * screen reads for the applicant and zone — so the platform-admin Centros screen shows a real
+ * "waiting for approval" card whose Aprobar/Rechazar run through `convite_decidir_centro`. It is
+ * created after the partner org, so the partner stays the earliest-created org where staff land;
+ * this one has only the pending invitation. Idempotent on the org name, the invitation email and
+ * the audit action.
+ */
+async function sembrarCentroPendiente(client: PoolClient): Promise<void> {
+  const nombre = marcado(CENTRO_PENDIENTE_DEMO.nombre)
+  const { rows } = await client.query<{ id: string }>(
+    `insert into organizaciones (nombre, estado_aprobacion)
+       values ($1, 'pendiente')
+     on conflict (nombre) do nothing
+     returning id`,
+    [nombre],
+  )
+  const orgId =
+    rows[0]?.id ??
+    (
+      await client.query<{ id: string }>('select id from organizaciones where nombre = $1', [nombre])
+    ).rows[0]?.id
+  if (!orgId) throw new Error('No se pudo crear ni encontrar el centro pendiente demo.')
+
+  // `invitaciones_correo_key` is a PARTIAL unique index (where correo is not null, 0029), so a
+  // bare ON CONFLICT (correo) does not match it — a select-guard keeps the insert idempotent.
+  const { rowCount: yaHayInvitacion } = await client.query(
+    'select 1 from invitaciones_staff where correo = $1',
+    [CENTRO_PENDIENTE_DEMO.adminCorreo],
+  )
+  if (!yaHayInvitacion) {
+    await client.query(
+      `insert into invitaciones_staff (correo, rol_staff, organizacion_id, es_plataforma)
+         values ($1, 'admin', $2, false)`,
+      [CENTRO_PENDIENTE_DEMO.adminCorreo, orgId],
+    )
+  }
+
+  const { rowCount: yaHayAuditoria } = await client.query(
+    `select 1 from auditoria
+      where entidad = 'organizaciones' and entidad_id = $1 and accion = 'centro.solicitado'`,
+    [orgId],
+  )
+  if (!yaHayAuditoria) {
+    await client.query(
+      `insert into auditoria (accion, entidad, entidad_id, despues)
+         values ('centro.solicitado', 'organizaciones', $1, $2)`,
+      [
+        orgId,
+        JSON.stringify({
+          solicitante: marcado(CENTRO_PENDIENTE_DEMO.solicitante),
+          contacto: CENTRO_PENDIENTE_DEMO.contacto,
+          detalle: CENTRO_PENDIENTE_DEMO.detalle,
+        }),
+      ],
+    )
+  }
+}
+
+/**
  * The seed is realistic on purpose — real community names, real Chocoano phrasing — which is
  * exactly what makes it dangerous once it is sitting on a staging URL somebody from the
  * partner organisation might open. «Rosa Palacios, Tagachí, necesita mercados» reads as a
@@ -966,6 +1203,16 @@ async function resumen(): Promise<void> {
   `)
   console.log('\nCapa de canales y despacho:')
   for (const e of extra) console.log(`  ${e.tabla.padEnd(22)} ${e.filas}`)
+
+  const { rows: paneles } = await pool.query<{ tabla: string; filas: string }>(`
+    select 'puntos de conexión' as tabla, count(*)::text as filas from puntos_conexion
+    union all select 'apadrinamientos',       count(*)::text from apadrinamientos
+    union all select 'apadrin. activos',      count(*)::text from apadrinamientos where estado = 'activo'
+    union all select 'asignaciones de fondos', count(*)::text from apadrinamiento_asignaciones
+    union all select 'centros pendientes',    count(*)::text from organizaciones where estado_aprobacion = 'pendiente'
+  `)
+  console.log('\nPaneles §5.9 / PRD-12 / plataforma:')
+  for (const p of paneles) console.log(`  ${p.tabla.padEnd(24)} ${p.filas}`)
   console.log()
 }
 

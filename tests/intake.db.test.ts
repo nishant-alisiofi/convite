@@ -345,7 +345,12 @@ conBase('el webhook de WhatsApp', () => {
   })
 
   it('enruta por phone_number_id cuando la organización lo tiene', async () => {
-    await client.query('update organizaciones set waba_phone_number_id = $1', [PHONE_NUMBER_ID])
+    // Scoped to the operating (approved) centre: the seed now also carries a `pendiente` demo
+    // centre, and setting every org to the same phone id would trip the WABA unique index.
+    await client.query(
+      "update organizaciones set waba_phone_number_id = $1 where estado_aprobacion = 'aprobada'",
+      [PHONE_NUMBER_ID],
+    )
     await manejadorWebhookWhatsApp()(job({ webhook: WEBHOOK_TEXTO }), client)
 
     const { rows } = await client.query<{ organizacion_id: string }>(
@@ -365,7 +370,9 @@ conBase('el webhook de WhatsApp', () => {
     // entry happened to come first. Getting this wrong is not a lost message, it is one
     // partner reading another partner's community (0008).
     const { rows: primeras } = await client.query<{ id: string }>(
-      'update organizaciones set waba_phone_number_id = $1 returning id',
+      // Only the operating (approved) centre: the seed's `pendiente` demo centre must keep its
+      // null WABA id, or two rows would collide on the phone-number unique index.
+      "update organizaciones set waba_phone_number_id = $1 where estado_aprobacion = 'aprobada' returning id",
       [PHONE_NUMBER_ID],
     )
     const { rows: segundas } = await client.query<{ id: string }>(
