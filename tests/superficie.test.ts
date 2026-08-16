@@ -60,6 +60,10 @@ const POLITICA: Record<string, 'publica' | 'autenticada'> = {
   '/centros': 'autenticada',
   '/rutas': 'autenticada',
   '/recogidas': 'autenticada',
+  // §5.9 connection points (PRD-10) and §PRD-12 sponsorship: panel screens behind a session,
+  // with RLS as the boundary — the same shape as every other operational screen.
+  '/conexion': 'autenticada',
+  '/apadrinar': 'autenticada',
   '/ajustes': 'autenticada',
   '/estado': 'autenticada',
   '/verificacion': 'autenticada',
