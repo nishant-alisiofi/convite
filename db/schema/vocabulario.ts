@@ -138,6 +138,13 @@ export const FUENTES_RUTA = ['google', 'manual'] as const
 export const ESTADOS_CAPACIDAD = ['OFRECIDA', 'COMPROMETIDA', 'CANCELADA', 'COMPLETADA'] as const
 
 /**
+ * FR-18 (§29.3b): the lifecycle of a transport-capacity OFFER made by an aportante (supply side).
+ * Narrower than ESTADOS_CAPACIDAD on purpose — an offer is either standing or withdrawn; the
+ * dispatch-side commitment/completion lives on `capacidades`, not on the supply-side offer.
+ */
+export const ESTADOS_OFERTA_TRANSPORTE = ['OFRECIDA', 'RETIRADA'] as const
+
+/**
  * `SIN_CLASIFICAR` is a first-class state, not an error. «Muchas cosas!! De todo!!!» is a
  * phone call a coordinator should make, never an offer we reject (2.12, Section 9.4).
  */
@@ -272,6 +279,7 @@ export type Modo = (typeof MODOS)[number]
 export type Temporada = (typeof TEMPORADAS)[number]
 export type FuenteRuta = (typeof FUENTES_RUTA)[number]
 export type EstadoCapacidad = (typeof ESTADOS_CAPACIDAD)[number]
+export type EstadoOfertaTransporte = (typeof ESTADOS_OFERTA_TRANSPORTE)[number]
 export type EstadoOferta = (typeof ESTADOS_OFERTA)[number]
 export type EstadoMensaje = (typeof ESTADOS_MENSAJE)[number]
 export type TipoAdjunto = (typeof TIPOS_ADJUNTO)[number]
