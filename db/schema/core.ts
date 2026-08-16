@@ -22,6 +22,7 @@ import {
   ROLES_CONTACTO,
   ROLES_STAFF,
   TIPOS_COMUNIDAD,
+  TIPOS_ORGANIZACION,
 } from './vocabulario'
 
 /**
@@ -34,6 +35,13 @@ export const organizaciones = pgTable(
   {
     id: pk(),
     nombre: text('nombre').notNull(),
+    /**
+     * §29.3b: the kind of organisation in the shared registry — an anchor community network, a
+     * foundation, an arriving NGO, a donor, a transporter, a shop. Nullable, because
+     * organisations registered before this column have no type recorded; `otro` keeps the
+     * registry from ever having to reject a real org to record it. Registry typing is PRD-35.
+     */
+    tipo: text('tipo'),
     /**
      * Null until we know whose WABA we operate under. Nothing in the system requires it:
      * the messaging channel sits behind a port (lib/canales) and the simulator driver
@@ -52,6 +60,20 @@ export const organizaciones = pgTable(
      */
     estadoAprobacion: text('estado_aprobacion').notNull().default('pendiente'),
     /**
+     * §29.4: the capability ceiling the approving body sets at approval time. The organisation
+     * administers freely below it; delegation cannot escalate past it. Shape per §29.4 —
+     * comunidades_alcance, direcciones_hogar, inventario_nodo, despacho, agendamiento,
+     * evaluacion, puede_delegar. Default `{}` grants nothing (fail closed, the direction the RLS
+     * floor already fails). Enforcement is PRD-16; this column only stores the ceiling.
+     */
+    techoPermisos: jsonb('techo_permisos').notNull().default(sql`'{}'::jsonb`),
+    /**
+     * §29.3b: why this organisation was vouched into the shared registry — «X vouches for Y»,
+     * recorded so the shared accountability is auditable. The vouch workflow and revocation
+     * (which suspends the vouched org) are PRD-35; this column only records the reason.
+     */
+    avalMotivo: text('aval_motivo'),
+    /**
      * §5.7: the centre's own point on the map, from which the Recogidas run is measured. Set
      * via `convite_fijar_ubicacion_organizacion` (migration 0036), which is the only writer.
      * Non-negotiable 2.2 — a stored point never travels without its declared source and radius.
@@ -69,6 +91,10 @@ export const organizaciones = pgTable(
       .on(t.wabaPhoneNumberId)
       .where(sql`waba_phone_number_id is not null`),
     check('organizaciones_estado_aprobacion_check', enLista('estado_aprobacion', ESTADOS_APROBACION)),
+    check(
+      'organizaciones_tipo_check',
+      sql`tipo is null or ${enLista('tipo', TIPOS_ORGANIZACION)}`,
+    ),
     check(
       'organizaciones_ubicacion_declarada_check',
       sql`(ubicacion is null and ubicacion_fuente is null)
@@ -95,6 +121,13 @@ export const comunidades = pgTable(
     municipio: text('municipio').notNull(),
     /** Sub-municipal grouping used by the field team, e.g. "Atrato medio", "Vía Yuto". */
     agrupador: text('agrupador'),
+    /**
+     * §5.7: the region this community belongs to in the shared gazetteer. Nullable — a community
+     * may exist before a region is assigned, and a proposal to the shared registry (§29.3b) can
+     * arrive first. FK declared in SQL (0042) rather than here, to avoid a circular import
+     * between core.ts and territorio.ts (the same reason pedidos.oferta_sugerida does, 0011).
+     */
+    regionId: uuid('region_id'),
     ubicacion: punto('ubicacion'),
     /** Non-negotiable 2.2 — a community centroid is not a GPS pin and must not render as one. */
     ubicacionFuente: text('ubicacion_fuente').notNull().default('centroide'),
@@ -104,6 +137,13 @@ export const comunidades = pgTable(
     tierConectividad: smallint('tier_conectividad').notNull().default(2),
     /** Section 9.8: silence beyond this many days is a signal, not an absence of need. */
     intervaloChequeoDias: integer('intervalo_chequeo_dias').notNull().default(14),
+    /**
+     * §14 / §29.3b: when someone from the territory confirmed this community. NULL = unverified,
+     * and nothing seeded counts as verified until the territory says so — so this is NULL by
+     * default and stays NULL for every seeded row. The «unverified» state it drives is surfaced
+     * by the registry/Comunidades UI (PRD-28/PRD-35); this column only records the moment.
+     */
+    verificadoEn: timestamp('verificado_en', { withTimezone: true, mode: 'date' }),
     activa: boolean('activa').notNull().default(true),
     creadoEn: creadoEn(),
     actualizadoEn: actualizadoEn(),
