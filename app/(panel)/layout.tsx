@@ -28,6 +28,7 @@ const SECCIONES: {
   { href: '/inventario', etiqueta: 'Inventario' },
   { href: '/rutas', etiqueta: 'Rutas', listo: true },
   { href: '/recogidas', etiqueta: 'Recogidas', listo: true },
+  { href: '/conexion', etiqueta: 'Conexión', listo: true },
   { href: '/envios', etiqueta: 'Envíos', listo: true },
   { href: '/comunidades', etiqueta: 'Comunidades' },
   { href: '/catalogo', etiqueta: 'Catálogo' },
