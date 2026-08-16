@@ -1,3 +1,9 @@
+import {
+  dentroDeVentanaTransito,
+  exigeCadenaFrio,
+  grafoCadenaFrio,
+  nodoGuardaCadenaFrio,
+} from './cadena-frio'
 import { type Fuente, ofertasParaPedido } from './fuentes'
 import { Grafo } from './grafo'
 import {
@@ -7,6 +13,7 @@ import {
   motivoSinCapacidad,
   motivoSinExistencia,
   motivoSinRuta,
+  motivoSinRutaCadenaFrio,
   motivoSinRutaConExistencia,
 } from './motivos'
 import type {
@@ -35,7 +42,15 @@ export function resolver(
   contexto: ContextoEmparejamiento,
   grafoPrecalculado?: Grafo,
 ): Resolucion {
-  const grafo = grafoPrecalculado ?? new Grafo(contexto.rutas, contexto.temporada)
+  // PRD-33 §24: a cold-chain item resolves against a graph restricted to the legs that can
+  // preserve it, so an open boat is simply not in the graph. Everything below is the same
+  // resolver — reachability, waypoints, ordering — run over fewer edges, not a forked path.
+  // Ordinary items keep the memoised full graph, so nothing that matched before changes.
+  const requisito = pedido.requisitoAlmacenamiento ?? null
+  const conCadenaFrio = exigeCadenaFrio(requisito)
+  const grafo = conCadenaFrio
+    ? grafoCadenaFrio(contexto.rutas, contexto.temporada)
+    : (grafoPrecalculado ?? new Grafo(contexto.rutas, contexto.temporada))
   const comunidad = contexto.nombresComunidad.get(pedido.comunidadId) ?? 'la comunidad'
   const frase: ContextoFrase = {
     pedido,
@@ -52,9 +67,30 @@ export function resolver(
 
   // 1. Which supply nodes can reach the community by active routes this season?
   const nodosActivos = contexto.nodos.filter((n) => n.activo)
-  const nodosQueLlegan = nodosActivos.filter((n) => grafo.llega(n.comunidadId, pedido.comunidadId))
+  let nodosQueLlegan = nodosActivos.filter((n) => grafo.llega(n.comunidadId, pedido.comunidadId))
+
+  // PRD-33 §24: for a cold-chain item the source must also be able to *hold* it, and the path
+  // must keep it within its open-transit window. Anything else would be proposing to spoil
+  // insulin, so it is excluded here rather than surfaced as a plan.
+  if (conCadenaFrio && requisito) {
+    nodosQueLlegan = nodosQueLlegan.filter(
+      (n) =>
+        nodoGuardaCadenaFrio(n) &&
+        dentroDeVentanaTransito(grafo.costoCrudo(n.comunidadId, pedido.comunidadId), requisito),
+    )
+  }
 
   if (nodosQueLlegan.length === 0) {
+    // A distinct stuck-state: the community may be perfectly reachable, just not by a route that
+    // keeps the medicine cold. Never propose an invalid route (AC2) — say why, and mark it so the
+    // board can tell it apart from an ordinary «community cut off».
+    if (conCadenaFrio) {
+      return {
+        estado: 'SIN_RUTA',
+        cadenaFrioBloqueada: true,
+        motivo: motivoSinRutaCadenaFrio(comunidad),
+      }
+    }
     return { estado: 'SIN_RUTA', motivo: motivoSinRuta(comunidad, contexto.temporada) }
   }
 

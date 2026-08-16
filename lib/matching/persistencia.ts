@@ -32,13 +32,21 @@ export async function cargarContexto(
 ): Promise<ContextoEmparejamiento> {
   // One query at a time: a node-postgres client is not concurrent, and issuing these
   // together on the same client is deprecated and unsafe.
+  // PRD-33 §24: a route carries its cold-chain aptitude (absent row = not apt, fail-closed), so
+  // the matcher can exclude legs that cannot preserve a cold-chain item.
   const rutas = await client.query(
-    `select id, origen_id, destino_id, modo, minutos, temporada, activa from rutas`,
+    `select r.id, r.origen_id, r.destino_id, r.modo, r.minutos, r.temporada, r.activa,
+            coalesce(rcf.apta_cadena_frio, false) as apta_cadena_frio
+       from rutas r
+       left join rutas_restriccion_cadena_frio rcf on rcf.ruta_id = r.id`,
   )
+  // PRD-33 §24: a node carries whether it can hold cold chain (absent row = cannot).
   const nodos = await client.query(
-    `select id, nombre, comunidad_id, activo,
-            st_y(ubicacion) as lat, st_x(ubicacion) as lon
-       from nodos`,
+    `select n.id, n.nombre, n.comunidad_id, n.activo,
+            st_y(n.ubicacion) as lat, st_x(n.ubicacion) as lon,
+            coalesce(naf.apta_cadena_frio, false) as apta_cadena_frio
+       from nodos n
+       left join nodos_almacenamiento_frio naf on naf.nodo_id = n.id`,
   )
   const existencias = await client.query(
     `select nodo_id, codigo_item, cantidad, contado_en from existencias`,
@@ -76,6 +84,7 @@ export async function cargarContexto(
       minutos: r.minutos,
       temporada: r.temporada,
       activa: r.activa,
+      aptaCadenaFrio: r.apta_cadena_frio,
     })),
     nodos: nodos.rows.map((n) => ({
       id: n.id,
@@ -84,6 +93,7 @@ export async function cargarContexto(
       activo: n.activo,
       lat: n.lat,
       lon: n.lon,
+      aptaCadenaFrio: n.apta_cadena_frio,
     })),
     existencias: existencias.rows.map((e) => ({
       nodoId: e.nodo_id,
@@ -122,9 +132,12 @@ async function pedidosAbiertos(client: PoolClient, soloPedidoId?: string) {
   const { rows } = await client.query(
     `select p.id, p.comunidad_id, p.codigo_item, p.familias, p.urgencia, p.estado,
             p.motivo, p.nodo_sugerido, p.oferta_sugerida,
-            ci.item_label, ci.unidad_singular, ci.unidad_plural, ci.entregable
+            ci.item_label, ci.unidad_singular, ci.unidad_plural, ci.entregable,
+            cra.cadena_frio, cra.sensible_luz, cra.max_minutos_transito
        from pedidos p
        join catalogo_items ci on ci.codigo = p.codigo_item
+       -- PRD-33 §24: the item's storage requirement, when it has one (left join: most items do not).
+       left join catalogo_requisitos_almacenamiento cra on cra.codigo_item = p.codigo_item
       where p.estado = any($1::text[])
         and ($2::uuid is null or p.id = $2::uuid)
         -- A human has already committed to this one; the matcher does not get to
@@ -162,6 +175,15 @@ export async function emparejar(
       entregable: fila.entregable,
       familias: fila.familias,
       urgencia: fila.urgencia,
+      // PRD-33 §24: null when the item has no storage constraint (no requisitos row).
+      requisitoAlmacenamiento:
+        fila.cadena_frio === null || fila.cadena_frio === undefined
+          ? null
+          : {
+              cadenaFrio: fila.cadena_frio,
+              sensibleLuz: fila.sensible_luz,
+              maxMinutosTransito: fila.max_minutos_transito,
+            },
     }
 
     const veredicto = resolver(pedido, contexto, grafo)

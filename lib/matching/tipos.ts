@@ -20,6 +20,25 @@ import { ALCANCE_RECOGIDA_M } from '@/lib/recogidas/plan'
 /** The season we are resolving for. `todo_el_ano` is a property of a route, never a query. */
 export type TemporadaActual = Exclude<Temporada, 'todo_el_ano'>
 
+/**
+ * PRD-33 §24: what a catalogue item needs to survive the trip. A cold-chain item (insulin,
+ * injectables) may only travel a route that can preserve it, and only for so long — a six-hour
+ * open boat is not a path for insulin. Null/absent on a pedido means an ordinary item with no
+ * storage constraint, which is every item the matcher saw before this shipped.
+ */
+export type RequisitoAlmacenamiento = {
+  /** Requires refrigeration end to end — the flag the matcher gates routing on. */
+  cadenaFrio: boolean
+  /** Degrades in light. Kept for completeness of the constraint model; not yet a route gate. */
+  sensibleLuz: boolean
+  /**
+   * Longest the item tolerates in open transit before it spoils, in minutes. Null = no time
+   * bound (cold chain still enforced by route/node aptitude). For insulin this is the window
+   * that rules out the long river legs.
+   */
+  maxMinutosTransito: number | null
+}
+
 export type RutaGrafo = {
   id: string
   origenId: string
@@ -29,6 +48,12 @@ export type RutaGrafo = {
   minutos: number | null
   temporada: Temporada
   activa: boolean
+  /**
+   * PRD-33 §24: whether this leg can carry a cold-chain item — a refrigerated or short covered
+   * run, not an open boat. Absent/false means it cannot (fail-closed): an unassessed leg never
+   * carries insulin. Only consulted for items that require cold chain.
+   */
+  aptaCadenaFrio?: boolean
 }
 
 export type NodoGrafo = {
@@ -39,6 +64,11 @@ export type NodoGrafo = {
   /** Null when nobody has located it yet — a real case in the seed, not an oversight. */
   lat: number | null
   lon: number | null
+  /**
+   * PRD-33 §24: whether this node can *hold* a cold-chain item — it has cold storage.
+   * Absent/false means it cannot (fail-closed). Only consulted for cold-chain items.
+   */
+  aptaCadenaFrio?: boolean
 }
 
 export type ExistenciaGrafo = {
@@ -95,6 +125,11 @@ export type PedidoAResolver = {
   entregable: boolean
   familias: number
   urgencia: number
+  /**
+   * PRD-33 §24: storage constraint for this item, or null/absent for an ordinary item. When it
+   * requires cold chain the resolver excludes routes and nodes that cannot preserve it.
+   */
+  requisitoAlmacenamiento?: RequisitoAlmacenamiento | null
 }
 
 export type ContextoEmparejamiento = {
@@ -134,6 +169,13 @@ export type Resolucion = {
   /** Set when the plan sources from an individual offer and includes a pickup leg. */
   ofertaId?: string
   capacidadId?: string
+  /**
+   * PRD-33 §24: set when the item requires cold chain and no route/node can preserve it to the
+   * community. A distinct signal on top of estado=SIN_RUTA so a cold-chain block reads apart
+   * from an ordinary «community cut off» — the matcher refuses to propose an invalid route
+   * rather than routing insulin over an open boat.
+   */
+  cadenaFrioBloqueada?: boolean
 }
 
 export const HORIZONTE_DIAS_POR_DEFECTO = 14

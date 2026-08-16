@@ -126,6 +126,19 @@ export function motivoSinRuta(comunidad: string, temporada: 'lluvias' | 'seca'):
 }
 
 /**
+ * PRD-33 §24: reachable, but not by a route that keeps the cold chain. A different sentence
+ * from «incomunicada» because it is a different call — not «open a pass» but «find a cold
+ * transport or a shorter route». The matcher refuses to load insulin onto a six-hour open boat.
+ */
+export function motivoSinRutaCadenaFrio(comunidad: string): string {
+  return (
+    `No hay una ruta que conserve la cadena de frío hasta ${comunidad}: este medicamento no ` +
+    `puede viajar en lancha abierta ni pasar tanto tiempo fuera de refrigeración. Hay que ` +
+    `conseguir un transporte refrigerado o una ruta más corta antes de despacharlo.`
+  )
+}
+
+/**
  * Cut off *and* the goods exist. A different sentence because it is a different phone call:
  * somebody has to open a way through, not find a donor.
  */
