@@ -85,6 +85,8 @@ const POLITICA: Record<string, 'publica' | 'autenticada'> = {
   '/evaluaciones': 'autenticada',
   '/ajustes': 'autenticada',
   '/estado': 'autenticada',
+  // PRD-36 staged onboarding. Behind a session; derives setup progress from data.
+  '/configuracion-inicial': 'autenticada',
   '/verificacion': 'autenticada',
   '/verificacion/audio/[id]': 'autenticada',
   '/envios': 'autenticada',
