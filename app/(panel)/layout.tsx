@@ -91,7 +91,7 @@ const SECCIONES: SeccionNav[] = [
     href: '/mapa',
     ver: rol(['despachador', 'coordinador', 'admin', 'lectura']),
     items: [
-      { href: '', etiqueta: 'Evaluaciones' }, // PRD-29
+      { href: '/evaluaciones', etiqueta: 'Evaluaciones', listo: true }, // PRD-29
       { href: '/rutas', etiqueta: 'Rutas', listo: true },
       { href: '/conexion', etiqueta: 'Puntos de conexión', listo: true },
     ],
@@ -102,6 +102,7 @@ const SECCIONES: SeccionNav[] = [
     ver: rol(['verificador', 'coordinador', 'admin']),
     items: [
       { href: '/comunidades', etiqueta: 'Red', listo: true, ver: VE_REGISTRO },
+      { href: '/radio', etiqueta: 'Radio', listo: true }, // PRD-11
       { href: '/estado#silencio', etiqueta: 'Silencio', listo: true, ver: VE_SILENCIO },
     ],
   },
@@ -110,10 +111,11 @@ const SECCIONES: SeccionNav[] = [
     etiqueta: 'Agenda',
     ver: rol(['despachador', 'coordinador', 'admin']),
     items: [
-      { href: '', etiqueta: 'Programas' }, // PRD-31
-      { href: '', etiqueta: 'Jornadas' }, // PRD-30
+      { href: '/programas', etiqueta: 'Programas', listo: true }, // PRD-31
+      { href: '/jornadas', etiqueta: 'Jornadas', listo: true }, // PRD-30
       { href: '', etiqueta: 'Citas' }, // FR-17
       { href: '/envios', etiqueta: 'Envíos', listo: true },
+      { href: '/traslados', etiqueta: 'Traslado de personas', listo: true }, // PRD-8
       { href: '/recogidas', etiqueta: 'Recogidas', listo: true, ver: VE_RECOGIDAS },
       { href: '', etiqueta: 'Capacidad ofrecida' }, // §18
     ],
@@ -127,6 +129,7 @@ const SECCIONES: SeccionNav[] = [
       { href: '/inventario', etiqueta: 'Inventario', listo: true, ver: VE_REGISTRO },
       { href: '', etiqueta: 'Ofertas' }, // §18
       { href: '/catalogo', etiqueta: 'Catálogo', listo: true, ver: VE_REGISTRO },
+      { href: '/compra-local', etiqueta: 'Compra local', listo: true }, // PRD-9
     ],
   },
   {
@@ -150,6 +153,7 @@ const SECCIONES: SeccionNav[] = [
       { href: '/equipo', etiqueta: 'Equipo', listo: true, ver: (s) => s.rolStaff === 'admin' || s.esPlataforma },
       { href: '/centros', etiqueta: 'Organizaciones', listo: true, ver: (s) => s.esPlataforma },
       { href: '/estado', etiqueta: 'Estado', listo: true, ver: VE_SILENCIO },
+      { href: '/configuracion-inicial', etiqueta: 'Configuración inicial', listo: true }, // PRD-36
     ],
   },
 ]
