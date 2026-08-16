@@ -242,3 +242,26 @@ export const RUTAS_SEMILLA: RutaSemilla[] = [
     notas: 'Subiendo el Quito. Bajando rinde más.',
   }),
 ].flat()
+
+/**
+ * Demo-only routes. STAGING ONLY — see COMUNIDADES_DEMO.
+ *
+ * The one connector on the Pacific coast: Pizarro to Sivirú by boat. It exists so Sivirú is
+ * reachable from Pizarro's acopio (which is empty of what Sivirú asks for), while the Quibdó
+ * warehouse — with the goods — has no path to the coast at all. That is the SIN_RUTA the
+ * matcher is meant to name: «hay 180 mercados en Quibdó, pero no hay cómo llegar a Sivirú».
+ * Docampadó is deliberately left with no route, so its own request is a plain SIN_RUTA.
+ *
+ * Kept out of RUTAS_SEMILLA because that array is what the reachability tests pin — the basin
+ * they describe is strongly connected from Quibdó, and the coast is precisely not.
+ */
+export const RUTAS_DEMO: RutaSemilla[] = [
+  par({
+    a: 'PIZ',
+    b: 'SIV',
+    modo: 'lancha',
+    minutos: [40, 45],
+    costoEstimadoCop: 120000,
+    notas: 'Por la costa y la boca del Baudó. Depende de la marea y del mar de leva.',
+  }),
+].flat()

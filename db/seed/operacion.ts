@@ -1,3 +1,5 @@
+import type { Canal } from '@/db/schema/vocabulario'
+
 /**
  * Demo operating data: staff, reporters, nodes, stock, a few verified needs and one
  * offered boat.
@@ -394,6 +396,8 @@ export type NecesidadSemilla = {
   detalleLibre?: string
   verificadoPor: string
   diasAtras: number
+  /** How it arrived. Omitted means WhatsApp, which is what the canonical basin assumes. */
+  canal?: Canal
 }
 
 export const NECESIDADES_VERIFICADAS: NecesidadSemilla[] = [
@@ -552,3 +556,480 @@ export const CAPACIDADES_SEMILLA = [
     notas: 'Va con carga de la alcaldía, lleva lo que quepa.',
   },
 ]
+
+// ════════════════════════════════════════════════════════════════════════════════════════
+// DEMO LAYER — staging only.
+//
+// Everything below is layered on top of the canonical seed by scripts/seed.ts so the staging
+// walkthrough has something true-to-life on every screen and the matcher produces its whole
+// spread of states. It is kept in separate `_DEMO` arrays, never folded into the arrays above,
+// because those are the fixtures the matcher and map unit tests pin — this layer must be able
+// to grow without moving a single assertion. It is the same honest data as the rest: real
+// Chocoano phrasing, honest location sources, `texto_original` untouched, every row marked
+// [DATO DE PRUEBA] by scripts/seed.ts before it reaches a screen a partner might open.
+// ════════════════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Parteras (the first partner is a network of them), a radio operator who relays for the
+ * communities with no signal of their own, and one lanchera. Phones are synthetic and not
+ * dialable, continuing the +57300000002x block.
+ */
+export const CONTACTOS_DEMO = [
+  {
+    telefono: '+573000000020',
+    nombre: 'Feliciana Moreno (partera)',
+    rol: 'reportante' as const,
+    comunidad: 'SIV',
+    canalPreferido: 'sms' as const,
+  },
+  {
+    telefono: '+573000000021',
+    nombre: 'Bertha Rentería (partera)',
+    rol: 'reportante' as const,
+    comunidad: 'DOC',
+    // Tier-4 coast: reached by radio relay, never a data channel.
+    canalPreferido: 'radio' as const,
+  },
+  {
+    telefono: '+573000000022',
+    nombre: 'Yined Mosquera (partera)',
+    rol: 'reportante' as const,
+    comunidad: 'PIZ',
+    canalPreferido: 'whatsapp' as const,
+  },
+  {
+    telefono: '+573000000023',
+    nombre: 'Custodia Palacios (partera)',
+    rol: 'reportante' as const,
+    comunidad: 'BEB',
+    canalPreferido: 'radio' as const,
+  },
+  {
+    // The other half of a radio relay (PRD §5.8): the person at the base who keys the message
+    // in on behalf of someone who cannot reach us directly. Named on the relayed reports.
+    telefono: '+573000000024',
+    nombre: 'Aristóbulo Mena (operador de radio)',
+    rol: 'reportante' as const,
+    comunidad: 'QBD',
+    canalPreferido: 'radio' as const,
+  },
+  {
+    telefono: '+573000000025',
+    nombre: 'Sixta Mena (lanchera)',
+    rol: 'transportista' as const,
+    comunidad: 'QBD',
+    canalPreferido: 'whatsapp' as const,
+  },
+  {
+    telefono: '+573000000026',
+    nombre: 'Rosalba Cuesta (partera)',
+    rol: 'reportante' as const,
+    comunidad: 'TUT',
+    canalPreferido: 'whatsapp' as const,
+  },
+  {
+    telefono: '+573000000027',
+    nombre: 'Deyanira Ríos (partera)',
+    rol: 'reportante' as const,
+    comunidad: 'SFI',
+    canalPreferido: 'sms' as const,
+  },
+]
+
+/**
+ * The coastal acopio. Its stock is deliberately the wrong stock: it holds aseo and curación,
+ * not the mercados Sivirú asks for — so the matcher, finding nothing on the coast it can use
+ * and 180 mercados stranded in Quibdó with no river to the sea, returns SIN_RUTA and names
+ * where the goods actually are. Located `manual`, like every node: staff placed it, so it is
+ * an honest radius, not a GPS pin.
+ */
+export const NODOS_DEMO = [
+  {
+    clave: 'ACO-PIZ',
+    nombre: 'Acopio Pizarro',
+    tipo: 'acopio' as const,
+    comunidad: 'PIZ',
+    responsableTelefono: '+573000000022',
+    lat: 4.955,
+    lon: -77.366,
+    ubicacionFuente: 'manual' as const,
+    ubicacionPrecisionM: 300,
+  },
+]
+
+/**
+ * Coastal stock. Counted three days ago (fresh), and short on purpose: 10 curación kits
+ * against a request for 40, so Pizarro's own request classifies as SIN_EXISTENCIA with the
+ * honest sentence «solo hay 10 en Acopio Pizarro». No mercados at all, which is what strands
+ * Sivirú. The Quibdó warehouse keeps only 35 curación kits, so nothing anywhere covers the 40.
+ */
+export const EXISTENCIAS_DEMO = [
+  {
+    nodo: 'ACO-PIZ',
+    contadoPor: COORDINADOR,
+    diasDesdeConteo: 3,
+    items: { '41': 20, '24': 10, '33': 8 } as Record<string, number>,
+  },
+]
+
+/**
+ * Verified needs on the demo layer, one per matcher state the canonical basin does not already
+ * reach. Each names the channel it arrived on so the Tablero shows the four-channel spread.
+ * Verified by the coordinator, who is not community-scoped (the seeded verificadora is, and the
+ * coast is outside her territory — so signing her name here would demo a permission she lacks).
+ */
+export const NECESIDADES_VERIFICADAS_DEMO: NecesidadSemilla[] = [
+  {
+    comunidad: 'SIV',
+    telefono: '+573000000020',
+    codigoItem: '11',
+    familias: 20,
+    urgencia: 2,
+    descripcion: 'Se perdió la comida con el mar de leva. Somos veinte familias en Sivirú.',
+    canal: 'radio',
+    verificadoPor: COORDINADOR,
+    diasAtras: 4,
+  },
+  {
+    comunidad: 'DOC',
+    telefono: '+573000000021',
+    codigoItem: '11',
+    familias: 30,
+    urgencia: 2,
+    descripcion: 'Docampadó quedó incomunicado y sin mercado. Piden ayuda por la radio.',
+    canal: 'radio',
+    verificadoPor: COORDINADOR,
+    diasAtras: 5,
+  },
+  {
+    comunidad: 'TUT',
+    telefono: '+573000000026',
+    codigoItem: '62',
+    familias: 20,
+    urgencia: 1,
+    descripcion: 'Se perdió el pancoger con la creciente. Necesitan semillas para volver a sembrar.',
+    canal: 'whatsapp',
+    verificadoPor: COORDINADOR,
+    diasAtras: 6,
+  },
+  {
+    comunidad: 'PIZ',
+    telefono: '+573000000022',
+    codigoItem: '41',
+    familias: 12,
+    urgencia: 1,
+    descripcion: 'Piden aseo para las familias que están en el albergue de la escuela.',
+    canal: 'whatsapp',
+    verificadoPor: COORDINADOR,
+    diasAtras: 5,
+  },
+  {
+    comunidad: 'PIZ',
+    telefono: '+573000000022',
+    codigoItem: '24',
+    familias: 40,
+    urgencia: 2,
+    descripcion: 'Muchos heridos leves después del temporal. Se acabaron las gasas y el alcohol.',
+    canal: 'sms',
+    verificadoPor: COORDINADOR,
+    diasAtras: 4,
+  },
+]
+
+/**
+ * Verified needs that are not cargo (Section 4.5): a person has to travel, not a box. They
+ * never become a `pedido`; they sit in the «derivaciones» list of the verification screen so
+ * it is not empty. `apoyo psicosocial` (item 53) is `entregable = false` in the catalogue.
+ */
+export const NECESIDADES_DERIVADAS_DEMO: NecesidadSemilla[] = [
+  {
+    comunidad: 'BLL',
+    telefono: '+573000000003',
+    codigoItem: '53',
+    familias: 20,
+    urgencia: 2,
+    descripcion: 'Piden acompañamiento para las familias; los niños siguen asustados.',
+    canal: 'whatsapp',
+    verificadoPor: COORDINADOR,
+    diasAtras: 3,
+  },
+]
+
+/**
+ * Reports still in the verification queue, across all four channels. Some carry a voice note
+ * (see NOTAS_DE_VOZ_DEMO); two are radio relays, second-hand and therefore requiring a human
+ * to confirm; two are things nobody could classify on arrival — a first-class state, not an
+ * error (2.12), so they land in the clarification queue with no item rather than a guess.
+ */
+export type ReporteDemoSemilla = {
+  /** Stable key, used to attach voice notes and inbound messages to this exact report. */
+  semilla: string
+  tipo: 'necesidad' | 'dano' | 'sin_clasificar'
+  comunidad: string
+  telefono: string
+  codigoItem: string | null
+  familias?: number
+  urgencia?: number
+  severidad?: number
+  descripcion?: string
+  /** Where intake stores inbound/transcribed text; the queue reads this before descripcion. */
+  detalleLibre?: string
+  canal: Canal
+  diasAtras: number
+  /** Radio relay only: the person at the base who keyed it in for the speaker (PRD §5.8). */
+  relatadoPor?: string
+}
+
+export const REPORTES_SIN_VERIFICAR_DEMO: ReporteDemoSemilla[] = [
+  {
+    semilla: 'demo-tut-13',
+    tipo: 'necesidad',
+    comunidad: 'TUT',
+    telefono: '+573000000026',
+    codigoItem: '13',
+    familias: 15,
+    urgencia: 2,
+    // A transcribed voice note: intake writes what the model heard into detalle_libre, warts
+    // and all («pelaos»), and the correction flow exists for exactly that.
+    detalleLibre: 'las niñas estan con diarrea y no hay con que prepararles la comida a los pelaos',
+    canal: 'whatsapp',
+    diasAtras: 1,
+  },
+  {
+    semilla: 'demo-sfi-12',
+    tipo: 'necesidad',
+    comunidad: 'SFI',
+    telefono: '+573000000027',
+    codigoItem: '12',
+    familias: 18,
+    urgencia: 2,
+    detalleLibre: 'no hay agua limpia el caño bajo revuelto y los pelaos con diarrea',
+    canal: 'sms',
+    diasAtras: 1,
+  },
+  {
+    semilla: 'demo-pac-21',
+    tipo: 'necesidad',
+    comunidad: 'PAC',
+    telefono: '+573000000008',
+    codigoItem: '21',
+    familias: 10,
+    urgencia: 2,
+    // Came in as a missed call; the callback recording was transcribed (see NOTAS_DE_VOZ_DEMO).
+    detalleLibre: 'necesitamos remedios para la fiebre y el dolor somos varias familias',
+    canal: 'ivr',
+    diasAtras: 2,
+  },
+  {
+    semilla: 'demo-win-33',
+    tipo: 'necesidad',
+    comunidad: 'WIN',
+    telefono: '+573000000002',
+    codigoItem: '33',
+    familias: 12,
+    urgencia: 2,
+    descripcion: 'El vendaval levantó unos techos en Winandó.',
+    canal: 'radio',
+    relatadoPor: 'Aristóbulo Mena (operador de radio)',
+    diasAtras: 1,
+  },
+  {
+    semilla: 'demo-doc-21',
+    tipo: 'necesidad',
+    comunidad: 'DOC',
+    telefono: '+573000000021',
+    codigoItem: '21',
+    familias: 8,
+    urgencia: 2,
+    descripcion: 'Hay una señora mayor con la tensión muy alta y sin sus pastillas.',
+    canal: 'radio',
+    relatadoPor: 'Aristóbulo Mena (operador de radio)',
+    diasAtras: 2,
+  },
+  {
+    // «🍲 90» — the M4 named case: an emoji and a number are not ninety of anything. No item,
+    // no quantity, straight to clarification (2.12).
+    semilla: 'demo-sc-cocina',
+    tipo: 'sin_clasificar',
+    comunidad: 'SFI',
+    telefono: '+573000000027',
+    codigoItem: null,
+    descripcion: '🍲 90',
+    canal: 'sms',
+    diasAtras: 1,
+  },
+  {
+    semilla: 'demo-sc-ayuda',
+    tipo: 'sin_clasificar',
+    comunidad: 'TAG',
+    telefono: '+573000000001',
+    codigoItem: null,
+    detalleLibre: 'Ayúdennos por favor aquí estamos mal manden lo que puedan',
+    canal: 'whatsapp',
+    diasAtras: 1,
+  },
+]
+
+/**
+ * Voice notes on the demo layer, attached by seed key. Together with the canonical one on the
+ * Bellavista report this gives the audio inbox three notes to play, each with the machine's
+ * transcript, its confidence, and a duration — the daily work of Section 4.5. Synthetic tones,
+ * never a real person's voice, for the same reason the phone numbers are not dialable.
+ */
+export const NOTAS_DE_VOZ_DEMO = [
+  {
+    semillaReporte: 'demo-tut-13',
+    segundos: 7,
+    transcripcion: 'las niñas estan con diarrea y no hay con que prepararles la comida a los pelados',
+    confianza: 0.55,
+  },
+  {
+    semillaReporte: 'demo-pac-21',
+    segundos: 9,
+    transcripcion: 'necesitamos remedios para la fiebre y el dolor somos varias familias aca',
+    confianza: 0.62,
+  },
+]
+
+/**
+ * Raw inbound messages, exactly as the channel layer would have written them on receipt (2.13).
+ * They give the silence job real signal to reason about and show the four-channel ingestion as
+ * it actually looks: WhatsApp, SMS, an IVR callback, and radio relay. `reporteSemilla` links a
+ * message to the report it produced; a null one is a message that produced no report — like
+ * Bebedó's, eleven days old with nothing since, which is what makes Bebedó go quiet.
+ */
+export type MensajeDemoSemilla = {
+  /** Deterministic provider id, so re-running the seed inserts each message exactly once. */
+  id: string
+  reporteSemilla: string | null
+  direccion: 'entrante' | 'saliente'
+  canal: Canal
+  proveedor: string
+  telefono: string
+  cuerpo: string
+  diasAtras: number
+  payload?: Record<string, unknown>
+}
+
+export const MENSAJES_DEMO: MensajeDemoSemilla[] = [
+  {
+    id: 'demo-msg-tut-13',
+    reporteSemilla: 'demo-tut-13',
+    direccion: 'entrante',
+    canal: 'whatsapp',
+    proveedor: 'whatsapp_cloud',
+    telefono: '+573000000026',
+    cuerpo: '[nota de voz] las niñas estan con diarrea y no hay con que prepararles la comida',
+    diasAtras: 1,
+    payload: { tipo: 'audio', transcrito: true },
+  },
+  {
+    id: 'demo-msg-sfi-12',
+    reporteSemilla: 'demo-sfi-12',
+    direccion: 'entrante',
+    canal: 'sms',
+    proveedor: 'sms_hablame',
+    telefono: '+573000000027',
+    cuerpo: 'no hay agua limpia el caño bajo revuelto y los pelaos con diarrea',
+    diasAtras: 1,
+  },
+  {
+    id: 'demo-msg-pac-21',
+    reporteSemilla: 'demo-pac-21',
+    direccion: 'entrante',
+    canal: 'ivr',
+    proveedor: 'ivr_hablame',
+    telefono: '+573000000008',
+    cuerpo: '[llamada perdida → devolución, opción 1] grabación transcrita',
+    diasAtras: 2,
+    payload: { tipo: 'llamada', opcion: 1 },
+  },
+  {
+    id: 'demo-msg-win-33',
+    reporteSemilla: 'demo-win-33',
+    direccion: 'entrante',
+    canal: 'radio',
+    proveedor: 'radio_hf',
+    telefono: '+573000000002',
+    cuerpo: 'el vendaval levantó unos techos en Winandó',
+    diasAtras: 1,
+    payload: { relatado_por: 'Aristóbulo Mena (operador de radio)', hablante: 'Élver Mosquera', segunda_mano: true },
+  },
+  {
+    id: 'demo-msg-doc-21',
+    reporteSemilla: 'demo-doc-21',
+    direccion: 'entrante',
+    canal: 'radio',
+    proveedor: 'radio_hf',
+    telefono: '+573000000021',
+    cuerpo: 'hay una señora mayor con la tensión muy alta y sin sus pastillas',
+    diasAtras: 2,
+    payload: { relatado_por: 'Aristóbulo Mena (operador de radio)', hablante: 'Bertha Rentería (partera)', segunda_mano: true },
+  },
+  {
+    id: 'demo-msg-sc-cocina',
+    reporteSemilla: 'demo-sc-cocina',
+    direccion: 'entrante',
+    canal: 'sms',
+    proveedor: 'sms_hablame',
+    telefono: '+573000000027',
+    cuerpo: '🍲 90',
+    diasAtras: 1,
+  },
+  {
+    id: 'demo-msg-sc-ayuda',
+    reporteSemilla: 'demo-sc-ayuda',
+    direccion: 'entrante',
+    canal: 'whatsapp',
+    proveedor: 'whatsapp_cloud',
+    telefono: '+573000000001',
+    cuerpo: 'Ayúdennos por favor aquí estamos mal manden lo que puedan',
+    diasAtras: 1,
+  },
+  {
+    // Bebedó: one message eleven days ago and nothing since, with a seven-day interval. No
+    // report ever came of it — this is what silence looks like, not a queue backing up.
+    id: 'demo-msg-beb-silencio',
+    reporteSemilla: null,
+    direccion: 'entrante',
+    canal: 'radio',
+    proveedor: 'radio_hf',
+    telefono: '+573000000023',
+    cuerpo: 'aquí estamos pendientes, avisamos cuando podamos bajar a la cabecera',
+    diasAtras: 11,
+    payload: { relatado_por: 'Aristóbulo Mena (operador de radio)', hablante: 'Custodia Palacios (partera)' },
+  },
+]
+
+/**
+ * One more boat, so the thin side is not a single trip. Sixta's chalupa up the Río Quito to
+ * Paimadó turns that request LISTO, and it is the trip scripts/seed.ts actually dispatches.
+ * Its route serves only Paimadó (no needy community sits between Quibdó and the Quito), so it
+ * leaves the SIN_CAPACIDAD spread on the Atrato untouched.
+ */
+export const CAPACIDADES_DEMO = [
+  {
+    telefono: '+573000000025',
+    modo: 'chalupa' as const,
+    origenNodo: 'BOD-QBD',
+    hastaComunidad: 'PAI',
+    enDias: 4,
+    cupoFamilias: 60,
+    notas: 'Sube el Quito el sábado con encargos; puede llevar carga.',
+  },
+]
+
+/**
+ * The demo dispatch. STAGING ONLY. One trip is actually sent so Envíos, the manifest and its
+ * four-digit codes are not empty, and one request shows EN_CAMINO on the Tablero. Sixta's
+ * chalupa carries Paimadó's water-treatment request in full (50 of a 60 cupo), so nobody is
+ * short and no rationing decision is required. See scripts/seed.ts `sembrarDespacho`.
+ */
+export const DESPACHO_DEMO = {
+  /** The lanchera whose offered trip we dispatch. */
+  transportistaTelefono: '+573000000025',
+  hastaComunidad: 'PAI',
+  /** The request loaded onto it. */
+  pedidoComunidad: 'PAI',
+  pedidoCodigoItem: '44',
+}

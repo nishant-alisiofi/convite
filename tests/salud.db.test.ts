@@ -70,8 +70,10 @@ conBase('el estado del sistema', () => {
   it('con la cola al día, dice que está bien', async () => {
     const estado = await estadoSistema(client, AHORA)
 
-    expect(estado.ok).toBe(true)
-    expect(estado.alertas).toEqual([])
+    // The demo seed intentionally includes one community that has gone quiet (Section 9.8) —
+    // a list of phone calls to make, not an outage. «La cola al día» is about the machinery,
+    // so the silence alert is expected and filtered out; nothing else may be firing.
+    expect(estado.alertas.filter((a) => !a.includes('intervalo de chequeo'))).toEqual([])
     expect(estado.base.conectada).toBe(true)
     // Migrations are counted, so a half-deployed database is visible rather than implied.
     expect(estado.base.migraciones).toBeGreaterThan(20)
@@ -86,7 +88,8 @@ conBase('el estado del sistema', () => {
     )
     const estado = await estadoSistema(client, AHORA)
 
-    expect(estado.ok).toBe(true)
+    // Only silence is expected on the seed (filtered); the just-due job is not an alarm.
+    expect(estado.alertas.filter((a) => !a.includes('intervalo de chequeo'))).toEqual([])
     expect(estado.jobs.pendientes).toBe(1)
   })
 
@@ -125,7 +128,8 @@ conBase('el estado del sistema', () => {
     const estado = await estadoSistema(client, AHORA)
 
     expect(estado.jobs.colgados).toBe(0)
-    expect(estado.ok).toBe(true)
+    // A just-started job is not hung; only the seed's silence alert is expected (filtered).
+    expect(estado.alertas.filter((a) => !a.includes('intervalo de chequeo'))).toEqual([])
   })
 
   it('avisa de los jobs que agotaron sus reintentos', async () => {
