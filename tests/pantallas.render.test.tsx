@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import type { PoolClient } from 'pg'
 import { Pool } from 'pg'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 /**
  * Every panel screen, rendered with real rows.
@@ -29,10 +29,42 @@ const conBase = describe.skipIf(!url)
 
 const SALIDA = '.data/vista-pantallas'
 const COORDINADOR = '00000000-0000-4000-8000-000000000001'
+// The admin the seed creates for the aid organisation, and a platform-tier fixture the harness
+// inserts — the two identities the role-gated screens (/equipo, /centros) are written for.
+const ADMIN = '00000000-0000-4000-8000-000000000004'
+const PLATAFORMA = '00000000-0000-4000-8000-0000000000f0'
+
+/**
+ * The signed-in identity the mocked session returns. It is a mutable module value rather than a
+ * constant because the role-gated screens have to be looked at as the role they are for — /equipo
+ * as a centre admin, /centros as the platform tier — and a fixed coordinator would only ever see
+ * their «not for you» card. `beforeEach` resets it, so every test starts as the coordinator and a
+ * role-specific test opts in explicitly.
+ */
+type SesionMock = {
+  authId: string
+  correo: string
+  telefono: string | null
+  rolStaff: string
+  organizacionId: string
+  esPlataforma: boolean
+  estadoOrganizacion: string
+}
+const SESION_COORDINADOR: SesionMock = {
+  authId: COORDINADOR,
+  correo: 'coordinador@convite.test',
+  telefono: null,
+  rolStaff: 'coordinador',
+  organizacionId: '',
+  esPlataforma: false,
+  estadoOrganizacion: 'aprobada',
+}
 
 let pool: Pool
 let client: PoolClient
 let envioId = ''
+let orgId = ''
+let sesionActiva: SesionMock = SESION_COORDINADOR
 
 /**
  * The only thing faked is who is signed in — the session itself is real.
@@ -47,16 +79,19 @@ let envioId = ''
  * A savepoint keeps the role change from leaking into the surrounding transaction.
  */
 vi.mock('@/lib/sesion', () => ({
-  sesionActual: async () => ({
-    authId: COORDINADOR,
-    correo: 'coordinador@convite.test',
-    rolStaff: 'coordinador',
-    organizacionId: '',
-  }),
+  sesionActual: async () => sesionActiva,
   conSesion: async <T,>(_sesion: unknown, fn: (c: PoolClient) => Promise<T>): Promise<T> => {
     await client.query('savepoint pantalla')
     await client.query(`select set_config('request.jwt.claims', $1, true)`, [
-      JSON.stringify({ sub: COORDINADOR, role: 'authenticated', email: 'coordinador@convite.test' }),
+      JSON.stringify({
+        sub: sesionActiva.authId,
+        role: 'authenticated',
+        email: sesionActiva.correo,
+        ...(sesionActiva.telefono ? { telefono: sesionActiva.telefono } : {}),
+        // §2.5: the platform claim rides along so a route guard reading claims agrees with the
+        // table; RLS still reads the source of truth via convite_es_plataforma().
+        ...(sesionActiva.esPlataforma ? { es_plataforma: true } : {}),
+      }),
     ])
     await client.query('set local role authenticated')
     try {
@@ -127,7 +162,55 @@ beforeAll(async () => {
     await ponerParada(client, envioId, p.id, i === 0 ? p.familias : Math.max(1, p.familias - 5))
   }
   await ordenarPorRecorrido(client, envioId, 'lluvias')
+
+  /*
+   * Fixtures for the role-gated screens. `db:seed` deliberately leaves these empty — staff
+   * invitations come from `sembrar:staff` and a pending centre from a real /solicitar-centro
+   * request, neither of which the demo seed runs — so without them /equipo and /centros would
+   * only ever show their empty states and the harness would never look at the populated screen.
+   * Inserted as the owner (RLS is applied per-render inside `conSesion`) and rolled back in
+   * `afterAll` with everything else.
+   */
+  const { rows: orgs } = await client.query<{ id: string }>(
+    `select id from organizaciones where estado_aprobacion = 'aprobada' and activo
+      order by creado_en limit 1`,
+  )
+  orgId = orgs[0]!.id
+
+  // A platform admin, so /centros renders the platform tier instead of its «not for you» card.
+  await client.query(
+    `insert into usuarios (id, rol_staff, organizacion_id, es_plataforma, activo)
+       values ($1, 'admin', $2, true, true) on conflict (id) do nothing`,
+    [PLATAFORMA, orgId],
+  )
+
+  // A centre awaiting approval, so «En revisión» is a list with approve/reject and not empty.
+  const { rows: pendiente } = await client.query<{ id: string }>(
+    `insert into organizaciones (nombre, estado_aprobacion, activo)
+       values ('Fundación Río Baudó (solicitud de prueba)', 'pendiente', true) returning id`,
+  )
+  await client.query(
+    `insert into invitaciones_staff (correo, rol_staff, organizacion_id) values ($1, 'admin', $2)`,
+    ['contacto@rio-baudo.test', pendiente[0]!.id],
+  )
+
+  // Team invitations for the org: one already linked to a signed-in admin (shows «Activo»), one
+  // still pending (shows «Invitado»), so /equipo shows people rather than «no ha invitado a nadie».
+  await client.query(
+    `insert into invitaciones_staff (correo, rol_staff, organizacion_id, usuario_id, usado_en)
+       values ($1, 'admin', $2, $3, now())`,
+    ['admin@alisio.test', orgId, ADMIN],
+  )
+  await client.query(
+    `insert into invitaciones_staff (correo, rol_staff, organizacion_id) values ($1, 'verificador', $2)`,
+    ['nueva.verificadora@alisio.test', orgId],
+  )
 }, 120_000)
+
+// Every test starts as the coordinator; a role-gated test opts into its role explicitly.
+beforeEach(() => {
+  sesionActiva = SESION_COORDINADOR
+})
 
 afterAll(async () => {
   if (!url) return
@@ -239,6 +322,14 @@ conBase('cada pantalla del panel se dibuja con datos reales', () => {
       searchParams: Promise.resolve({}),
     })
     expect(marcado).toContain('Temporada')
+    /*
+     * «Quién la ha cambiado» is the season's history, and it must stay the season's. Every setting
+     * writes the same `configuracion.cambio` audit action — the voice budget writes one valued
+     * «120» — so an unscoped query showed that row under «who changed the season». With the season
+     * never flipped after boot, the honest state is the empty message, not another setting's value.
+     */
+    expect(marcado).toContain('sigue en el valor con el que arrancó el sistema')
+    expect(marcado).not.toContain('>120<')
     sinEntrañas(marcado, 'ajustes')
   })
 
@@ -247,6 +338,69 @@ conBase('cada pantalla del panel se dibuja con datos reales', () => {
     const marcado = await pintar('estado', Estado as never)
     expect(marcado).toContain('Estado')
     sinEntrañas(marcado, 'estado')
+  })
+
+  it('el mapa', async () => {
+    const { default: Mapa } = await import('@/app/(panel)/mapa/page')
+    const marcado = await pintar('mapa', Mapa as never, { searchParams: Promise.resolve({}) })
+    expect(marcado).toContain('Mapa')
+    // The list under the map carries the same rows, so the screen answers even when the map does
+    // not load. A seeded community proves it is populated rather than an empty basin.
+    expect(marcado).toContain('Tagachí')
+    sinEntrañas(marcado, 'mapa')
+  })
+
+  it('la conexión', async () => {
+    const { default: Conexion } = await import('@/app/(panel)/conexion/page')
+    const marcado = await pintar('conexion', Conexion as never, { searchParams: Promise.resolve({}) })
+    expect(marcado).toContain('Puntos de conexión')
+    sinEntrañas(marcado, 'conexion')
+  })
+
+  it('los apadrinamientos', async () => {
+    const { default: Apadrinar } = await import('@/app/(panel)/apadrinar/page')
+    const marcado = await pintar('apadrinar', Apadrinar as never, {
+      searchParams: Promise.resolve({}),
+    })
+    expect(marcado).toContain('Apadrinamientos')
+    sinEntrañas(marcado, 'apadrinar')
+  })
+
+  it('el equipo, como admin del centro', async () => {
+    sesionActiva = {
+      ...SESION_COORDINADOR,
+      authId: ADMIN,
+      correo: 'admin@alisio.test',
+      rolStaff: 'admin',
+      organizacionId: orgId,
+    }
+    const { default: Equipo } = await import('@/app/(panel)/equipo/page')
+    const marcado = await pintar('equipo', Equipo as never, { searchParams: Promise.resolve({}) })
+    expect(marcado).toContain('Equipo')
+    // The populated team, not the «not for you» card and not the «invited nobody» empty state.
+    expect(marcado).not.toContain('Solo el admin de su centro gestiona al equipo')
+    expect(marcado).not.toContain('Todavía no ha invitado a nadie')
+    expect(marcado).toContain('nueva.verificadora@alisio.test')
+    sinEntrañas(marcado, 'equipo')
+  })
+
+  it('los centros, como plataforma', async () => {
+    sesionActiva = {
+      ...SESION_COORDINADOR,
+      authId: PLATAFORMA,
+      correo: 'plataforma@alisio.test',
+      rolStaff: 'admin',
+      esPlataforma: true,
+      organizacionId: orgId,
+    }
+    const { default: Centros } = await import('@/app/(panel)/centros/page')
+    const marcado = await pintar('centros', Centros as never, { searchParams: Promise.resolve({}) })
+    expect(marcado).toContain('Centros')
+    // The platform screen, with a pending centre to decide and the approved org listed.
+    expect(marcado).not.toContain('solo para el equipo de plataforma')
+    expect(marcado).toContain('Fundación Río Baudó')
+    expect(marcado).toContain('Aprobar')
+    sinEntrañas(marcado, 'centros')
   })
 
   it('la página pública', async () => {

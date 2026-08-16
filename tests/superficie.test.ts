@@ -66,8 +66,8 @@ const POLITICA: Record<string, 'publica' | 'autenticada'> = {
   '/centros': 'autenticada',
   '/rutas': 'autenticada',
   '/recogidas': 'autenticada',
-  // The first-mile pickup planner (PRD-10) and the earmarked-sponsorship desk (PRD-12). Both
-  // behind a session; each refuses the wrong role rather than leaking, like the rest of the panel.
+  // §5.9 connection points (PRD-10) and the earmarked-sponsorship desk (PRD-12). Both behind a
+  // session; each refuses the wrong role rather than leaking, like the rest of the panel.
   '/conexion': 'autenticada',
   '/apadrinar': 'autenticada',
   '/ajustes': 'autenticada',

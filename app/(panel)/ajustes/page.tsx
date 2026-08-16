@@ -56,11 +56,16 @@ export default async function Ajustes({ searchParams }: { searchParams: Params }
       despues: { valor: string }
       creado_en: Date
     }>(
+      // Scoped to the season key: `configuracion.cambio` covers every settings row (the voice
+      // budget writes one too), so without this filter the season history shows a change that
+      // was never made to the season — «120» under «who changed the season».
       `select antes, despues, creado_en
          from auditoria
         where accion = 'configuracion.cambio'
+          and despues->>'clave' = $1
         order by creado_en desc
         limit 10`,
+      [CLAVE_TEMPORADA],
     )
 
     return {
