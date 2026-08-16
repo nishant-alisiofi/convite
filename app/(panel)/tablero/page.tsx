@@ -23,13 +23,23 @@ export default async function Tablero() {
 
   const filas = await conSesion(sesion, async (client) => {
     const { rows } = await client.query<Fila>(
+      // The report is joined in only to carry how the need arrived onto the board (its channel,
+      // and whether it was a transcribed voice note). LEFT JOIN so a pedido never drops off the
+      // Tablero if RLS happens to hide its report row — the badge just goes quiet.
       `select p.id, p.estado, p.motivo, p.familias, p.urgencia,
               c.nombre as comunidad, c.municipio,
               ci.item_label as item,
-              extract(day from now() - p.creado_en)::int as dias
+              extract(day from now() - p.creado_en)::int as dias,
+              r.canal,
+              exists (
+                select 1 from adjuntos a
+                 where a.reporte_id = r.id and a.tipo = 'audio'
+                   and coalesce(a.transcripcion_corregida, a.transcripcion) is not null
+              ) as transcrito
          from pedidos p
          join comunidades c on c.id = p.comunidad_id
          join catalogo_items ci on ci.codigo = p.codigo_item
+         left join reportes r on r.id = p.reporte_id
         where p.estado <> 'ENTREGADO' and p.estado <> 'CANCELADO'
         order by p.urgencia desc, p.creado_en`,
     )

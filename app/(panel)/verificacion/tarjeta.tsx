@@ -1,14 +1,11 @@
-import {
-  CheckCheck,
-  Copy,
-  MessageSquare,
-  Mic,
-  Phone,
-  Radio,
-  Route,
-  TriangleAlert,
-} from 'lucide-react'
+import { CheckCheck, Copy, Mic, Route, TriangleAlert } from 'lucide-react'
 import Link from 'next/link'
+import {
+  InsigniaCanal,
+  InsigniaSegundaMano,
+  InsigniaSinClasificar,
+  InsigniaTranscrito,
+} from '@/components/insignias'
 import type { FiltroTipo, FilaBandeja } from '@/lib/verificacion/bandeja'
 import type { RutaAfectada } from '@/lib/verificacion/danos'
 
@@ -23,15 +20,6 @@ import type { RutaAfectada } from '@/lib/verificacion/danos'
  * `accion` is a server action on the real screen and a plain string in the harness, where
  * nothing is meant to submit.
  */
-
-const ICONO_CANAL: Record<string, typeof MessageSquare> = {
-  whatsapp: MessageSquare,
-  sms: MessageSquare,
-  ivr: Phone,
-  radio: Radio,
-  papel: Copy,
-  web: MessageSquare,
-}
 
 export type AccionBandeja = ((formData: FormData) => Promise<void>) | string
 
@@ -55,7 +43,6 @@ export default function Tarjeta({
   /** Only ever populated for a `dano`: legs this report might be about. */
   rutasAfectadas?: RutaAfectada[]
 }) {
-  const IconoCanal = ICONO_CANAL[r.canal] ?? MessageSquare
   const sinClasificar = r.tipo === 'sin_clasificar'
   const faltaDetalle = r.pideDetalle && !r.detalleLibre
 
@@ -64,14 +51,13 @@ export default function Tarjeta({
       {/* The age is pinned to the right so it never wraps onto its own orphaned line; the rest
           of the meta flows and wraps within its own group on the left. */}
       <div className="flex items-baseline justify-between gap-2 text-sm">
-        <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
           <span className="font-mono text-barro-500">#{r.folio}</span>
           <span className="font-medium text-barro-900">{r.comunidad ?? 'Sin comunidad'}</span>
           {r.municipio && <span className="text-barro-500">{r.municipio}</span>}
-          <span className="flex items-center gap-1 text-barro-600">
-            <IconoCanal className="size-3.5" aria-hidden />
-            {r.canal}
-          </span>
+          <InsigniaCanal canal={r.canal} />
+          {r.canal === 'radio' && <InsigniaSegundaMano />}
+          {sinClasificar && <InsigniaSinClasificar />}
           {r.urgencia === 3 && (
             <span className="rounded bg-rose-100 px-1.5 py-0.5 text-xs font-medium text-rose-900">
               urgente
@@ -125,14 +111,17 @@ export default function Tarjeta({
 
       {r.adjuntos
         .filter((a) => a.tipo === 'audio')
-        .map((a) => (
+        .map((a) => {
+          const transcrito = Boolean(a.transcripcion ?? a.transcripcionCorregida)
+          return (
           <div key={a.id} className="mt-3 rounded border border-barro-200 bg-barro-50 px-3 py-3">
-            <p className="flex items-center gap-2 text-sm font-medium text-barro-800">
+            <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-barro-800">
               <Mic className="size-4" aria-hidden />
               Nota de voz
               {a.duracionSeg !== null && (
                 <span className="font-normal text-barro-600">{a.duracionSeg}s</span>
               )}
+              {transcrito && <InsigniaTranscrito confianza={a.transcripcionConfianza} />}
             </p>
 
             {/* The browser's own player: no JavaScript, works on a weak connection. */}
@@ -183,7 +172,8 @@ export default function Tarjeta({
               Lo que oyó la máquina se conserva aparte; la corrección no lo borra.
             </p>
           </div>
-        ))}
+          )
+        })}
 
       {rutasAfectadas.length > 0 && (
         <div className="mt-3 rounded border border-atrato-100 bg-atrato-50 px-3 py-3">
