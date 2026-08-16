@@ -74,6 +74,23 @@ export const organizaciones = pgTable(
      */
     avalMotivo: text('aval_motivo'),
     /**
+     * §29.3b: how this organisation was admitted — `ancla` (contract, responsable del
+     * tratamiento), `avalada` (vouched by an anchor), `aportante` (supply only, touches no
+     * community data) or `observadora` (aggregate read). Orthogonal to `tipo` (what kind of org)
+     * and `estadoAprobacion` (the approval lifecycle). Nullable, because organisations admitted
+     * before tiers existed have none recorded. Set by the admission/vouching flow in migration
+     * 0047 (`convite_avalar_organizacion`, `convite_fijar_nivel_admision`); the check constraint
+     * lives in SQL. PRD-35.
+     */
+    nivelAdmision: text('nivel_admision'),
+    /**
+     * §29.3b: the anchor that vouched an `avalada` organisation in — recorded so a revoked vouch
+     * is traceable and its ceiling verifiable against the voucher's. Self-referential FK declared
+     * in SQL (0047) rather than in this mirror, the same way `comunidades.region_id` is (0042), to
+     * keep organizaciones free of a circular self-import. NULL for anchors and pre-tier orgs.
+     */
+    avaladoPor: uuid('avalado_por'),
+    /**
      * §5.7: the centre's own point on the map, from which the Recogidas run is measured. Set
      * via `convite_fijar_ubicacion_organizacion` (migration 0036), which is the only writer.
      * Non-negotiable 2.2 — a stored point never travels without its declared source and radius.
