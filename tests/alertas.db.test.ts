@@ -87,12 +87,12 @@ conBase('el silencio es una señal (Sección 9.8)', () => {
     // Winandó is tier 4 — radio relay only — and the seed checks on it more often precisely
     // because it is the one most likely to go dark without anybody noticing.
     const { rows: intervalo } = await client.query<{ intervalo_chequeo_dias: number; tier: number }>(
-      `select intervalo_chequeo_dias, tier_conectividad as tier from comunidades where codigo = 'WIN'`,
+      `select intervalo_chequeo_dias, tier_conectividad as tier from comunidades where codigo = 'CH-QUI-WIN'`,
     )
-    await ultimoContacto('WIN', intervalo[0]!.intervalo_chequeo_dias + 5)
+    await ultimoContacto('CH-QUI-WIN', intervalo[0]!.intervalo_chequeo_dias + 5)
 
     const silenciosas = await comunidadesEnSilencio(client, AHORA)
-    const win = silenciosas.find((c) => c.codigo === 'WIN')
+    const win = silenciosas.find((c) => c.codigo === 'CH-QUI-WIN')
 
     expect(win).toBeTruthy()
     expect(win!.tier).toBe(intervalo[0]!.tier)
@@ -102,30 +102,30 @@ conBase('el silencio es una señal (Sección 9.8)', () => {
   })
 
   it('NO avisa de una comunidad que escribió ayer', async () => {
-    await ultimoContacto('TAG', 1)
+    await ultimoContacto('CH-QUI-TAG', 1)
     const silenciosas = await comunidadesEnSilencio(client, AHORA)
-    expect(silenciosas.find((c) => c.codigo === 'TAG')).toBeUndefined()
+    expect(silenciosas.find((c) => c.codigo === 'CH-QUI-TAG')).toBeUndefined()
   })
 
   it('cuenta cualquier señal, no solo un reporte', async () => {
     // Somebody confirming a delivery is as alive as somebody asking for food. Counting only
     // reports would flag a community that talks to us every day.
     const { rows } = await client.query<{ intervalo_chequeo_dias: number }>(
-      `select intervalo_chequeo_dias from comunidades where codigo = 'PAC'`,
+      `select intervalo_chequeo_dias from comunidades where codigo = 'CH-QUI-PAC'`,
     )
-    await ultimoContacto('PAC', rows[0]!.intervalo_chequeo_dias + 3)
-    expect((await comunidadesEnSilencio(client, AHORA)).some((c) => c.codigo === 'PAC')).toBe(true)
+    await ultimoContacto('CH-QUI-PAC', rows[0]!.intervalo_chequeo_dias + 3)
+    expect((await comunidadesEnSilencio(client, AHORA)).some((c) => c.codigo === 'CH-QUI-PAC')).toBe(true)
 
     const { rows: contactos } = await client.query<{ id: string }>(
       `select c.id from contactos c join comunidades co on co.id = c.comunidad_id
-        where co.codigo = 'PAC' limit 1`,
+        where co.codigo = 'CH-QUI-PAC' limit 1`,
     )
     await client.query(
       `insert into mensajes (organizacion_id, proveedor, direccion, canal, contacto_id, creado_en)
        values ($1, 'sms_simulador', 'entrante', 'sms', $2, $3)`,
       [organizacion, contactos[0]!.id, haceDias(0)],
     )
-    expect((await comunidadesEnSilencio(client, AHORA)).some((c) => c.codigo === 'PAC')).toBe(false)
+    expect((await comunidadesEnSilencio(client, AHORA)).some((c) => c.codigo === 'CH-QUI-PAC')).toBe(false)
   })
 
   it('no confunde «nunca hemos sabido de ellos» con «se callaron»', async () => {
@@ -158,14 +158,14 @@ conBase('tres daños en el mismo sitio son un evento, no tres filas', () => {
   }
 
   it('guarda silencio con dos', async () => {
-    await danosVerificados('TAG', 2, 2)
+    await danosVerificados('CH-QUI-TAG', 2, 2)
     const grupos = await agrupacionesDeDanos(client, AHORA)
     expect(grupos.find((g) => g.comunidades.includes('Tagachí'))).toBeUndefined()
   })
 
   it('con tres es UNA alerta, con la severidad más alta', async () => {
-    await danosVerificados('TAG', 2, 1)
-    await danosVerificados('TAG', 1, 3)
+    await danosVerificados('CH-QUI-TAG', 2, 1)
+    await danosVerificados('CH-QUI-TAG', 1, 3)
 
     const grupos = await agrupacionesDeDanos(client, AHORA)
     const grupo = grupos.find((g) => g.comunidades.includes('Tagachí'))
@@ -181,7 +181,7 @@ conBase('tres daños en el mismo sitio son un evento, no tres filas', () => {
   it('no cuenta daños sin verificar: eso son tres personas preocupadas', async () => {
     // 2.1. An unverified cluster is a phone call, not an alert that reroutes boats.
     const { rows } = await client.query<{ id: string }>(
-      `select id from comunidades where codigo = 'TAG'`,
+      `select id from comunidades where codigo = 'CH-QUI-TAG'`,
     )
     for (let i = 0; i < 4; i++) {
       await client.query(
@@ -194,7 +194,7 @@ conBase('tres daños en el mismo sitio son un evento, no tres filas', () => {
   })
 
   it('se olvida honestamente cuando pasa la ventana', async () => {
-    await danosVerificados('TAG', 3, 2)
+    await danosVerificados('CH-QUI-TAG', 3, 2)
     expect((await agrupacionesDeDanos(client, AHORA)).length).toBeGreaterThan(0)
 
     // Same rows, read three days later: the storm is over and the alert is gone on its own,

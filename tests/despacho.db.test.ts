@@ -106,8 +106,8 @@ async function pedidoEn(codigo: string): Promise<{ id: string; familias: number 
 /** A plan that shorts Las Mercedes: the boat holds 40 and the two stops want 45. */
 async function planConRecorte(): Promise<{ envioId: string; tag: string; mer: string }> {
   const capacidad = await laCapacidad()
-  const tag = await pedidoEn('TAG')
-  const mer = await pedidoEn('MER')
+  const tag = await pedidoEn('CH-QUI-TAG')
+  const mer = await pedidoEn('CH-QUI-MER')
 
   const envio = await como(DESPACHADOR, () => crearEnvio(client, capacidad, DESPACHADOR))
   const envioId = (envio as { id: string }).id
@@ -215,7 +215,7 @@ conBase('el racionamiento se registra o el envío no sale', () => {
   it('un envío que alcanza para todos no necesita decisión', async () => {
     await client.query('savepoint caso')
     const capacidad = await laCapacidad()
-    const tag = await pedidoEn('TAG')
+    const tag = await pedidoEn('CH-QUI-TAG')
 
     await como(DESPACHADOR, async () => {
       const envio = await crearEnvio(client, capacidad, DESPACHADOR)
@@ -229,7 +229,7 @@ conBase('el racionamiento se registra o el envío no sale', () => {
   it('regenera el motivo al pasar a EN_CAMINO — no deja «Confirme para despachar» (D1)', async () => {
     await client.query('savepoint caso')
     const capacidad = await laCapacidad()
-    const tag = await pedidoEn('TAG')
+    const tag = await pedidoEn('CH-QUI-TAG')
 
     const { rows: antes } = await client.query<{ estado: string; motivo: string | null }>(
       `select estado, motivo from pedidos where id = $1`,
@@ -257,8 +257,8 @@ conBase('el racionamiento se registra o el envío no sale', () => {
   it('el bote no crece porque la cola sea larga', async () => {
     await client.query('savepoint caso')
     const capacidad = await laCapacidad()
-    const tag = await pedidoEn('TAG')
-    const mer = await pedidoEn('MER')
+    const tag = await pedidoEn('CH-QUI-TAG')
+    const mer = await pedidoEn('CH-QUI-MER')
 
     await como(DESPACHADOR, async () => {
       const envio = await crearEnvio(client, capacidad, DESPACHADOR)
@@ -375,7 +375,7 @@ conBase('varios ofrecimientos cubren un pedido', () => {
   it('ocho personas con dos mercados cada una satisfacen un pedido de doce', async () => {
     await client.query('savepoint caso')
 
-    const bll = await pedidoEn('BLL')
+    const bll = await pedidoEn('CH-BOJ')
     await client.query(`update pedidos set familias = 12 where id = $1`, [bll.id])
 
     // Ocho vecinos ofreciendo dos cada uno: por separado ninguno alcanza.
@@ -415,7 +415,7 @@ conBase('varios ofrecimientos cubren un pedido', () => {
 
   it('cada ofrecimiento queda como su propia fila confirmada, con nombre', async () => {
     await client.query('savepoint caso')
-    const bll = await pedidoEn('BLL')
+    const bll = await pedidoEn('CH-BOJ')
 
     const ofertas: string[] = []
     for (let i = 0; i < 3; i += 1) {
@@ -564,7 +564,7 @@ conBase('el planeador', () => {
   it('avisa cuando lo que sostiene un pedido se vence antes de que el bote salga', async () => {
     await client.query('savepoint caso')
     const capacidad = await laCapacidad()
-    const tag = await pedidoEn('TAG')
+    const tag = await pedidoEn('CH-QUI-TAG')
 
     // Una oferta perecedera que no llega a la salida del domingo (2.15).
     const { rows } = await client.query<{ id: string }>(
@@ -599,8 +599,8 @@ conBase('el orden de las paradas', () => {
   it('sigue el recorrido y no el orden en que se agregaron', async () => {
     await client.query('savepoint caso')
     const capacidad = await laCapacidad()
-    const tag = await pedidoEn('TAG')
-    const mer = await pedidoEn('MER')
+    const tag = await pedidoEn('CH-QUI-TAG')
+    const mer = await pedidoEn('CH-QUI-MER')
 
     await como(DESPACHADOR, async () => {
       const envio = await crearEnvio(client, capacidad, DESPACHADOR)
@@ -622,7 +622,7 @@ conBase('el orden de las paradas', () => {
 
       // Las Mercedes queda entre Quibdó y Tagachí: pasar de largo y devolverse es un viaje
       // que nadie hace. La urgencia decide quién sube al bote; la geografía, en qué orden.
-      expect(rows.map((r) => r.codigo)).toEqual(['MER', 'TAG'])
+      expect(rows.map((r) => r.codigo)).toEqual(['CH-QUI-MER', 'CH-QUI-TAG'])
     })
   })
 })

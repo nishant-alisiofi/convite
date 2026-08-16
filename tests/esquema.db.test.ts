@@ -1,7 +1,6 @@
 import type { PoolClient } from 'pg'
 import { Pool } from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { COMUNIDADES_DEMO, COMUNIDADES_SEMILLA } from '@/db/seed/comunidades'
 
 /**
  * Acceptance for M1, run against a real database: `pnpm db:up && pnpm db:reset && pnpm test`.
@@ -58,28 +57,46 @@ conBase('la cuenca queda consultable', () => {
     expect(rows).toHaveLength(1)
   })
 
-  it('siembra la cuenca con una fuente de ubicación declarada en cada comunidad', async () => {
-    // The canonical basin (all gazetteer centroids) plus the staging demo layer, which adds a
-    // GPS pin the field team dropped and radio-relayed circles for places only heard about.
-    const { rows } = await client.query<{ n: string; fuentes: string[]; sin_fuente: string }>(
+  it('siembra una sola comunidad por lugar real, con fuente declarada (PRD-39)', async () => {
+    // PRD-39: staging carries ONE community set — the real registry (sembrar:territorio) — and
+    // the demo activity layers onto it. It used to carry the registry AND a parallel demo set,
+    // so a real place appeared twice (two Quibdós, two Bellavistas). The guard is that no two
+    // rows share (nombre, municipio): a duplicate real place would fail here immediately.
+    const { rows } = await client.query<{
+      n: string
+      lugares: string
+      codigos: string
+      fuentes: string[]
+      sin_fuente: string
+    }>(
       `select count(*)::text as n,
+              count(distinct (nombre, municipio))::text as lugares,
+              count(distinct codigo)::text as codigos,
               array_agg(distinct ubicacion_fuente order by ubicacion_fuente) as fuentes,
               count(*) filter (where ubicacion is null or ubicacion_fuente is null)::text as sin_fuente
          from comunidades`,
     )
-    expect(rows[0]!.n).toBe(String(COMUNIDADES_SEMILLA.length + COMUNIDADES_DEMO.length))
+    // One row per real place, one row per code: zero duplicates.
+    expect(rows[0]!.lugares).toBe(rows[0]!.n)
+    expect(rows[0]!.codigos).toBe(rows[0]!.n)
+    // The real registry (63 comunidades) plus the five river/coast places PRD-39 promoted into
+    // it (Sivirú, Docampadó, Bebedó, Samurindó, Puerto Conto).
+    expect(Number(rows[0]!.n)).toBe(68)
     // Non-negotiable 2.2: every stored point declares an honest source — nothing left blank.
     expect(Number(rows[0]!.sin_fuente)).toBe(0)
     for (const f of rows[0]!.fuentes) {
       expect(['centroide', 'gps', 'referida', 'manual']).toContain(f)
     }
-    // The basin is centroids at heart; the mix is the demo layer's, not a silent upgrade.
+    // The registry is centroids at heart; radio-relayed places carry a wider `referida` circle.
     expect(rows[0]!.fuentes).toContain('centroide')
   })
 
   it('siembra el catálogo completo', async () => {
     const { rows } = await client.query<{ n: string }>('select count(*)::text as n from catalogo_items')
-    expect(rows[0]!.n).toBe('26')
+    // The registry (sembrar:territorio) carries the full 34-item response catalogue of
+    // ASOREDIPARCHOCÓ; the demo's CATALOGO_SEMILLA (26) is a subset upserted onto it by code,
+    // so the unified database holds the registry's 34 with zero duplicates.
+    expect(rows[0]!.n).toBe('34')
   })
 
   it('responde la pregunta que importa: qué hay y a qué distancia', async () => {
@@ -153,8 +170,8 @@ conBase('las no negociables están en la base, no en el frontend', () => {
   })
 
   it('7.3 — rechaza un tramo fluvial derivado de Google', async () => {
-    const origen = await unId('comunidades', "codigo = 'QBD'")
-    const destino = await unId('comunidades', "codigo = 'BTA'")
+    const origen = await unId('comunidades', "codigo = 'CH-QUI'")
+    const destino = await unId('comunidades', "codigo = 'CH-QUI-TAN'")
     const mensaje = await esperaRechazo(
       `insert into rutas (origen_id, destino_id, modo, minutos, temporada, fuente)
          values ($1, $2, 'lancha', 40, 'todo_el_ano', 'google')`,

@@ -176,6 +176,27 @@ values
 on conflict (codigo) do nothing;
 
 -- ---------------------------------------------------------------------------
+-- CHOCÓ — COMUNIDADES DE RÍO Y LITORAL (antes solo demo, PRD-39)
+-- Estas cinco eran filas «demo» paralelas en db/seed/comunidades.ts, con códigos
+-- cortos (SIV, DOC, BEB, SAM, PCO). Son lugares reales del territorio, así que
+-- pasan al registro como cualquier otro corregimiento (verificado_en = NULL) y
+-- la actividad demo de staging se apoya sobre ELLAS, sin duplicar el lugar.
+-- Coordenadas aproximadas, como el resto del archivo. Se declara la fuente donde
+-- no es un centroide: Docampadó y Puerto Conto llegaron por radio (`referida`).
+-- ---------------------------------------------------------------------------
+insert into comunidades
+  (codigo, nombre, tipo, municipio, agrupador, region_id, organizacion_id,
+   ubicacion, ubicacion_fuente, ubicacion_precision_m,
+   familias_estimadas, tier_conectividad, intervalo_chequeo_dias, activa)
+values
+  ('CH-BBA-SIV','Sivirú','corregimiento','Bajo Baudó','Baudó','11111111-0000-0000-0000-000000000001','22222222-0000-0000-0000-000000000001', st_setsrid(st_makepoint(-77.3808, 4.8992),4326), 'centroide', 1000, 55, 3, 10, true),
+  ('CH-BBA-DOC','Docampadó','corregimiento','Bajo Baudó','Baudó','11111111-0000-0000-0000-000000000001','22222222-0000-0000-0000-000000000001', st_setsrid(st_makepoint(-77.3164, 4.7789),4326), 'referida', 2000, 40, 4, 7, true),
+  ('CH-RQU-BEB','Bebedó','corregimiento','Río Quito','Medio Atrato','11111111-0000-0000-0000-000000000001','22222222-0000-0000-0000-000000000001', st_setsrid(st_makepoint(-76.8203, 5.3494),4326), 'centroide', 1000, 90, 4, 7, true),
+  ('CH-ATR-SAM','Samurindó','corregimiento','Atrato','Medio Atrato','11111111-0000-0000-0000-000000000001','22222222-0000-0000-0000-000000000001', st_setsrid(st_makepoint(-76.6822, 5.6231),4326), 'centroide', 1000, 65, 3, 10, true),
+  ('CH-BOJ-PCO','Puerto Conto','corregimiento','Bojayá','Medio Atrato','11111111-0000-0000-0000-000000000001','22222222-0000-0000-0000-000000000001', st_setsrid(st_makepoint(-76.9061, 6.5972),4326), 'referida', 2000, 110, 4, 7, true)
+on conflict (codigo) do nothing;
+
+-- ---------------------------------------------------------------------------
 -- PACÍFICO CAUCANO — CABECERAS
 -- Territorio de la Fundación Herencia de Timbiquí.
 -- Los tres municipios donde movieron 40+ toneladas durante la pandemia.
@@ -253,7 +274,11 @@ from (values
   ('CH-QUI-GUA','CH-QUI-MER','lancha',50,'todo_el_ano','Suposición.'),
   ('CH-QUI-MER','CH-QUI-TAG','lancha',45,'todo_el_ano','Suposición.'),
   ('CH-QUI','CH-QUI-BAR','lancha',    55,'todo_el_ano','Suposición.'),
-  ('CH-QUI-BAR','CH-QUI-WIN','lancha',60,'todo_el_ano','Suposición.'),
+  -- Winandó se entra por el caño desde Las Mercedes y SOLO en lluvias: en seca el caño no
+  -- tiene agua y la comunidad queda incomunicada. No hay puerta de todo el año (esa es la
+  -- que aislaría el escenario estacional del demo, PRD-39). El db:seed de staging refuerza
+  -- este mismo tramo (misma clave origen/destino/modo/temporada), así que no lo duplica.
+  ('CH-QUI-MER','CH-QUI-WIN','chalupa',25,'lluvias','Por el caño desde Las Mercedes. En verano no entra chalupa. Suposición.'),
   ('CH-QUI-BAR','CH-QUI-TAN','lancha',40,'todo_el_ano','Suposición.'),
   ('CH-QUI','CH-QUI-MUR','lancha',    70,'todo_el_ano','Suposición.'),
   ('CH-QUI-PAC','CH-QUI-ROS','trocha',80,'todo_el_ano','Suposición.'),

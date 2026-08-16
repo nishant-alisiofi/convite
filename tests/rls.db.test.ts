@@ -45,7 +45,13 @@ beforeAll(async () => {
   client = await pool.connect()
   await client.query('begin')
 
-  const { rows } = await client.query<{ id: string }>('select id from organizaciones limit 1')
+  // PRD-39: the registry seeds several organisations (ASOREDIPARCHOCÓ, Fundación Herencia, a
+  // pending demo centre), so an unordered `limit 1` no longer reliably lands on the org that
+  // owns the Chocó communities this test writes to. Pick the anchor org the seed itself uses —
+  // «la organización activa más antigua» — which owns Quibdó, Bellavista, Tagachí and the rest.
+  const { rows } = await client.query<{ id: string }>(
+    'select id from organizaciones where activo order by creado_en limit 1',
+  )
   const org = rows[0]!.id
 
   for (const rol of ['verificador', 'despachador', 'coordinador', 'admin', 'lectura'] as const) {
@@ -58,7 +64,7 @@ beforeAll(async () => {
   // The verifier is scoped to the Atrato medio, like the seeded one.
   await client.query(
     `insert into usuarios_comunidades (usuario_id, comunidad_id)
-     select $1, id from comunidades where codigo in ('TAG', 'MER', 'BET')`,
+     select $1, id from comunidades where codigo in ('CH-QUI-TAG', 'CH-QUI-MER', 'CH-MAT')`,
     [ID.verificador],
   )
 
@@ -71,7 +77,7 @@ beforeAll(async () => {
    */
   const { rows: pac } = await client.query<{ id: string }>(
     `select r.id from reportes r join comunidades c on c.id = r.comunidad_id
-      where c.codigo = 'PAC' limit 1`,
+      where c.codigo = 'CH-QUI-PAC' limit 1`,
   )
   FUERA.reporte = pac[0]!.id
 
@@ -95,7 +101,7 @@ beforeAll(async () => {
 
   const { rows: ct } = await client.query<{ id: string }>(
     `select ct.id from contactos ct join comunidades c on c.id = ct.comunidad_id
-      where c.codigo = 'PAC' limit 1`,
+      where c.codigo = 'CH-QUI-PAC' limit 1`,
   )
   FUERA.contacto = ct[0]!.id
 })
@@ -177,7 +183,7 @@ conBase('separación de funciones (Sección 11)', () => {
   it('un verificador NO puede ofrecer capacidad ni confirmar un emparejamiento', async () => {
     const contacto = await id('contactos', "rol = 'transportista'")
     const nodo = await id('nodos')
-    const comunidad = await id('comunidades', "codigo = 'TAG'")
+    const comunidad = await id('comunidades', "codigo = 'CH-QUI-TAG'")
 
     await como('verificador', async () => {
       expect(
@@ -231,7 +237,7 @@ conBase('separación de funciones (Sección 11)', () => {
   it('un verificador SÍ puede verificar, dentro de sus comunidades', async () => {
     const reporte = await id(
       'reportes',
-      `estado = 'RECIBIDO' and comunidad_id = (select id from comunidades where codigo = 'TAG')`,
+      `estado = 'RECIBIDO' and comunidad_id = (select id from comunidades where codigo = 'CH-QUI-TAG')`,
     )
 
     await como('verificador', async () => {
@@ -245,7 +251,7 @@ conBase('separación de funciones (Sección 11)', () => {
   })
 
   it('un verificador NO alcanza comunidades fuera de su territorio', async () => {
-    const fuera = await id('comunidades', "codigo = 'PAC'")
+    const fuera = await id('comunidades', "codigo = 'CH-QUI-PAC'")
 
     await como('verificador', async () => {
       const visibles = await contar(
@@ -333,7 +339,7 @@ conBase('el territorio del verificador alcanza también a las tablas hijas', () 
       const propios = await contar(
         `select count(*)::text as n from contactos ct
           join comunidades c on c.id = ct.comunidad_id
-         where c.codigo in ('TAG', 'MER', 'BET')`,
+         where c.codigo in ('CH-QUI-TAG', 'CH-QUI-MER', 'CH-MAT')`,
       )
       expect(propios).toBeGreaterThan(0)
     })
@@ -342,7 +348,7 @@ conBase('el territorio del verificador alcanza también a las tablas hijas', () 
 
 conBase('los centros los decide un admin', () => {
   it('un coordinador NO puede crear un centro', async () => {
-    const comunidad = await id('comunidades', "codigo = 'BLL'")
+    const comunidad = await id('comunidades', "codigo = 'CH-BOJ'")
     await como('coordinador', async () => {
       expect(
         await rechazado(
@@ -354,7 +360,7 @@ conBase('los centros los decide un admin', () => {
   })
 
   it('un admin SÍ puede, y solo en su propia organización', async () => {
-    const comunidad = await id('comunidades', "codigo = 'BLL'")
+    const comunidad = await id('comunidades', "codigo = 'CH-BOJ'")
     await como('admin', async () => {
       const { rowCount } = await client.query(
         `insert into nodos (comunidad_id, nombre, tipo) values ($1, 'Acopio Bellavista', 'acopio')`,
@@ -365,7 +371,9 @@ conBase('los centros los decide un admin', () => {
   })
 
   it('un coordinador SÍ cuenta el inventario de un centro que ya existe', async () => {
-    const nodo = await id('nodos')
+    // PRD-39: the registry adds reference nodes with no stock (e.g. Bodega Quibdó), so pick a
+    // node that actually holds existencias — the demo warehouse — or the update matches 0 rows.
+    const nodo = await id('nodos', 'id in (select nodo_id from existencias)')
     await como('coordinador', async () => {
       const { rowCount } = await client.query(
         `update existencias set cantidad = 99, contado_en = now(), contado_por = $2
@@ -386,7 +394,7 @@ conBase('los centros los decide un admin', () => {
   it('solo un admin edita el catálogo y el registro de comunidades', async () => {
     await como('coordinador', async () => {
       expect(await rechazado(`update catalogo_items set item_label = 'X' where codigo = '11'`)).toBe(true)
-      expect(await rechazado(`update comunidades set nombre = 'X' where codigo = 'TAG'`)).toBe(true)
+      expect(await rechazado(`update comunidades set nombre = 'X' where codigo = 'CH-QUI-TAG'`)).toBe(true)
     })
     await como('admin', async () => {
       const { rowCount } = await client.query(

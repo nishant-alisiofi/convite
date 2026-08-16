@@ -317,3 +317,43 @@ export const COMUNIDADES_DEMO: ComunidadSemilla[] = [
     ubicacionPrecisionM: 2000,
   },
 ]
+
+/**
+ * PRD-39 — every demo short code, mapped to its real registry code in db/seed/territorio.sql.
+ *
+ * Staging used to carry TWO community sets: the real registry (`sembrar:territorio`, long codes
+ * like `CH-QUI-TAG`) AND a parallel demo set (`db:seed`, short codes like `TAG`), so the same
+ * real place appeared twice (two Quibdós, two Bellavistas…). That is fixed by pointing ALL demo
+ * activity at the registry through this map, instead of minting a second row per place.
+ *
+ * The arrays above are unchanged on purpose: they stay the in-memory basin the matcher and map
+ * *unit* tests pin (tests/semilla.test.ts, tests/mapa.test.ts, tests/emparejador.test.ts, the
+ * cuenca fixture), which treat these codes as opaque graph ids and never touch the database. This
+ * map is the ONLY place the two languages meet, and scripts/seed.ts is the only consumer: it
+ * resolves each short code to the registry community's id so the whole demo layers onto one set.
+ *
+ * The last five (Sivirú, Docampadó, Bebedó, Samurindó, Puerto Conto) had no cabecera-level
+ * registry equivalent, so they were added to territorio.sql as proper registry corregimientos
+ * (verificado_en = NULL, like everything seeded) rather than kept as parallel demo rows.
+ */
+export const CODIGO_DEMO_A_REGISTRO: Record<string, string> = {
+  QBD: 'CH-QUI', // Quibdó
+  TUT: 'CH-QUI-TUT', // Tutunendo
+  PAC: 'CH-QUI-PAC', // Pacurita
+  GUY: 'CH-QUI-GUA', // Guayabal
+  YUT: 'CH-ATR', // Yuto (cabecera de Atrato)
+  SFI: 'CH-QUI-ICH', // San Francisco de Ichó
+  BTA: 'CH-QUI-TAN', // Boca de Tanandó
+  TAG: 'CH-QUI-TAG', // Tagachí
+  MER: 'CH-QUI-MER', // Las Mercedes
+  WIN: 'CH-QUI-WIN', // Winandó
+  BET: 'CH-MAT', // Beté (cabecera de Medio Atrato)
+  BLL: 'CH-BOJ', // Bellavista (cabecera de Bojayá)
+  PAI: 'CH-RQU', // Paimadó (cabecera de Río Quito)
+  PIZ: 'CH-BBA', // Pizarro (cabecera de Bajo Baudó)
+  SIV: 'CH-BBA-SIV', // Sivirú — añadida al registro (PRD-39)
+  DOC: 'CH-BBA-DOC', // Docampadó — añadida al registro (PRD-39)
+  BEB: 'CH-RQU-BEB', // Bebedó — añadida al registro (PRD-39)
+  SAM: 'CH-ATR-SAM', // Samurindó — añadida al registro (PRD-39)
+  PCO: 'CH-BOJ-PCO', // Puerto Conto — añadida al registro (PRD-39)
+}

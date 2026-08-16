@@ -68,7 +68,7 @@ async function como<T>(usuarioId: string, fn: () => Promise<T>): Promise<T> {
 }
 
 /** A seeded report waiting in the queue, in a community the verifier is scoped to. */
-async function reporteEnCola(codigoComunidad = 'BLL'): Promise<{ id: string; folio: number }> {
+async function reporteEnCola(codigoComunidad = 'CH-BOJ'): Promise<{ id: string; folio: number }> {
   const { rows } = await client.query<{ id: string; folio: number }>(
     `select r.id, r.folio from reportes r
        join comunidades c on c.id = r.comunidad_id
@@ -242,7 +242,7 @@ conBase('nada llega a pedidos sin que una persona lo ponga ahí', () => {
   it('una verificadora no toca reportes fuera de sus comunidades', async () => {
     await client.query('savepoint caso')
     // La verificadora sembrada está limitada al Atrato medio; Pacurita no es suya.
-    const ajeno = await reporteEnCola('PAC')
+    const ajeno = await reporteEnCola('CH-QUI-PAC')
 
     await como(VERIFICADORA, async () => {
       expect((await verificar(client, ajeno.id, VERIFICADORA)).ok).toBe(false)
@@ -357,7 +357,7 @@ conBase('duplicados', () => {
     const hijo = await reporteEnCola()
     const { rows: padres } = await client.query<{ id: string }>(
       `select r.id from reportes r join comunidades c on c.id = r.comunidad_id
-        where r.estado = 'VERIFICADO' and c.codigo = 'BLL' limit 1`,
+        where r.estado = 'VERIFICADO' and c.codigo = 'CH-BOJ' limit 1`,
     )
     const padre = padres[0]!.id
 
@@ -402,7 +402,7 @@ conBase('clasificar lo que nadie pudo clasificar', () => {
     const { rows } = await client.query<{ id: string }>(
       `insert into reportes (organizacion_id, tipo, canal, comunidad_id, descripcion, estado)
        select o.id, 'sin_clasificar', 'whatsapp', c.id, 'Muchas cosas!! De todo!!!', 'RECIBIDO'
-         from organizaciones o, comunidades c where c.codigo = 'BLL' limit 1
+         from organizaciones o, comunidades c where c.codigo = 'CH-BOJ' limit 1
        returning id`,
     )
     const id = rows[0]!.id
@@ -462,18 +462,18 @@ conBase('el audio de una nota de voz', () => {
 
   it('la verificadora saca el audio de sus comunidades', async () => {
     await client.query('savepoint caso')
-    expect(await claveComo(VERIFICADORA, await audioEn('BLL'))).toBe('audio/cd/nota.ogg')
+    expect(await claveComo(VERIFICADORA, await audioEn('CH-BOJ'))).toBe('audio/cd/nota.ogg')
   })
 
   it('pero no el de una comunidad ajena, ni conociendo el id', async () => {
     await client.query('savepoint caso')
     // Pacurita no es suya. Sin fila no hay clave, y sin clave no hay audio.
-    expect(await claveComo(VERIFICADORA, await audioEn('PAC'))).toBeNull()
+    expect(await claveComo(VERIFICADORA, await audioEn('CH-QUI-PAC'))).toBeNull()
   })
 
   it('un coordinador sí, porque su alcance es toda la cuenca', async () => {
     await client.query('savepoint caso')
-    expect(await claveComo(COORDINADOR, await audioEn('PAC'))).toBe('audio/cd/nota.ogg')
+    expect(await claveComo(COORDINADOR, await audioEn('CH-QUI-PAC'))).toBe('audio/cd/nota.ogg')
   })
 })
 
@@ -487,7 +487,7 @@ conBase('un ítem que pide detalle y no lo trae está incompleto', () => {
                              familias, urgencia, descripcion, estado)
        select o.id, 'necesidad', 'whatsapp', c.id, '22', 8, 2,
               'Se acabaron las pastillas', 'RECIBIDO'
-         from organizaciones o, comunidades c where c.codigo = 'BLL' limit 1
+         from organizaciones o, comunidades c where c.codigo = 'CH-BOJ' limit 1
        returning id`,
     )
     const id = rows[0]!.id
@@ -562,7 +562,7 @@ conBase('el razonamiento del clasificador, en pantalla', () => {
     const { rows } = await client.query<{ id: string }>(
       `insert into reportes (organizacion_id, tipo, canal, comunidad_id, detalle_libre, estado)
        select o.id, 'sin_clasificar', 'whatsapp', c.id, 'Muchas cosas!! De todo!!!', 'RECIBIDO'
-         from organizaciones o, comunidades c where c.codigo = 'BLL' limit 1
+         from organizaciones o, comunidades c where c.codigo = 'CH-BOJ' limit 1
        returning id`,
     )
     const id = rows[0]!.id

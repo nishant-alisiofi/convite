@@ -92,8 +92,8 @@ conBase('el editor de rutas', () => {
     await client.query('savepoint caso')
     const espia = vi.spyOn(globalThis, 'fetch')
 
-    const bll = await comunidad('BLL')
-    const pai = await comunidad('PAI')
+    const bll = await comunidad('CH-BOJ')
+    const pai = await comunidad('CH-RQU')
 
     await como(COORDINADOR, async () => {
       expect(await crearRuta(client, tramo(bll, pai), COORDINADOR)).toEqual({ ok: true })
@@ -122,8 +122,8 @@ conBase('el editor de rutas', () => {
 
   it('no deja duplicar el mismo tramo, modo y temporada', async () => {
     await client.query('savepoint caso')
-    const bll = await comunidad('BLL')
-    const pai = await comunidad('PAI')
+    const bll = await comunidad('CH-BOJ')
+    const pai = await comunidad('CH-RQU')
 
     await como(COORDINADOR, async () => {
       await crearRuta(client, tramo(bll, pai), COORDINADOR)
@@ -137,7 +137,7 @@ conBase('el editor de rutas', () => {
 
   it('no deja un tramo que empieza y termina en el mismo sitio', async () => {
     await client.query('savepoint caso')
-    const bll = await comunidad('BLL')
+    const bll = await comunidad('CH-BOJ')
 
     await como(COORDINADOR, async () => {
       const resultado = await crearRuta(client, tramo(bll, bll), COORDINADOR)
@@ -150,8 +150,8 @@ conBase('el editor de rutas', () => {
 
   it('un despachador no abre ni edita tramos', async () => {
     await client.query('savepoint caso')
-    const bll = await comunidad('BLL')
-    const pai = await comunidad('PAI')
+    const bll = await comunidad('CH-BOJ')
+    const pai = await comunidad('CH-RQU')
 
     await como(DESPACHADOR, async () => {
       const creada = await crearRuta(client, tramo(bll, pai), DESPACHADOR)
@@ -166,7 +166,7 @@ conBase('cerrar un tramo deja constancia de quién', () => {
       `select r.id from rutas r
          join comunidades o on o.id = r.origen_id
          join comunidades d on d.id = r.destino_id
-        where o.codigo = 'MER' and d.codigo = 'WIN' and r.temporada = 'lluvias'`,
+        where o.codigo = 'CH-QUI-MER' and d.codigo = 'CH-QUI-WIN' and r.temporada = 'lluvias'`,
     )
     return rows[0]!.id
   }
@@ -241,7 +241,7 @@ conBase('lo que cuesta cerrar un tramo', () => {
       `select r.id from rutas r
          join comunidades o on o.id = r.origen_id
          join comunidades d on d.id = r.destino_id
-        where o.codigo = 'MER' and d.codigo = 'WIN' and r.temporada = 'lluvias'`,
+        where o.codigo = 'CH-QUI-MER' and d.codigo = 'CH-QUI-WIN' and r.temporada = 'lluvias'`,
     )
 
     expect(await comunidadesQueQuedanSinPaso(client, rows[0]!.id, 'lluvias')).toEqual(['Winandó'])
@@ -254,7 +254,7 @@ conBase('lo que cuesta cerrar un tramo', () => {
       `select r.id from rutas r
          join comunidades o on o.id = r.origen_id
          join comunidades d on d.id = r.destino_id
-        where o.codigo = 'QBD' and d.codigo = 'GUY'`,
+        where o.codigo = 'CH-QUI' and d.codigo = 'CH-QUI-GUA'`,
     )
 
     expect(await comunidadesQueQuedanSinPaso(client, rows[0]!.id, 'lluvias')).toEqual([])

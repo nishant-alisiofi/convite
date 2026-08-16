@@ -118,7 +118,7 @@ conBase('el daño y los tramos', () => {
                              severidad, descripcion, estado)
        select o.id, 'dano', 'whatsapp', c.id, '92', 3,
               'Se tapó el caño con palos y basura.', 'RECIBIDO'
-         from organizaciones o, comunidades c where c.codigo = 'MER' limit 1
+         from organizaciones o, comunidades c where c.codigo = 'CH-QUI-MER' limit 1
        returning id`,
     )
 
@@ -171,7 +171,7 @@ conBase('códigos de confirmación que nadie podría resolver', () => {
     // llegara a existir —fila vieja, inserción manual— alguien la ve.
     const { rows: pedidos } = await client.query<{ id: string; comunidad_id: string }>(
       `select p.id, p.comunidad_id from pedidos p join comunidades c on c.id = p.comunidad_id
-        where c.codigo = 'TAG' limit 1`,
+        where c.codigo = 'CH-QUI-TAG' limit 1`,
     )
     const { rows: envios } = await client.query<{ id: string }>(
       `insert into envios (codigo, modo, responsable_id, origen_nodo_id, cupo_familias, estado)
