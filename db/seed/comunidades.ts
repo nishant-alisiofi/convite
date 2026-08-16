@@ -22,6 +22,15 @@ export type ComunidadSemilla = {
   /** 1 data reliable · 2 intermittent · 3 voice/SMS only · 4 radio relay only. */
   tierConectividad: number
   intervaloChequeoDias: number
+  /**
+   * Where this coordinate came from. Omitted means `centroide` at 1000 m — a gazetteer
+   * centroid, which is what every row of the canonical basin below is. The demo basin sets
+   * it explicitly so the map has one of each: a `gps` pin the field team dropped, a
+   * `referida` circle relayed over radio, and centroids for the rest. Non-negotiable 2.2:
+   * the source is declared honestly and the precision matches it — never a pin over a guess.
+   */
+  ubicacionFuente?: 'gps' | 'centroide' | 'referida' | 'manual'
+  ubicacionPrecisionM?: number
 }
 
 export const COMUNIDADES_SEMILLA: ComunidadSemilla[] = [
@@ -191,3 +200,120 @@ export const COMUNIDADES_SEMILLA: ComunidadSemilla[] = [
 
 /** Rough bounding box of the Chocó basin, used by the seed validation tests. */
 export const BBOX_CHOCO = { minLat: 4.0, maxLat: 8.7, minLon: -77.9, maxLon: -75.8 }
+
+/**
+ * Demo-only communities, layered on top of the canonical basin for the staging walkthrough.
+ *
+ * ⚠ STAGING ONLY. These exist so every panel screen has something true-to-life to show and
+ * so the matcher produces its full spread of states — a coast the warehouse cannot reach
+ * (SIN_RUTA), a community whose own acopio is short (SIN_EXISTENCIA), one that has gone quiet
+ * (silence alert), and places on the map we have never heard a word from. They are kept out
+ * of COMUNIDADES_SEMILLA on purpose: that array is the fixture the matcher and map unit tests
+ * pin, and it stays exactly thirteen centroids.
+ *
+ * Coordinates are approximate places on the Pacific littoral (Bajo Baudó) and the Atrato /
+ * Río Quito, all inside BBOX_CHOCO. The source is set honestly per row — no pin over a guess.
+ */
+export const COMUNIDADES_DEMO: ComunidadSemilla[] = [
+  // ── Litoral del Bajo Baudó ──────────────────────────────────────────────────────────
+  // Off the Atrato graph entirely: no river connects the warehouse in Quibdó to the coast,
+  // which is exactly what makes a request here classify as SIN_RUTA.
+  {
+    codigo: 'PIZ',
+    nombre: 'Pizarro',
+    tipo: 'cabecera',
+    municipio: 'Bajo Baudó',
+    agrupador: 'Litoral del Baudó',
+    lat: 4.9553,
+    lon: -77.3653,
+    familiasEstimadas: 380,
+    tierConectividad: 2,
+    intervaloChequeoDias: 14,
+    // The field team stood on the pier and dropped a pin, so this one is a real point.
+    ubicacionFuente: 'gps',
+    ubicacionPrecisionM: 0,
+  },
+  {
+    codigo: 'SIV',
+    nombre: 'Sivirú',
+    tipo: 'corregimiento',
+    municipio: 'Bajo Baudó',
+    agrupador: 'Litoral del Baudó',
+    lat: 4.8992,
+    lon: -77.3808,
+    familiasEstimadas: 55,
+    tierConectividad: 3,
+    intervaloChequeoDias: 10,
+    // A gazetteer centroid, like the canonical basin.
+    ubicacionFuente: 'centroide',
+    ubicacionPrecisionM: 1000,
+  },
+  {
+    codigo: 'DOC',
+    nombre: 'Docampadó',
+    tipo: 'corregimiento',
+    municipio: 'Bajo Baudó',
+    agrupador: 'Litoral del Baudó',
+    lat: 4.7789,
+    lon: -77.3164,
+    familiasEstimadas: 40,
+    tierConectividad: 4,
+    intervaloChequeoDias: 7,
+    // We have never surveyed Docampadó; its location reached us over the radio net, so it is
+    // a wide `referida` circle — approximate on purpose (2.2).
+    ubicacionFuente: 'referida',
+    ubicacionPrecisionM: 2000,
+  },
+
+  // ── Río Quito: a community that has gone quiet ──────────────────────────────────────
+  // Sent one message eleven days ago and nothing since; its check-in interval is seven days,
+  // so it accrues silence on the Estado screen. Radio-relay tier, where silence says more
+  // about the signal than about the situation (Section 9.8).
+  {
+    codigo: 'BEB',
+    nombre: 'Bebedó',
+    tipo: 'corregimiento',
+    municipio: 'Río Quito',
+    agrupador: 'Río Quito',
+    lat: 5.3494,
+    lon: -76.8203,
+    familiasEstimadas: 90,
+    tierConectividad: 4,
+    intervaloChequeoDias: 7,
+    ubicacionFuente: 'centroide',
+    ubicacionPrecisionM: 1000,
+  },
+
+  // ── On the map, never heard from ────────────────────────────────────────────────────
+  // In the registry with coordinates but no message ever received (PRD §5.7). They render on
+  // the map and count as «nunca vistas» — a to-do list, not an alarm — rather than silence.
+  {
+    codigo: 'SAM',
+    nombre: 'Samurindó',
+    tipo: 'corregimiento',
+    municipio: 'Atrato',
+    agrupador: 'Vía Yuto',
+    lat: 5.6231,
+    lon: -76.6822,
+    familiasEstimadas: 65,
+    tierConectividad: 3,
+    intervaloChequeoDias: 10,
+    ubicacionFuente: 'centroide',
+    ubicacionPrecisionM: 1000,
+  },
+  {
+    codigo: 'PCO',
+    nombre: 'Puerto Conto',
+    tipo: 'corregimiento',
+    municipio: 'Bojayá',
+    agrupador: 'Atrato bajo',
+    lat: 6.5972,
+    lon: -76.9061,
+    familiasEstimadas: 110,
+    tierConectividad: 4,
+    intervaloChequeoDias: 7,
+    // Relayed coordinates again: nobody from Convite has been to Puerto Conto.
+    ubicacionFuente: 'referida',
+    ubicacionPrecisionM: 2000,
+  },
+]

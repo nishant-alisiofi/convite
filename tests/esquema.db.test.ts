@@ -1,6 +1,7 @@
 import type { PoolClient } from 'pg'
 import { Pool } from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { COMUNIDADES_DEMO, COMUNIDADES_SEMILLA } from '@/db/seed/comunidades'
 
 /**
  * Acceptance for M1, run against a real database: `pnpm db:up && pnpm db:reset && pnpm test`.
@@ -57,12 +58,23 @@ conBase('la cuenca queda consultable', () => {
     expect(rows).toHaveLength(1)
   })
 
-  it('siembra 13 comunidades con centroide declarado', async () => {
-    const { rows } = await client.query<{ n: string; fuentes: string[] }>(
-      `select count(*)::text as n, array_agg(distinct ubicacion_fuente) as fuentes from comunidades`,
+  it('siembra la cuenca con una fuente de ubicación declarada en cada comunidad', async () => {
+    // The canonical basin (all gazetteer centroids) plus the staging demo layer, which adds a
+    // GPS pin the field team dropped and radio-relayed circles for places only heard about.
+    const { rows } = await client.query<{ n: string; fuentes: string[]; sin_fuente: string }>(
+      `select count(*)::text as n,
+              array_agg(distinct ubicacion_fuente order by ubicacion_fuente) as fuentes,
+              count(*) filter (where ubicacion is null or ubicacion_fuente is null)::text as sin_fuente
+         from comunidades`,
     )
-    expect(rows[0]!.n).toBe('13')
-    expect(rows[0]!.fuentes).toEqual(['centroide'])
+    expect(rows[0]!.n).toBe(String(COMUNIDADES_SEMILLA.length + COMUNIDADES_DEMO.length))
+    // Non-negotiable 2.2: every stored point declares an honest source — nothing left blank.
+    expect(Number(rows[0]!.sin_fuente)).toBe(0)
+    for (const f of rows[0]!.fuentes) {
+      expect(['centroide', 'gps', 'referida', 'manual']).toContain(f)
+    }
+    // The basin is centroids at heart; the mix is the demo layer's, not a silent upgrade.
+    expect(rows[0]!.fuentes).toContain('centroide')
   })
 
   it('siembra el catálogo completo', async () => {

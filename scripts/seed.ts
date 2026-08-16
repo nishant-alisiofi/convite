@@ -5,20 +5,32 @@ import { closeDb, getPool } from '@/db/client'
 import { resolve } from 'node:path'
 import { almacenamientoLocal, raizDatos } from '@/lib/canales/almacenamiento'
 import { CATALOGO_SEMILLA, UNIDADES_SEMILLA } from '@/db/seed/catalogo'
-import { COMUNIDADES_SEMILLA } from '@/db/seed/comunidades'
+import { COMUNIDADES_DEMO, COMUNIDADES_SEMILLA, type ComunidadSemilla } from '@/db/seed/comunidades'
 import {
+  CAPACIDADES_DEMO,
   CAPACIDADES_SEMILLA,
+  CONTACTOS_DEMO,
   CONTACTOS_SEMILLA,
+  DESPACHO_DEMO,
+  EXISTENCIAS_DEMO,
   EXISTENCIAS_SEMILLA,
+  MENSAJES_DEMO,
+  NECESIDADES_DERIVADAS_DEMO,
   NECESIDADES_VERIFICADAS,
+  NECESIDADES_VERIFICADAS_DEMO,
+  NODOS_DEMO,
   NODOS_SEMILLA,
-  OFERTAS_SEMILLA,
   NOTA_DE_VOZ_SEMILLA,
+  NOTAS_DE_VOZ_DEMO,
+  OFERTAS_SEMILLA,
   REPORTES_SIN_VERIFICAR,
+  REPORTES_SIN_VERIFICAR_DEMO,
   USUARIOS_SEMILLA,
   VOLUNTARIOS_SEMILLA,
+  type NecesidadSemilla,
 } from '@/db/seed/operacion'
-import { RUTAS_SEMILLA } from '@/db/seed/rutas'
+import { RUTAS_DEMO, RUTAS_SEMILLA } from '@/db/seed/rutas'
+import { crearEnvio, despachar, ordenarPorRecorrido, ponerParada } from '@/lib/despacho/plan'
 import { emparejar } from '@/lib/matching/persistencia'
 import { temporadaVigente } from '@/lib/temporada'
 
@@ -51,6 +63,7 @@ async function main() {
     const nodos = await sembrarNodos(client, comunidades, contactos)
     await sembrarExistencias(client, nodos)
     await sembrarReportes(client, organizacionId, comunidades, contactos)
+    await sembrarMensajes(client, organizacionId, contactos)
     await sembrarCapacidades(client, contactos, nodos, comunidades)
     await sembrarOfertas(client, contactos)
     await sembrarVoluntarios(client, contactos, nodos)
@@ -64,6 +77,9 @@ async function main() {
   }
 
   await clasificar()
+  // Runs after the matcher so it dispatches a request the engine has marked LISTO, turning it
+  // EN_CAMINO. Its own transaction: a failed dispatch must not roll back the whole seed.
+  await sembrarDespacho()
   await resumen()
 }
 
@@ -100,10 +116,15 @@ async function clasificar(): Promise<void> {
 // ── Blocks ────────────────────────────────────────────────────────────────────────────
 
 async function sembrarOrganizacion(client: PoolClient): Promise<string> {
+  // `estado_aprobacion` is 'aprobada': the seeded centre is a partner already operating, so
+  // the panel is not gated behind the «en revisión» screen (§2.4, app/(panel)/layout.tsx).
+  // Without this the demo signs in to a waiting room and no screen shows any data. The insert
+  // defaults the column to 'pendiente', and 0034 only backfills organisations that predate it,
+  // never one the seed inserts afterwards — so it is set explicitly here.
   const { rows } = await client.query<{ id: string }>(
-    `insert into organizaciones (nombre, waba_phone_number_id, waba_id)
-       values ($1, $2, $3)
-     on conflict do nothing
+    `insert into organizaciones (nombre, waba_phone_number_id, waba_id, estado_aprobacion)
+       values ($1, $2, $3, 'aprobada')
+     on conflict (nombre) do update set estado_aprobacion = 'aprobada'
      returning id`,
     [ORGANIZACION, process.env.WHATSAPP_PHONE_NUMBER_ID ?? null, process.env.WHATSAPP_BUSINESS_ACCOUNT_ID ?? null],
   )
@@ -124,9 +145,15 @@ async function sembrarComunidades(
 ): Promise<Map<string, string>> {
   const mapa = new Map<string, string>()
 
-  for (const c of COMUNIDADES_SEMILLA) {
-    // ubicacion_fuente stays 'centroide' with a 1000 m radius: these are gazetteer
-    // centroids, not pins (non-negotiable 2.2).
+  // The canonical basin is all gazetteer centroids; the demo layer adds a couple of honest
+  // exceptions (a GPS pin the field team dropped on Pizarro, radio-relayed circles for the
+  // places we have only heard about). The source and radius come from the row, defaulting to
+  // 'centroide' / 1000 m — a coordinate is never silently promoted to a pin (non-negotiable 2.2).
+  const comunidades: ComunidadSemilla[] = [...COMUNIDADES_SEMILLA, ...COMUNIDADES_DEMO]
+
+  for (const c of comunidades) {
+    const fuente = c.ubicacionFuente ?? 'centroide'
+    const precision = c.ubicacionPrecisionM ?? 1000
     const { rows } = await client.query<{ id: string }>(
       `insert into comunidades (
          organizacion_id, codigo, nombre, tipo, municipio, agrupador,
@@ -134,7 +161,7 @@ async function sembrarComunidades(
          familias_estimadas, tier_conectividad, intervalo_chequeo_dias
        ) values (
          $1, $2, $3, $4, $5, $6,
-         st_setsrid(st_makepoint($7, $8), 4326), 'centroide', 1000,
+         st_setsrid(st_makepoint($7, $8), 4326), $12, $13,
          $9, $10, $11
        )
        on conflict (codigo) do update set
@@ -143,6 +170,8 @@ async function sembrarComunidades(
          municipio = excluded.municipio,
          agrupador = excluded.agrupador,
          ubicacion = excluded.ubicacion,
+         ubicacion_fuente = excluded.ubicacion_fuente,
+         ubicacion_precision_m = excluded.ubicacion_precision_m,
          familias_estimadas = excluded.familias_estimadas,
          tier_conectividad = excluded.tier_conectividad,
          intervalo_chequeo_dias = excluded.intervalo_chequeo_dias
@@ -159,6 +188,8 @@ async function sembrarComunidades(
         c.familiasEstimadas,
         c.tierConectividad,
         c.intervaloChequeoDias,
+        fuente,
+        precision,
       ],
     )
     mapa.set(c.codigo, rows[0]!.id)
@@ -214,7 +245,7 @@ async function sembrarContactos(
   const mapa = new Map<string, string>()
 
   const filas = [
-    ...CONTACTOS_SEMILLA.map((c) => ({
+    ...[...CONTACTOS_SEMILLA, ...CONTACTOS_DEMO].map((c) => ({
       telefono: c.telefono,
       nombre: c.nombre,
       rol: c.rol as string,
@@ -281,7 +312,7 @@ async function sembrarUsuarios(
 }
 
 async function sembrarRutas(client: PoolClient, comunidades: Map<string, string>): Promise<void> {
-  for (const r of RUTAS_SEMILLA) {
+  for (const r of [...RUTAS_SEMILLA, ...RUTAS_DEMO]) {
     const origen = comunidades.get(r.origen)
     const destino = comunidades.get(r.destino)
     if (!origen || !destino) {
@@ -323,7 +354,7 @@ async function sembrarNodos(
 ): Promise<Map<string, string>> {
   const mapa = new Map<string, string>()
 
-  for (const n of NODOS_SEMILLA) {
+  for (const n of [...NODOS_SEMILLA, ...NODOS_DEMO]) {
     const comunidadId = comunidades.get(n.comunidad)
     if (!comunidadId) throw new Error(`Nodo ${n.nombre}: comunidad ${n.comunidad} desconocida.`)
 
@@ -368,7 +399,7 @@ async function sembrarNodos(
 }
 
 async function sembrarExistencias(client: PoolClient, nodos: Map<string, string>): Promise<void> {
-  for (const bloque of EXISTENCIAS_SEMILLA) {
+  for (const bloque of [...EXISTENCIAS_SEMILLA, ...EXISTENCIAS_DEMO]) {
     const nodoId = nodos.get(bloque.nodo)
     if (!nodoId) throw new Error(`Existencias: nodo ${bloque.nodo} desconocido.`)
 
@@ -392,48 +423,22 @@ async function sembrarReportes(
   comunidades: Map<string, string>,
   contactos: Map<string, string>,
 ): Promise<void> {
+  // Verified needs — the canonical basin (all WhatsApp) and the demo layer (each carrying the
+  // channel it arrived on). Both promote to a `pedido` the matcher will classify.
   for (const [i, n] of NECESIDADES_VERIFICADAS.entries()) {
-    const semilla = `nec-${n.comunidad}-${n.codigoItem}-${i}`
-    if (await yaSembrado(client, semilla)) continue
-
-    // Reports arrive by WhatsApp without a location pin unless the person sent one. None of
-    // these did, so ubicacion stays null rather than borrowing the community centroid —
-    // "we do not know" is a valid and honest answer (non-negotiable 2.2).
-    const { rows } = await client.query<{ id: string }>(
-      `insert into reportes (
-         organizacion_id, tipo, canal, contacto_id, comunidad_id, codigo_item,
-         familias, urgencia, detalle_libre, descripcion,
-         estado, verificado_por, verificado_en, payload_crudo, creado_en
-       ) values (
-         $1, 'necesidad', 'whatsapp', $2, $3, $4,
-         $5, $6, $7, $8,
-         'VERIFICADO', $9, now() - make_interval(days => $10), $11, now() - make_interval(days => $10)
-       )
-       returning id`,
-      [
-        organizacionId,
-        contactos.get(n.telefono) ?? null,
-        comunidades.get(n.comunidad),
-        n.codigoItem,
-        n.familias,
-        n.urgencia,
-        n.detalleLibre ?? null,
-        marcado(n.descripcion),
-        n.verificadoPor,
-        n.diasAtras,
-        JSON.stringify({ semilla }),
-      ],
-    )
-
-    // The pedido is what the matcher works on. It is created here because a human already
-    // verified the report above; M2 leaves it ABIERTO until the engine classifies it.
-    await client.query(
-      `insert into pedidos (reporte_id, comunidad_id, codigo_item, familias, urgencia, estado)
-         values ($1, $2, $3, $4, $5, 'ABIERTO')`,
-      [rows[0]!.id, comunidades.get(n.comunidad), n.codigoItem, n.familias, n.urgencia],
-    )
+    await insertarNecesidadVerificada(client, organizacionId, comunidades, contactos, n, `nec-${n.comunidad}-${n.codigoItem}-${i}`, true)
+  }
+  for (const [i, n] of NECESIDADES_VERIFICADAS_DEMO.entries()) {
+    await insertarNecesidadVerificada(client, organizacionId, comunidades, contactos, n, `demo-nec-${n.comunidad}-${n.codigoItem}-${i}`, true)
   }
 
+  // Verified needs that are NOT cargo (apoyo psicosocial): a person travels, no box ships, so
+  // no `pedido` is created. They surface in the «derivaciones» list of the verification screen.
+  for (const [i, n] of NECESIDADES_DERIVADAS_DEMO.entries()) {
+    await insertarNecesidadVerificada(client, organizacionId, comunidades, contactos, n, `demo-der-${n.comunidad}-${n.codigoItem}-${i}`, false)
+  }
+
+  // The canonical verification queue (all WhatsApp).
   for (const [i, r] of REPORTES_SIN_VERIFICAR.entries()) {
     const semilla = `sinver-${r.comunidad}-${r.codigoItem}-${i}`
     if (await yaSembrado(client, semilla)) continue
@@ -462,7 +467,98 @@ async function sembrarReportes(
     )
   }
 
-  await sembrarNotaDeVoz(client)
+  // The demo verification queue: the same daily work, across all four channels, with a couple
+  // of things nobody could classify on arrival (item null → clarification, not a guess).
+  for (const r of REPORTES_SIN_VERIFICAR_DEMO) {
+    if (await yaSembrado(client, r.semilla)) continue
+
+    const payload: Record<string, unknown> = { semilla: r.semilla }
+    // A radio relay is two people: the speaker and the operator who keyed it in (PRD §5.8).
+    // Second-hand, so it waits for a human to confirm — which is what RECIBIDO already means.
+    if (r.relatadoPor) payload.relatado_por = r.relatadoPor
+
+    await client.query(
+      `insert into reportes (
+         organizacion_id, tipo, canal, contacto_id, comunidad_id, codigo_item,
+         familias, urgencia, severidad, detalle_libre, descripcion, estado, payload_crudo, creado_en
+       ) values (
+         $1, $2, $3, $4, $5, $6,
+         $7, $8, $9, $10, $11, 'RECIBIDO', $12, now() - make_interval(days => $13)
+       )`,
+      [
+        organizacionId,
+        r.tipo,
+        r.canal,
+        contactos.get(r.telefono) ?? null,
+        comunidades.get(r.comunidad),
+        r.codigoItem,
+        r.familias ?? null,
+        r.urgencia ?? null,
+        r.severidad ?? null,
+        r.detalleLibre ? marcado(r.detalleLibre) : null,
+        r.descripcion ? marcado(r.descripcion) : null,
+        JSON.stringify(payload),
+        r.diasAtras,
+      ],
+    )
+  }
+
+  await sembrarNotasDeVoz(client)
+}
+
+/**
+ * Inserts one verified need, carrying the channel it arrived on. Creates the `pedido` the
+ * matcher works on unless the need is not cargo (`crearPedido = false`), in which case it
+ * stays a verified report only — the referral list, never a shipment (Section 4.5).
+ *
+ * Location stays null: a WhatsApp or radio report has no pin unless the person sent one, and
+ * borrowing the community centroid would be inventing a precision (non-negotiable 2.2).
+ */
+async function insertarNecesidadVerificada(
+  client: PoolClient,
+  organizacionId: string,
+  comunidades: Map<string, string>,
+  contactos: Map<string, string>,
+  n: NecesidadSemilla,
+  semilla: string,
+  crearPedido: boolean,
+): Promise<void> {
+  if (await yaSembrado(client, semilla)) return
+
+  const { rows } = await client.query<{ id: string }>(
+    `insert into reportes (
+       organizacion_id, tipo, canal, contacto_id, comunidad_id, codigo_item,
+       familias, urgencia, detalle_libre, descripcion,
+       estado, verificado_por, verificado_en, payload_crudo, creado_en
+     ) values (
+       $1, 'necesidad', $2, $3, $4, $5,
+       $6, $7, $8, $9,
+       'VERIFICADO', $10, now() - make_interval(days => $11), $12, now() - make_interval(days => $11)
+     )
+     returning id`,
+    [
+      organizacionId,
+      n.canal ?? 'whatsapp',
+      contactos.get(n.telefono) ?? null,
+      comunidades.get(n.comunidad),
+      n.codigoItem,
+      n.familias,
+      n.urgencia,
+      n.detalleLibre ?? null,
+      marcado(n.descripcion),
+      n.verificadoPor,
+      n.diasAtras,
+      JSON.stringify({ semilla }),
+    ],
+  )
+
+  if (!crearPedido) return
+
+  await client.query(
+    `insert into pedidos (reporte_id, comunidad_id, codigo_item, familias, urgencia, estado)
+       values ($1, $2, $3, $4, $5, 'ABIERTO')`,
+    [rows[0]!.id, comunidades.get(n.comunidad), n.codigoItem, n.familias, n.urgencia],
+  )
 }
 
 /**
@@ -473,51 +569,46 @@ async function sembrarReportes(
  * because it can be synthesised here without pulling in an encoder, and every browser plays
  * one.
  */
-async function sembrarNotaDeVoz(client: PoolClient): Promise<void> {
-  const { rows } = await client.query<{ id: string }>(
-    `select id from reportes where payload_crudo->>'semilla' = $1`,
-    [NOTA_DE_VOZ_SEMILLA.semillaReporte],
-  )
-  const reporteId = rows[0]?.id
-  if (!reporteId) return
-
-  const { rowCount } = await client.query(
-    `select 1 from adjuntos where reporte_id = $1 and tipo = 'audio'`,
-    [reporteId],
-  )
-  if (rowCount) return
-
+async function sembrarNotasDeVoz(client: PoolClient): Promise<void> {
   // `raizDatos()` reads DATA_DIR with `??`, and `.env.example` ships `DATA_DIR=` empty — an
   // empty string is not nullish, so it resolves to the repo root and media lands in the
   // working tree. Operational data belongs outside the repo, so refuse rather than pollute.
+  // Checked once: if DATA_DIR is wrong, no voice note seeds and the warning prints once.
   const raiz = raizDatos()
   if (!raiz || resolve(raiz) === resolve(process.cwd())) {
     console.warn(
-      '\n  ⚠️  Nota de voz omitida: DATA_DIR está vacío, y el audio caería dentro del repo.\n' +
+      '\n  ⚠️  Notas de voz omitidas: DATA_DIR está vacío, y el audio caería dentro del repo.\n' +
         '     Póngale una ruta absoluta fuera del proyecto y vuelva a sembrar.\n',
     )
     return
   }
 
-  const bytes = tonoWav(NOTA_DE_VOZ_SEMILLA.segundos)
-  const hash = createHash('sha256').update(bytes).digest('hex')
-  const clave = `audio/${hash.slice(0, 2)}/${hash}.wav`
-  await almacenamientoLocal(raiz).guardar(clave, bytes)
+  for (const nota of [NOTA_DE_VOZ_SEMILLA, ...NOTAS_DE_VOZ_DEMO]) {
+    const { rows } = await client.query<{ id: string }>(
+      `select id from reportes where payload_crudo->>'semilla' = $1`,
+      [nota.semillaReporte],
+    )
+    const reporteId = rows[0]?.id
+    if (!reporteId) continue
 
-  await client.query(
-    `insert into adjuntos (reporte_id, tipo, storage_key, mime, bytes, duracion_seg,
-                           hash_sha256, transcripcion, transcripcion_confianza)
-     values ($1, 'audio', $2, 'audio/wav', $3, $4, $5, $6, $7)`,
-    [
-      reporteId,
-      clave,
-      bytes.byteLength,
-      NOTA_DE_VOZ_SEMILLA.segundos,
-      hash,
-      NOTA_DE_VOZ_SEMILLA.transcripcion,
-      NOTA_DE_VOZ_SEMILLA.confianza,
-    ],
-  )
+    const { rowCount } = await client.query(
+      `select 1 from adjuntos where reporte_id = $1 and tipo = 'audio'`,
+      [reporteId],
+    )
+    if (rowCount) continue
+
+    const bytes = tonoWav(nota.segundos)
+    const hash = createHash('sha256').update(bytes).digest('hex')
+    const clave = `audio/${hash.slice(0, 2)}/${hash}.wav`
+    await almacenamientoLocal(raiz).guardar(clave, bytes)
+
+    await client.query(
+      `insert into adjuntos (reporte_id, tipo, storage_key, mime, bytes, duracion_seg,
+                             hash_sha256, transcripcion, transcripcion_confianza)
+       values ($1, 'audio', $2, 'audio/wav', $3, $4, $5, $6, $7)`,
+      [reporteId, clave, bytes.byteLength, nota.segundos, hash, nota.transcripcion, nota.confianza],
+    )
+  }
 }
 
 /** A quiet sine tone as a 16-bit mono WAV. Placeholder audio, never a person's voice. */
@@ -552,7 +643,7 @@ async function sembrarCapacidades(
   nodos: Map<string, string>,
   comunidades: Map<string, string>,
 ): Promise<void> {
-  for (const c of CAPACIDADES_SEMILLA) {
+  for (const c of [...CAPACIDADES_SEMILLA, ...CAPACIDADES_DEMO]) {
     const contactoId = contactos.get(c.telefono)
     const nodoId = nodos.get(c.origenNodo)
     const comunidadId = comunidades.get(c.hastaComunidad)
@@ -694,6 +785,135 @@ async function yaSembrado(client: PoolClient, semilla: string): Promise<boolean>
   return Boolean(rowCount)
 }
 
+/**
+ * Raw inbound messages, one per demo report plus the standalone that makes Bebedó go quiet.
+ * This is the layer the whole «AI ingestion from multiple channels» story rests on: the same
+ * pipeline behind WhatsApp, SMS, an IVR callback and radio relay. Idempotent on the provider
+ * message id, exactly the way real intake is (non-negotiable 2.7).
+ */
+async function sembrarMensajes(
+  client: PoolClient,
+  organizacionId: string,
+  contactos: Map<string, string>,
+): Promise<void> {
+  for (const m of MENSAJES_DEMO) {
+    let reporteId: string | null = null
+    if (m.reporteSemilla) {
+      const { rows } = await client.query<{ id: string }>(
+        `select id from reportes where payload_crudo->>'semilla' = $1`,
+        [m.reporteSemilla],
+      )
+      reporteId = rows[0]?.id ?? null
+    }
+
+    await client.query(
+      `insert into mensajes (
+         organizacion_id, proveedor, proveedor_mensaje_id, direccion, canal,
+         telefono, contacto_id, reporte_id, cuerpo, estado, payload, creado_en
+       ) values (
+         $1, $2, $3, $4, $5,
+         $6, $7, $8, $9, $10, $11, now() - make_interval(days => $12)
+       )
+       on conflict (proveedor, proveedor_mensaje_id) where proveedor_mensaje_id is not null
+         do nothing`,
+      [
+        organizacionId,
+        m.proveedor,
+        m.id,
+        m.direccion,
+        m.canal,
+        m.telefono,
+        contactos.get(m.telefono) ?? null,
+        reporteId,
+        marcado(m.cuerpo),
+        m.direccion === 'entrante' ? 'recibido' : 'entregado',
+        m.payload ? JSON.stringify(m.payload) : null,
+        m.diasAtras,
+      ],
+    )
+  }
+}
+
+/**
+ * The demo dispatch, run after the matcher so it acts on a request the engine has already
+ * marked LISTO. Sends one trip end to end through the real dispatch path — plan, load, send —
+ * so Envíos, the manifest, and its four-digit codes are populated and one request shows
+ * EN_CAMINO. Idempotent: it is skipped once any shipment exists.
+ *
+ * The trip fully covers its one stop (50 of a 60 cupo), so no rationing decision is required
+ * and the shipment leaves clean. See DESPACHO_DEMO.
+ */
+async function sembrarDespacho(): Promise<void> {
+  const pool = getPool()
+  const client = await pool.connect()
+  try {
+    await client.query('begin')
+
+    const yaHay = await client.query('select 1 from envios limit 1')
+    if ((yaHay.rowCount ?? 0) > 0) {
+      await client.query('commit')
+      return
+    }
+
+    const { rows: caps } = await client.query<{ id: string }>(
+      `select c.id
+         from capacidades c
+         join contactos ct on ct.id = c.contacto_id
+         join comunidades com on com.id = c.hasta_comunidad_id
+        where ct.telefono = $1 and com.codigo = $2 and c.estado = 'OFRECIDA'
+        order by c.creado_en
+        limit 1`,
+      [DESPACHO_DEMO.transportistaTelefono, DESPACHO_DEMO.hastaComunidad],
+    )
+    const { rows: peds } = await client.query<{ id: string; familias: number }>(
+      `select p.id, p.familias
+         from pedidos p
+         join comunidades com on com.id = p.comunidad_id
+        where com.codigo = $1 and p.codigo_item = $2
+        order by p.creado_en
+        limit 1`,
+      [DESPACHO_DEMO.pedidoComunidad, DESPACHO_DEMO.pedidoCodigoItem],
+    )
+    const { rows: desp } = await client.query<{ id: string }>(
+      `select id from usuarios where rol_staff = 'despachador' order by creado_en limit 1`,
+    )
+
+    const capacidadId = caps[0]?.id
+    const pedido = peds[0]
+    const despachadorId = desp[0]?.id
+    if (!capacidadId || !pedido || !despachadorId) {
+      console.warn('\n  ⚠️  Despacho demo omitido: falta la capacidad, el pedido o el despachador.\n')
+      await client.query('commit')
+      return
+    }
+
+    const abierto = await crearEnvio(client, capacidadId, despachadorId)
+    if (!abierto.ok || !abierto.id) {
+      throw new Error(`No se pudo abrir el envío demo: ${abierto.ok ? 'sin id' : abierto.error}`)
+    }
+    const puesta = await ponerParada(client, abierto.id, pedido.id, pedido.familias)
+    if (!puesta.ok) throw new Error(`No se pudo armar el envío demo: ${puesta.error}`)
+    await ordenarPorRecorrido(client, abierto.id, await temporadaVigente(client))
+    const enviado = await despachar(client, abierto.id, despachadorId)
+    if (!enviado.ok) throw new Error(`No se pudo despachar el envío demo: ${enviado.error}`)
+
+    // While it was LISTO the matcher left an unconfirmed proposal on this request; now that it
+    // is EN_CAMINO the engine will never revisit it to tidy up (it only touches open states),
+    // so drop the stale proposal here. Keeps «only LISTO requests carry a proposal» true.
+    await client.query(
+      `delete from emparejamientos where pedido_id = $1 and confirmado_por is null`,
+      [pedido.id],
+    )
+
+    await client.query('commit')
+  } catch (error) {
+    await client.query('rollback')
+    throw error
+  } finally {
+    client.release()
+  }
+}
+
 // ── Report ────────────────────────────────────────────────────────────────────────────
 
 async function resumen(): Promise<void> {
@@ -720,6 +940,32 @@ async function resumen(): Promise<void> {
   )
   console.log('\nPedidos por estado (ya pasaron por el emparejador):')
   for (const p of pendientes) console.log(`  ${p.estado.padEnd(16)} ${p.n}`)
+
+  const { rows: porCanal } = await pool.query<{ canal: string; n: string }>(
+    'select canal, count(*)::text as n from reportes group by canal order by canal',
+  )
+  console.log('\nReportes por canal (ingesta multicanal):')
+  for (const c of porCanal) console.log(`  ${c.canal.padEnd(16)} ${c.n}`)
+
+  const { rows: extra } = await pool.query<{ tabla: string; filas: string }>(`
+    select 'mensajes' as tabla, count(*)::text as filas from mensajes
+    union all select 'reportes RECIBIDO', count(*)::text from reportes where estado = 'RECIBIDO'
+    union all select 'notas de voz',      count(*)::text from adjuntos where tipo = 'audio'
+    union all select 'ofertas',           count(*)::text from ofertas
+    union all select 'envios',            count(*)::text from envios
+    union all select 'entregas',          count(*)::text from entregas
+    union all select 'comunidades calladas', count(*)::text from comunidades c
+      where c.activa and exists (
+        select 1 from (
+          select co.comunidad_id as cid, m.creado_en as cuando from mensajes m
+            join contactos co on co.id = m.contacto_id where m.direccion = 'entrante'
+          union all select r.comunidad_id, r.creado_en from reportes r where r.comunidad_id is not null
+        ) s where s.cid = c.id
+        group by s.cid having max(s.cuando) < now() - make_interval(days => c.intervalo_chequeo_dias)
+      )
+  `)
+  console.log('\nCapa de canales y despacho:')
+  for (const e of extra) console.log(`  ${e.tabla.padEnd(22)} ${e.filas}`)
   console.log()
 }
 
