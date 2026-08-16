@@ -69,6 +69,9 @@ const POLITICA: Record<string, 'publica' | 'autenticada'> = {
   // §5.9 connection points (PRD-10) and the earmarked-sponsorship desk (PRD-12). Both behind a
   // session; each refuses the wrong role rather than leaking, like the rest of the panel.
   '/conexion': 'autenticada',
+  // PRD-11 radio ingestion: attestation management and the manual relay intake. Behind a
+  // session; radio is off per community until a coordinator attests, and RLS is the boundary.
+  '/radio': 'autenticada',
   '/apadrinar': 'autenticada',
   '/ajustes': 'autenticada',
   '/estado': 'autenticada',
