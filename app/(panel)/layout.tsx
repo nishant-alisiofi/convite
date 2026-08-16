@@ -29,6 +29,12 @@ const SECCIONES: {
   { href: '/rutas', etiqueta: 'Rutas', listo: true },
   { href: '/recogidas', etiqueta: 'Recogidas', listo: true },
   { href: '/envios', etiqueta: 'Envíos', listo: true },
+  {
+    href: '/apadrinar',
+    etiqueta: 'Apadrinar',
+    listo: true,
+    ver: (s) => s.rolStaff === 'coordinador' || s.rolStaff === 'admin',
+  },
   { href: '/comunidades', etiqueta: 'Comunidades' },
   { href: '/catalogo', etiqueta: 'Catálogo' },
   {
