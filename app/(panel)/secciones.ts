@@ -101,6 +101,7 @@ export const SECCIONES: SeccionNav[] = [
       { href: '/evaluaciones', etiqueta: 'Evaluaciones', listo: true }, // PRD-29
       { href: '/rutas', etiqueta: 'Rutas', listo: true },
       { href: '/conexion', etiqueta: 'Puntos de conexión', listo: true },
+      { href: '/mapa-offline', etiqueta: 'Mapa sin conexión', listo: true }, // PRD-13
     ],
   },
   {
@@ -110,6 +111,8 @@ export const SECCIONES: SeccionNav[] = [
     items: [
       { href: '/comunidades', etiqueta: 'Red', listo: true, ver: VE_REGISTRO },
       { href: '/radio', etiqueta: 'Radio', listo: true }, // PRD-11
+      { href: '/manual', etiqueta: 'Entrada manual', listo: true }, // PRD-35
+      { href: '/registro', etiqueta: 'Correcciones del registro', listo: true }, // PRD-35
       { href: '/estado#silencio', etiqueta: 'Silencio', listo: true, ver: VE_SILENCIO },
     ],
   },
@@ -144,7 +147,7 @@ export const SECCIONES: SeccionNav[] = [
     etiqueta: 'Informes',
     ver: rol(['coordinador', 'admin', 'lectura']),
     items: [
-      { href: '', etiqueta: 'Cobertura' }, // §18
+      { href: '/coordinacion', etiqueta: 'Cobertura', listo: true }, // PRD-35
       { href: '', etiqueta: 'Entregas y evidencia' }, // §18
       { href: '/apadrinar', etiqueta: 'Apadrinamientos', listo: true, ver: VE_APADRINAR },
       { href: '', etiqueta: 'Exportes' }, // §18
