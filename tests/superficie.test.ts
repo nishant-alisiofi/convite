@@ -73,6 +73,9 @@ const POLITICA: Record<string, 'publica' | 'autenticada'> = {
   // session; radio is off per community until a coordinator attests, and RLS is the boundary.
   '/radio': 'autenticada',
   '/apadrinar': 'autenticada',
+  // PRD-29 assessments & recovery (levels 2–4, coverage, bill of materials). Behind a session;
+  // RLS is the boundary, and it refuses the wrong role with a legible note like the rest of the panel.
+  '/evaluaciones': 'autenticada',
   '/ajustes': 'autenticada',
   '/estado': 'autenticada',
   '/verificacion': 'autenticada',
