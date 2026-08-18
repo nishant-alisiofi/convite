@@ -5,7 +5,7 @@ self-contained markdown. Each file carries its own acceptance criteria and, for 
 ordered **Codex validation** checklist that a validator runs on **`staging.convite.ai`**.
 
 **Numbering:** one shared sequence, type-prefixed (`PRD-` feature/scoped, `BUG-` defect,
-`FR-` open request). IDs are forever — never renumber. Highest allocated ID: **PRD-39**.
+`FR-` open request). IDs are forever — never renumber. Highest allocated ID: **FR-48**.
 
 > **Governing spec:** `docs/PRD_Convite_v3.md` (v3.0, Aug 2026) **supersedes the earlier PRDs**
 > (`docs/PRD.md` and the v1.0/v2 vision) as the canonical product specification. v3 is written
@@ -127,6 +127,35 @@ tables) → **then** `PRD-38` (run the seed). The seed needs only the *schema* f
 unblockable ahead of the feature logic in `PRD-16` (ceiling), `PRD-30` (jornadas) and `PRD-35`
 (vouching). The `territorio.sql` registry data is valid for **both staging and production** (it is
 the community registry, not demo test data) — unlike the staging-only demo `db:seed` reports/pedidos.
+
+---
+
+## Nishant field-feedback wrap-up (Chocó / Doña Marta, Aug 2026) — building now
+
+Source: Nishant's relay of Red de Mujeres Chocanas / Doña Marta field feedback (2026-08-17).
+**"Missed call with a recorded call back is the feature they need the most."** Provider path:
+Infobip (`infobip.com/docs`), which matches PRD-15's already-specified missed-call design.
+
+**Flagship — implements PRD-15 (voice + SMS via Infobip):** missed call → early-media
+«lo llamamos ya» (audible during ringing, caller **never billed**) → callback IVR → record →
+intake → verification, plus the Infobip **SMS** driver. Copy is **«solo marque»** (BUG-26 — the
+system disconnects, not the caller). Live test is blocked on Nishant provisioning the Infobip
+account + Colombian voice number + account-manager activation of recordings/early media.
+
+| ID | Title | Type | Priority | Status |
+|----|-------|------|----------|--------|
+| [PRD-15](PRD-15-gateways-sms-voz.md) | Infobip voice missed-call + SMS gateway (build) | PRD | P1 | 🔨 In progress (adapter; live test pending Infobip number) |
+| [FR-42](FR-42-busqueda-rapida-personas.md) | Fast person/beneficiary search | FR | P2 | 🔨 In progress |
+| [FR-43](FR-43-caducidad-perecederos-alertas.md) | Perishable expiry tracking + alerts | FR | P2 | 🔨 In progress |
+| [FR-44](FR-44-inventario-farmacias-locales.md) | Local pharmacy inventory | FR | P3 | 🔨 In progress |
+| [FR-45](FR-45-categorias-bienes-ayuda.md) | Relief-goods categories (food/medical/construction) | FR | P2 | 🔨 In progress |
+| [FR-46](FR-46-lanchas-costo-y-pago.md) | Paid boat (lancha) logistics: cost + operator pay | FR | P2 | 🔨 In progress |
+| [PRD-47](PRD-47-red-de-lancheros-datos.md) | Lanchero relay network for data collection | PRD | P3 | 🔨 In progress (assumptions — partner review) |
+| [FR-48](FR-48-servicios-de-ingenieria.md) | Engineering / technical evaluation services | FR | P3 | 🔨 In progress (extend PRD-29) |
+
+**Also in this wrap-up (not a new WI):** WhatsApp live-number verification — number registered
+(+57 300 510 1284), production webhook green, env vars set on app + worker; blocked only on a real
+inbound test (needs a phone + confirming the `messages` field is subscribed + the app is published).
 
 ---
 

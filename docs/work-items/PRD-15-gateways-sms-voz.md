@@ -3,7 +3,8 @@
 - **Type:** PRD
 - **Tier:** 2 — Roadmap (from PRD v1.0)
 - **Priority:** P1
-- **Status:** Backlog
+- **Status:** In progress — Infobip adapter build (2026-08-18); live test pending the Infobip
+  account + Colombian voice number (Nishant provisioning)
 - **Source:** PRD v1.0 (four channels, live); PRD.md D1/D2 + M6/M10 (SMS driver + IVR built
   against simulators; real aggregator pending D2).
 
