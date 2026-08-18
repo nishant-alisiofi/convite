@@ -4,13 +4,7 @@ import { type DepsIntake, recibirSobre } from '../intake'
 import { COPIA } from '../salidas'
 import { despachar } from '../despachador'
 import { esquemaSobreEntrante, type SobreEntrante, VERSION_CONTRATO } from '../tipos'
-import {
-  aE164,
-  esquemaLlamadaEntrante,
-  type LlamadaEntrante,
-  PROVEEDOR_VOZ_SIMULADOR,
-  type ProveedorVoz,
-} from './driver'
+import { aE164, esquemaLlamadaEntrante, type LlamadaEntrante, type ProveedorVoz } from './driver'
 import { dictarFolio, opcionDe, PROMPTS, tipoDeIntencion } from './menu'
 
 /**
@@ -65,7 +59,7 @@ export async function recibirLlamadaPerdida(
      returning id`,
     [
       organizacionId,
-      PROVEEDOR_VOZ_SIMULADOR,
+      deps.proveedor.nombre,
       p.id,
       telefono,
       p.recibidaEn ? new Date(p.recibidaEn) : ahora,
@@ -76,7 +70,7 @@ export async function recibirLlamadaPerdida(
 
   const { rows: previas } = await client.query<{ id: string }>(
     'select id from llamadas where proveedor = $1 and proveedor_llamada_id = $2',
-    [PROVEEDOR_VOZ_SIMULADOR, p.id],
+    [deps.proveedor.nombre, p.id],
   )
   return { llamadaId: previas[0]!.id, telefono, duplicada: true }
 }
@@ -148,7 +142,7 @@ export async function devolverLlamada(
 
   const sobre: SobreEntrante = esquemaSobreEntrante.parse({
     version: VERSION_CONTRATO,
-    proveedor: PROVEEDOR_VOZ_SIMULADOR,
+    proveedor: deps.proveedor.nombre,
     canal: 'ivr',
     // A keypress is structural channel knowledge, like the printed card's code — so it may
     // set the type. It still does not choose an item: that waits for a transcript.

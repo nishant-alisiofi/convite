@@ -55,6 +55,10 @@ const POLITICA: Record<string, 'publica' | 'autenticada'> = {
   '/api/auth/[...all]': 'publica',
   '/api/salud': 'publica',
   '/api/webhooks/whatsapp': 'publica',
+  // PRD-15: the Infobip Calls webhook. Public by necessity — Infobip carries no session
+  // cookie — and safe the same way the WhatsApp one is: it is authenticated by a shared
+  // secret checked in constant time (lib/canales/voz/firma.ts), not by the session layer.
+  '/api/webhooks/voz': 'publica',
   '/api/jobs/correr': 'publica',
   // §28.1 (PRD-34): the per-membership .ics Agenda feed. Reachable without a session (a calendar
   // app holds no cookie) but authenticated by the token in the URL — a stranger with no valid

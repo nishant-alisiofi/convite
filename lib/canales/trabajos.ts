@@ -6,6 +6,7 @@ import { anotarMedia, recalcularEnlace } from './enlace'
 import { type DepsIntake, recibirSobre, resolverOrganizacion } from './intake'
 import { procesarMedia, type ProveedorMedia, proveedorMediaWhatsApp } from './media'
 import { type TranscripcionPort, transcripcionPendiente } from './transcripcion'
+import { MANEJADORES_VOZ } from './voz/trabajos'
 import { interpretarWebhook, PROVEEDOR_WHATSAPP } from './whatsapp/payload'
 
 /**
@@ -157,4 +158,6 @@ export function manejadorWebhookWhatsApp(deps: DepsIntake = {}): ManejadorJob {
 export const MANEJADORES_CANALES: Record<string, ManejadorJob> = {
   procesar_webhook_whatsapp: manejadorWebhookWhatsApp(),
   descargar_media: async (job, client) => manejadorDescargarMedia(depsMediaPorDefecto())(job, client),
+  // PRD-15: the voice channel registers its own handler the same way, in lib/canales/voz/trabajos.ts.
+  ...MANEJADORES_VOZ,
 }

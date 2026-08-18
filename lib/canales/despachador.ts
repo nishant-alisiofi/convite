@@ -3,7 +3,7 @@ import type { Canal } from '@/db/schema/vocabulario'
 import { comoConfirmar, type PerfilContacto } from './politica'
 import { recortarAUnSegmento, segmentar } from './sms/segmentos'
 import { type EstadoPresupuesto, revisarTopes } from './topes'
-import { PROVEEDOR_VOZ_SIMULADOR, type ProveedorVoz } from './voz/driver'
+import type { ProveedorVoz } from './voz/driver'
 import { type ContextoVentana, decidirSalida, type DecisionVentana, type Plantilla } from './ventana'
 
 /**
@@ -242,7 +242,7 @@ export async function llamarDeVuelta(
        returning id`,
       [
         destino.organizacionId,
-        PROVEEDOR_VOZ_SIMULADOR,
+        deps.proveedor.nombre,
         destino.contactoId ?? null,
         destino.telefono,
         veredicto.motivo,
@@ -266,7 +266,7 @@ export async function llamarDeVuelta(
      returning id`,
     [
       destino.organizacionId,
-      PROVEEDOR_VOZ_SIMULADOR,
+      deps.proveedor.nombre,
       salida.idExterno,
       destino.contactoId ?? null,
       destino.telefono,
