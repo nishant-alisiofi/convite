@@ -14,6 +14,7 @@ import {
 } from '@/lib/despacho/plan'
 import { fechaHoraCorta } from '@/lib/fechas'
 import {
+  esModoFluvial,
   lancherosDisponibles,
   marcarPagoLancheroPagado,
   pagosDeEnvio,
@@ -202,7 +203,7 @@ export default async function Envio({
         </p>
       )}
 
-      {manifiesto.modo === 'lancha' && (
+      {esModoFluvial(manifiesto.modo) && (
         <section className="mt-6 rounded-lg border border-barro-200 bg-white px-4 py-4">
           <h2 className="flex items-center gap-2 font-semibold text-barro-900">
             <Ship className="size-4" aria-hidden />

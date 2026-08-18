@@ -148,6 +148,9 @@ export const CATALOGO_SEMILLA: ItemSemilla[] = [
     itemLabel: 'Plásticos y tejas',
     tipo: 'necesidad',
     ayudaTexto: 'Para tapar el techo o levantar un cambuche.',
+    // FR-45: roofing sheet/tarp, the same repair material as family 7's «Láminas de zinc» —
+    // not a forced mapping (unlike cobijas/colchonetas, this one genuinely is a building good).
+    familiaAyuda: 'construccion',
   },
   {
     codigo: '34',

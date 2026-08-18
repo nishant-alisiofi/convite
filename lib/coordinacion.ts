@@ -1,4 +1,5 @@
 import type { PoolClient } from 'pg'
+import type { FamiliaAyuda } from '@/db/schema/vocabulario'
 
 /**
  * The aggregate coordination read layer (PRD-35, §29.3b).
@@ -12,6 +13,11 @@ import type { PoolClient } from 'pg'
  * migration 0052 — never another organisation's community-level operational detail, which §29.3b
  * says is negotiated bilaterally and is never default. The functions cross organisations; this
  * module only shapes their output for the page.
+ *
+ * FR-45: `panoramaCoordinacion` takes an optional coarse aid family (alimentos/medicinas/
+ * construcción) and narrows the demand counts (pendientes/atendidos) to it — migration 0060's
+ * `convite_coordinacion_demanda(text)`. Coverage and closed-leg facts are not goods-shaped, so
+ * they stay basin-wide regardless of the filter.
  */
 
 export type MunicipioCoordinacion = {
@@ -43,14 +49,23 @@ export type Coordinacion = {
   tramosCerrados: TramoCerrado[]
 }
 
-/** The whole coordination picture, assembled from the three aggregate functions. */
-export async function panoramaCoordinacion(client: PoolClient): Promise<Coordinacion> {
+/**
+ * The whole coordination picture, assembled from the three aggregate functions.
+ *
+ * `familiaAyuda` narrows the demand counts to one of the three FR-45 families; `null` (the
+ * default) reads every family, same as before the filter existed.
+ */
+export async function panoramaCoordinacion(
+  client: PoolClient,
+  familiaAyuda: FamiliaAyuda | null = null,
+): Promise<Coordinacion> {
   const [cobertura, demanda, cerrados] = await Promise.all([
     client.query<{ municipio: string; comunidad: string; cubierta: boolean }>(
       `select municipio, comunidad, cubierta from convite_coordinacion_comunidades()`,
     ),
     client.query<{ municipio: string; pendientes: string; atendidos: string }>(
-      `select municipio, pendientes, atendidos from convite_coordinacion_demanda()`,
+      `select municipio, pendientes, atendidos from convite_coordinacion_demanda($1)`,
+      [familiaAyuda],
     ),
     client.query<{
       origen: string

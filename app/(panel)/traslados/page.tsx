@@ -12,6 +12,7 @@ import {
   type Traslado,
 } from '@/lib/traslados'
 import {
+  esModoFluvial,
   lancherosDisponibles,
   type LancheroOpcion,
   marcarPagoLancheroPagado,
@@ -75,7 +76,7 @@ export default async function Traslados({ searchParams }: { searchParams: Params
       const { rows: comunidades } = await client.query<{ id: string; nombre: string }>(
         `select id, nombre from comunidades where activa order by nombre`,
       )
-      const conLancha = traslados.filter((t) => t.capacidadModo === 'lancha')
+      const conLancha = traslados.filter((t) => esModoFluvial(t.capacidadModo))
       const pagosPorTraslado: Record<string, PagoLanchero[]> = {}
       for (const t of conLancha) {
         pagosPorTraslado[t.id] = await pagosDeTraslado(client, t.id)
@@ -521,7 +522,7 @@ function Tarjeta({
         {t.estado === 'REGRESADO' && <span className="text-xs text-selva-700">De vuelta en casa.</span>}
       </div>
 
-      {t.capacidadModo === 'lancha' && (
+      {esModoFluvial(t.capacidadModo) && (
         <div className="mt-3 rounded border border-barro-200 bg-barro-50 px-3 py-2">
           <p className="flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-barro-600">
             <Ship className="size-3.5" aria-hidden />

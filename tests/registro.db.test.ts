@@ -422,6 +422,28 @@ conBase('la capa de coordinación agregada (§29.3b)', () => {
     expect(Number(rows[0]!.pendientes)).toBeGreaterThanOrEqual(1)
   })
 
+  it('FR-45: /coordinacion puede acotar la demanda a una de las tres familias', async () => {
+    // El pedido sembrado es codigo '11' (Mercado y alimentos → familia_ayuda = 'alimentos').
+    const alimentos = await client.query<{ pendientes: string }>(
+      `select pendientes from convite_coordinacion_demanda('alimentos') where municipio = 'MuniPrueba'`,
+    )
+    expect(alimentos.rows).toHaveLength(1)
+    expect(Number(alimentos.rows[0]!.pendientes)).toBeGreaterThanOrEqual(1)
+
+    // Ninguna necesidad sembrada aquí es construcción — el municipio no aparece para esa familia.
+    const construccion = await client.query<{ municipio: string }>(
+      `select municipio from convite_coordinacion_demanda('construccion') where municipio = 'MuniPrueba'`,
+    )
+    expect(construccion.rows).toHaveLength(0)
+
+    // null (o sin argumento) sigue leyendo todas las familias, igual que antes del filtro.
+    const todas = await client.query<{ pendientes: string }>(
+      `select pendientes from convite_coordinacion_demanda(null) where municipio = 'MuniPrueba'`,
+    )
+    expect(todas.rows).toHaveLength(1)
+    expect(todas.rows[0]!.pendientes).toBe(alimentos.rows[0]!.pendientes)
+  })
+
   it('lista los tramos reportados cerrados por nombre de comunidad', async () => {
     const { rows } = await client.query<{ origen: string; destino: string }>(
       `select origen, destino from convite_coordinacion_tramos_cerrados() where origen = 'Coord Uno'`,

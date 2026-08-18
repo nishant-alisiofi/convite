@@ -558,7 +558,17 @@ export async function cerrarCompra(client: PoolClient, id: string, actorId: stri
   return (rowCount ?? 0) > 0
 }
 
-/** Add a piece of documentary/photographic evidence (steps 3 and 6). Append-only. */
+/**
+ * Add a piece of documentary/photographic evidence (steps 3 and 6). Append-only.
+ *
+ * PRD-9: the chain cannot skip a step — `foto`/`documento`/`acta` are step 6's closing evidence,
+ * so they can only be filed once step 4 (verification) is done; `recibo` is step 3's own evidence
+ * and is exempt (`registrarRecibo` files it in the same transaction that moves the compra to
+ * `COMPRADA`, before verification exists). The real guard is `compra_local_evidencias_agrega`'s
+ * `with check` (migration 0060) — RLS refuses the insert outright, exactly like every other
+ * boundary in this module; the query here only turns that refusal into a message a coordinator
+ * can read, by checking the same condition first.
+ */
 export async function agregarEvidencia(
   client: PoolClient,
   id: string,
@@ -566,12 +576,32 @@ export async function agregarEvidencia(
   referencia: string,
   descripcion: string | null,
   actorId: string,
-): Promise<void> {
-  await client.query(
-    `insert into compra_local_evidencias (compra_id, tipo, referencia, descripcion, subido_por)
-     values ($1, $2, $3, $4, $5)`,
-    [id, tipo, referencia, descripcion, actorId],
-  )
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (tipo !== 'recibo') {
+    const { rows } = await client.query<{ estado: string }>(
+      `select estado from compras_locales where id = $1`,
+      [id],
+    )
+    const estado = rows[0]?.estado
+    if (!estado) return { ok: false, error: 'Esa compra no existe.' }
+    if (!['VERIFICADA', 'DISTRIBUIDA', 'CERRADA'].includes(estado)) {
+      return {
+        ok: false,
+        error: 'Verifique que los materiales llegaron antes de agregar esta evidencia.',
+      }
+    }
+  }
+
+  try {
+    await client.query(
+      `insert into compra_local_evidencias (compra_id, tipo, referencia, descripcion, subido_por)
+       values ($1, $2, $3, $4, $5)`,
+      [id, tipo, referencia, descripcion, actorId],
+    )
+    return { ok: true }
+  } catch {
+    return { ok: false, error: 'No se pudo agregar la evidencia.' }
+  }
 }
 
 export { TIPOS_EVIDENCIA_COMPRA }

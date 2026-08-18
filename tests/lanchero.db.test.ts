@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import type { PoolClient } from 'pg'
 import { Pool } from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { cargarBandeja } from '@/lib/verificacion/bandeja'
 
 /**
  * FR-46 (lancha: costo y pago al lanchero) + PRD-47 (red de lancheros para relevo de datos),
@@ -315,6 +316,24 @@ conBase('lancheros_comunidades + registrar_reporte_relevo — PRD-47 red de lanc
       expect(fila.canal).toBe('relevo')
       expect(fila.relevo_lanchero_id).toBe(LANCHERO)
       expect(fila.comunidad_id).toBe(COM_A)
+    })
+  })
+
+  it('la bandeja de verificación trae el nombre del lanchero que relevó (AC #3, PRD-47)', async () => {
+    // The verifier card shows the origin community and the «relevo de lanchero» badge from the
+    // report's own columns — this is the one field cargarBandeja has to join for, since a
+    // relayed report carries no `contacto_id` (it is attributed to the lanchero, not a reporter).
+    await como(COORD, async () => {
+      await client.query(
+        `select * from registrar_reporte_relevo($1, $2, null, 5, 2, $3, null)`,
+        [LANCHERO, COM_A, 'Para la bandeja'],
+      )
+      const bandeja = await cargarBandeja(client)
+      const fila = bandeja.pendientes.find((r) => r.canal === 'relevo' && r.detalleLibre === 'Para la bandeja')
+      expect(fila).toBeDefined()
+      expect(fila!.relevoLancheroNombre).toBe('Don Lanchero')
+      // A relayed report never carries a reporting contact — the relaying lanchero is the only name.
+      expect(fila!.contacto).toBeNull()
     })
   })
 

@@ -82,6 +82,10 @@ export default function Tarjeta({
         {r.item ?? 'sin ítem'}
         {r.familias !== null && ` · ${r.familias} familia${r.familias === 1 ? '' : 's'}`}
         {r.contacto && ` · ${r.contacto}`}
+        {/* PRD-47: a relayed report carries no `contacto` — it is attributed to the lanchero
+            who relayed it, not a reporting contact — so the chain (origin community above,
+            relaying lanchero here) needs its own line to be visible. */}
+        {r.canal === 'relevo' && r.relevoLancheroNombre && ` · relevado por ${r.relevoLancheroNombre}`}
       </p>
 
       {r.motivos.length > 0 && (

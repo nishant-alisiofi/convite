@@ -76,7 +76,10 @@ on conflict (id) do nothing;
 -- ---------------------------------------------------------------------------
 -- familia_ayuda (FR-45): the three coarse families Doña Marta asked to track distinctly —
 -- alimentos, medicinas, construcción — layered on top of the finer familia above. NULL where
--- an item genuinely is none of the three (abrigo, higiene, niñez, daños); see FAMILIAS_AYUDA.
+-- an item genuinely is none of the three (higiene, niñez, daños, and the rest of abrigo —
+-- cobijas/colchonetas/kit de cocina); see FAMILIAS_AYUDA. Code 33 (plásticos y tejas) is the
+-- one abrigo item that is itself a roofing/repair material, the same good as family 7's
+-- «láminas de zinc», so it resolves to construcción rather than staying null.
 -- perecedero (FR-43): whether counted stock of this item always carries a shelf life.
 insert into catalogo_items (codigo, familia, familia_label, item_label, tipo, pide_detalle, urgencia_min, entregable, orden, familia_ayuda, perecedero) values
   ('11','1','Alimentos y agua','Mercado y alimentos secos','necesidad',false,1,true,10,'alimentos',true),
@@ -89,7 +92,7 @@ insert into catalogo_items (codigo, familia, familia_label, item_label, tipo, pi
   ('25','2','Salud','Insumos de diabetes','necesidad',true,1,true,75,'medicinas',true),
   ('31','3','Abrigo y albergue','Cobijas, hamacas, toldillos','necesidad',false,1,true,80,null,false),
   ('32','3','Abrigo y albergue','Colchonetas','necesidad',false,1,true,90,null,false),
-  ('33','3','Abrigo y albergue','Plásticos y tejas','necesidad',false,1,true,100,null,false),
+  ('33','3','Abrigo y albergue','Plásticos y tejas','necesidad',false,1,true,100,'construccion',false),
   ('34','3','Abrigo y albergue','Kit de cocina','necesidad',false,1,true,110,null,false),
   ('41','4','Higiene','Kit de aseo personal','necesidad',false,1,true,120,null,false),
   ('42','4','Higiene','Pañales','necesidad',true,1,true,130,null,false),
