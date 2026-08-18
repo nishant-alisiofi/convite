@@ -90,6 +90,19 @@ export const CANALES_PREFERIDOS = ['whatsapp', 'sms', 'ivr', 'radio', 'papel'] a
 export const TIPOS_REPORTE = ['necesidad', 'dano'] as const
 
 /**
+ * FR-45 — the three coarse families the field actually triages by, on top of the catalogue's
+ * own finer families (`catalogo_items.familia`). Doña Marta's ask was distinct tracking for
+ * food, medicine and construction material — not a rebuild of the existing taxonomy.
+ *
+ * Not every catalogue item is one of these three (a blanket, forced mapping would misclassify
+ * shelter kits, hygiene supplies or psychosocial support as "construction" just to fill the
+ * field, which is the fabricated-precision failure 2.12/BUG-23 exist to prevent). Only items
+ * that genuinely are food, medicine or construction material carry a value; `catalogo_items
+ * .familia_ayuda` stays NULL for the rest, which is the honest answer, not a gap.
+ */
+export const FAMILIAS_AYUDA = ['alimentos', 'medicinas', 'construccion'] as const
+
+/**
  * What a `reportes` row may be, which is one value wider than the catalogue.
  *
  * A record is created on receipt (2.13) and the driver never classifies, so intake has to
@@ -304,6 +317,7 @@ export type TipoJornada = (typeof TIPOS_JORNADA)[number]
 export type EstadoJornada = (typeof ESTADOS_JORNADA)[number]
 export type Canal = (typeof CANALES)[number]
 export type TipoReporte = (typeof TIPOS_REPORTE)[number]
+export type FamiliaAyuda = (typeof FAMILIAS_AYUDA)[number]
 export type TipoReporteRegistrado = (typeof TIPOS_REPORTE_REGISTRADO)[number]
 export type FuenteUbicacion = (typeof FUENTES_UBICACION)[number]
 export type EstadoReporte = (typeof ESTADOS_REPORTE)[number]

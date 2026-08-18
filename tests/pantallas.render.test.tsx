@@ -304,7 +304,41 @@ conBase('cada pantalla del panel se dibuja con datos reales', () => {
     expect(marcado).toContain('Inventario')
     // D9: the catalogue code carries a «cód.» prefix so it cannot be read as a quantity.
     expect(marcado).toContain('cód.')
+    // FR-45/43/44: the family filter, the perishable lots, and the pharmacy stock — all
+    // three land on the same screen.
+    expect(marcado).toContain('Alimentos ·')
+    expect(marcado).toContain('En farmacias locales')
     sinEntrañas(marcado, 'inventario')
+  })
+
+  it('el inventario filtrado por familia (FR-45)', async () => {
+    const { default: Inventario } = await import('@/app/(panel)/inventario/page')
+    const marcado = await pintar('inventario-medicinas', Inventario as never, {
+      searchParams: Promise.resolve({ familia: 'medicinas' }),
+    })
+    expect(marcado).toContain('Inventario')
+    sinEntrañas(marcado, 'inventario-medicinas')
+  })
+
+  it('el catálogo', async () => {
+    const { default: Catalogo } = await import('@/app/(panel)/catalogo/page')
+    const marcado = await pintar('catalogo', Catalogo as never)
+    expect(marcado).toContain('Catálogo')
+    // FR-45/43: the coarse family and perishable badges show up on real seeded rows.
+    expect(marcado).toContain('Alimentos')
+    expect(marcado).toContain('perecedero')
+    sinEntrañas(marcado, 'catalogo')
+  })
+
+  it('la compra local (FR-44: farmacias locales)', async () => {
+    const { default: CompraLocal } = await import('@/app/(panel)/compra-local/page')
+    const marcado = await pintar('compra-local', CompraLocal as never, {
+      searchParams: Promise.resolve({}),
+    })
+    expect(marcado).toContain('Compra local financiada')
+    expect(marcado).toContain('Farmacias locales')
+    expect(marcado).toContain('Droguería La Salud')
+    sinEntrañas(marcado, 'compra-local')
   })
 
   it('las comunidades', async () => {

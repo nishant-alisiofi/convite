@@ -9,6 +9,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core'
 import { actualizadoEn, creadoEn, enLista, pk } from './_shared'
@@ -118,13 +119,64 @@ export const proveedoresLocales = pgTable(
     /** Free text of what they can supply — the catalogue coupling is out of v1 scope. */
     suministra: text('suministra'),
     contacto: text('contacto'),
+    /**
+     * FR-44 — a local pharmacy: medicine already sitting in a community, not shipped in. Distinct
+     * from an ordinary vendor only in that its stock is tracked structurally, item by item, in
+     * `proveedor_existencias` rather than the free-text `suministra` above — meeting a medical
+     * need locally is faster and cheaper than trucking supplies down the river. Out of v1 scope:
+     * live POS/ERP integration and non-medical retail (WI scope note).
+     */
+    esFarmacia: boolean('es_farmacia').notNull().default(false),
     activo: boolean('activo').notNull().default(true),
     creadoPor: uuid('creado_por').references(() => usuarios.id),
     notas: text('notas'),
     creadoEn: creadoEn(),
     actualizadoEn: actualizadoEn(),
   },
-  (t) => [index('proveedores_locales_organizacion_idx').on(t.organizacionId)],
+  (t) => [
+    index('proveedores_locales_organizacion_idx').on(t.organizacionId),
+    // A pharmacy is "a supply source tied to a community" (FR-44 AC #1) — the tie is required,
+    // not optional, for exactly the kind of vendor this WI is about.
+    check(
+      'proveedores_locales_farmacia_comunidad_check',
+      sql`not es_farmacia or comunidad_id is not null`,
+    ),
+  ],
+)
+
+/**
+ * FR-44 — a local pharmacy's medical stock, item by item: the structured twin of the free-text
+ * `suministra` above. One row per (proveedor, item), same shape as `existencias` for node stock,
+ * so Existencias/Compra local can read pharmacy stock the same way they read counted stock.
+ * `organizacion_id` is denormalised from the parent (same pattern as `compras_locales`) so RLS
+ * reads it directly rather than joining through `proveedores_locales` on every row check.
+ */
+export const proveedorExistencias = pgTable(
+  'proveedor_existencias',
+  {
+    id: pk(),
+    organizacionId: uuid('organizacion_id')
+      .notNull()
+      .references(() => organizaciones.id),
+    proveedorId: uuid('proveedor_id')
+      .notNull()
+      .references(() => proveedoresLocales.id, { onDelete: 'cascade' }),
+    codigoItem: char('codigo_item', { length: 2 })
+      .notNull()
+      .references(() => catalogoItems.codigo),
+    cantidad: integer('cantidad').notNull().default(0),
+    contadoEn: timestamp('contado_en', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+    contadoPor: uuid('contado_por')
+      .notNull()
+      .references(() => usuarios.id),
+    creadoEn: creadoEn(),
+    actualizadoEn: actualizadoEn(),
+  },
+  (t) => [
+    index('proveedor_existencias_organizacion_idx').on(t.organizacionId),
+    uniqueIndex('proveedor_existencias_proveedor_item_key').on(t.proveedorId, t.codigoItem),
+    check('proveedor_existencias_cantidad_check', sql`cantidad >= 0`),
+  ],
 )
 
 // ── The purchase + its traceability chain ───────────────────────────────────────────────────

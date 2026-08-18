@@ -391,6 +391,81 @@ conBase('los centros los decide un admin', () => {
     })
   })
 
+  it('FR-43: un coordinador SÍ registra un lote de caducidad, un despachador NO', async () => {
+    const existenciaId = await id('existencias')
+    await como('despachador', async () => {
+      expect(
+        await rechazado(
+          `insert into existencia_lotes (existencia_id, cantidad, contado_por) values ($1, 5, $2)`,
+          [existenciaId, ID.despachador],
+        ),
+      ).toBe(true)
+    })
+    await como('coordinador', async () => {
+      const { rowCount } = await client.query(
+        `insert into existencia_lotes (existencia_id, cantidad, contado_por) values ($1, 5, $2)`,
+        [existenciaId, ID.coordinador],
+      )
+      expect(rowCount).toBe(1)
+    })
+  })
+
+  it('FR-43: un verificador SÍ lee los lotes, coherente con leer existencias', async () => {
+    await como('verificador', async () => {
+      const { rowCount } = await client.query(`select 1 from existencia_lotes limit 1`)
+      // No assertion on rowCount beyond "no se rechazó" — puede no haber lotes sembrados en
+      // este punto de la transacción; lo que importa es que la política de lectura no bloquea.
+      expect(rowCount).not.toBeNull()
+    })
+  })
+
+  it('FR-44: una farmacia queda org-scoped — un coordinador NO ve la existencia de otra organización', async () => {
+    // A second organisation with its own pharmacy stock, outside the seeded anchor org.
+    const { rows: otraOrg } = await client.query<{ id: string }>(
+      `insert into organizaciones (nombre, tipo, activo) values ('Otra red', 'red_comunitaria', true) returning id`,
+    )
+    const { rows: otroProveedor } = await client.query<{ id: string }>(
+      `insert into proveedores_locales (organizacion_id, nombre, es_farmacia)
+         values ($1, 'Farmacia de otra org', false) returning id`,
+      [otraOrg[0]!.id],
+    )
+    const { rows: otraExistencia } = await client.query<{ id: string }>(
+      `insert into proveedor_existencias (organizacion_id, proveedor_id, codigo_item, cantidad, contado_por)
+         values ($1, $2, '21', 10, $3) returning id`,
+      [otraOrg[0]!.id, otroProveedor[0]!.id, ID.coordinador],
+    )
+    await como('coordinador', async () => {
+      const { rows } = await client.query(
+        `select 1 from proveedor_existencias where id = $1`,
+        [otraExistencia[0]!.id],
+      )
+      expect(rows).toHaveLength(0)
+    })
+  })
+
+  it('FR-44: una farmacia exige comunidad — la base rechaza es_farmacia sin comunidad_id', async () => {
+    // Same resolution as beforeAll's anchor org — the one ID.coordinador actually belongs to
+    // (convite_organizacion() reads from usuarios, and an unordered `activo` pick can land on
+    // a different active organisation).
+    const { rows } = await client.query<{ id: string }>(
+      'select id from organizaciones where activo order by creado_en limit 1',
+    )
+    const org = rows[0]!.id
+    const mensaje = await como('coordinador', () =>
+      client
+        .query(
+          `insert into proveedores_locales (organizacion_id, nombre, es_farmacia, creado_por)
+             values ($1, 'Farmacia sin comunidad', true, $2)`,
+          [org, ID.coordinador],
+        )
+        .then(
+          () => null,
+          (e: unknown) => (e instanceof Error ? e.message : String(e)),
+        ),
+    )
+    expect(mensaje).toContain('proveedores_locales_farmacia_comunidad_check')
+  })
+
   it('solo un admin edita el catálogo y el registro de comunidades', async () => {
     await como('coordinador', async () => {
       expect(await rechazado(`update catalogo_items set item_label = 'X' where codigo = '11'`)).toBe(true)

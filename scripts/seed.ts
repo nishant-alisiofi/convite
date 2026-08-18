@@ -14,6 +14,7 @@ import {
   DESPACHO_DEMO,
   EXISTENCIAS_DEMO,
   EXISTENCIAS_SEMILLA,
+  LOTES_EXISTENCIA_SEMILLA,
   MENSAJES_DEMO,
   NECESIDADES_DERIVADAS_DEMO,
   NECESIDADES_VERIFICADAS,
@@ -101,6 +102,7 @@ async function main() {
     await sembrarRutas(client, comunidades)
     const nodos = await sembrarNodos(client, comunidades, contactos)
     await sembrarExistencias(client, nodos)
+    await sembrarLotesExistencia(client, nodos)
     await sembrarReportes(client, organizacionId, comunidades, contactos)
     await sembrarMensajes(client, organizacionId, contactos)
     await sembrarCapacidades(client, contactos, nodos, comunidades)
@@ -258,8 +260,8 @@ async function sembrarCatalogo(client: PoolClient): Promise<void> {
       `insert into catalogo_items (
          codigo, familia, familia_label, item_label, tipo,
          ayuda_texto, pide_detalle, urgencia_min, entregable, orden,
-         unidad_singular, unidad_plural
-       ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+         unidad_singular, unidad_plural, familia_ayuda, perecedero
+       ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
        on conflict (codigo) do update set
          familia_label = excluded.familia_label,
          item_label = excluded.item_label,
@@ -270,7 +272,9 @@ async function sembrarCatalogo(client: PoolClient): Promise<void> {
          entregable = excluded.entregable,
          orden = excluded.orden,
          unidad_singular = excluded.unidad_singular,
-         unidad_plural = excluded.unidad_plural`,
+         unidad_plural = excluded.unidad_plural,
+         familia_ayuda = excluded.familia_ayuda,
+         perecedero = excluded.perecedero`,
       [
         item.codigo,
         // Passed explicitly rather than as left($1, 1): reusing $1 in both a char(2) column
@@ -286,6 +290,8 @@ async function sembrarCatalogo(client: PoolClient): Promise<void> {
         (i + 1) * 10,
         unidades?.[0] ?? null,
         unidades?.[1] ?? null,
+        item.familiaAyuda ?? null,
+        item.perecedero ?? false,
       ],
     )
   }
@@ -467,6 +473,45 @@ async function sembrarExistencias(client: PoolClient, nodos: Map<string, string>
         [nodoId, codigoItem, cantidad, bloque.diasDesdeConteo, bloque.contadoPor],
       )
     }
+  }
+}
+
+/**
+ * FR-43 — expiry lots against the `existencias` rows `sembrarExistencias` just wrote. Runs
+ * after it on purpose: a lot's FK needs the parent existencia to already exist. Idempotent by
+ * clearing every lot under a seeded existencia once before re-inserting the seed's own set, so
+ * a re-run of `db:seed` does not pile up duplicates.
+ */
+async function sembrarLotesExistencia(client: PoolClient, nodos: Map<string, string>): Promise<void> {
+  const limpiados = new Set<string>()
+
+  for (const lote of LOTES_EXISTENCIA_SEMILLA) {
+    const nodoId = nodos.get(lote.nodo)
+    if (!nodoId) throw new Error(`Lote: nodo ${lote.nodo} desconocido.`)
+
+    const { rows } = await client.query<{ id: string }>(
+      `select id from existencias where nodo_id = $1 and codigo_item = $2`,
+      [nodoId, lote.codigoItem],
+    )
+    const existenciaId = rows[0]?.id
+    if (!existenciaId) {
+      throw new Error(`Lote: no hay existencia para ${lote.nodo}/${lote.codigoItem}.`)
+    }
+
+    if (!limpiados.has(existenciaId)) {
+      await client.query(`delete from existencia_lotes where existencia_id = $1`, [existenciaId])
+      limpiados.add(existenciaId)
+    }
+
+    await client.query(
+      `insert into existencia_lotes (existencia_id, cantidad, fecha_caducidad, contado_por)
+         values (
+           $1, $2,
+           case when $3::int is null then null else current_date + make_interval(days => $3::int) end,
+           $4
+         )`,
+      [existenciaId, lote.cantidad, lote.diasHastaVencer, lote.contadoPor],
+    )
   }
 }
 
@@ -1367,14 +1412,27 @@ async function sembrarCompraLocal(
     const comunidadId = p.comunidad ? (comunidades.get(p.comunidad) ?? null) : null
     await client.query(
       `insert into proveedores_locales (
-         id, organizacion_id, nombre, comunidad_id, municipio, suministra, contacto, activo, creado_por
-       ) values ($1,$2,$3,$4,$5,$6,$7,true,$8)
-       on conflict (id) do nothing`,
+         id, organizacion_id, nombre, comunidad_id, municipio, suministra, contacto, es_farmacia, activo, creado_por
+       ) values ($1,$2,$3,$4,$5,$6,$7,$8,true,$9)
+       on conflict (id) do update set es_farmacia = excluded.es_farmacia`,
       [
         p.id, organizacionId, marcado(p.nombre), comunidadId, p.municipio,
-        p.suministra ? marcado(p.suministra) : null, p.contacto, ID_COORDINADOR,
+        p.suministra ? marcado(p.suministra) : null, p.contacto, p.esFarmacia ?? false, ID_COORDINADOR,
       ],
     )
+
+    // FR-44: a pharmacy's structured stock, item by item.
+    for (const e of p.existencias ?? []) {
+      await client.query(
+        `insert into proveedor_existencias (organizacion_id, proveedor_id, codigo_item, cantidad, contado_por)
+           values ($1,$2,$3,$4,$5)
+         on conflict (proveedor_id, codigo_item) do update set
+           cantidad = excluded.cantidad,
+           contado_en = now(),
+           contado_por = excluded.contado_por`,
+        [organizacionId, p.id, e.codigoItem, e.cantidad, ID_COORDINADOR],
+      )
+    }
   }
 
   for (const c of COMPRAS_LOCALES_DEMO) {

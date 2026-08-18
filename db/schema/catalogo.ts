@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm'
 import { boolean, char, check, integer, pgTable, smallint, text } from 'drizzle-orm/pg-core'
 import { actualizadoEn, creadoEn, enLista } from './_shared'
-import { TIPOS_REPORTE } from './vocabulario'
+import { FAMILIAS_AYUDA, TIPOS_REPORTE } from './vocabulario'
 
 /**
  * Non-negotiable 2.8: the item catalogue is data, not code. No enums, no switch statements
@@ -35,6 +35,23 @@ export const catalogoItems = pgTable(
     urgenciaMin: smallint('urgencia_min').notNull().default(1),
     /** False for items that are not a thing to load on a boat, e.g. psychosocial support. */
     entregable: boolean('entregable').notNull().default(true),
+    /**
+     * FR-45 — the coarse family Doña Marta asked to track distinctly: alimentos, medicinas or
+     * construcción. NULL for items that are genuinely none of the three (shelter kits, hygiene,
+     * niñez, daños) — see the vocabulary comment on `FAMILIAS_AYUDA`. Never guessed to fill the
+     * field.
+     */
+    familiaAyuda: text('familia_ayuda'),
+    /**
+     * FR-43 — whether counted stock of this item is the kind that carries a printed/labelled
+     * expiry (medicines, packaged food, water-treatment tablets). Distinct from `ofertas
+     * .perecedero`, which marks a specific donor's free-text offer (a cooked meal is perishable
+     * even under a catalogue code whose usual stock is not); this flags the catalogue LINE for
+     * counted node stock, which the same code always means. Drives whether the Inventario lot
+     * form offers a `fecha_caducidad` field — the date itself always stays optional (2.3, BUG-23:
+     * unknown shows «sin fecha», never a guess).
+     */
+    perecedero: boolean('perecedero').notNull().default(false),
     orden: integer('orden').notNull().default(0),
     activo: boolean('activo').notNull().default(true),
     creadoEn: creadoEn(),
@@ -45,5 +62,9 @@ export const catalogoItems = pgTable(
     check('catalogo_items_familia_check', sql`familia = left(codigo, 1)`),
     check('catalogo_items_tipo_check', enLista('tipo', TIPOS_REPORTE)),
     check('catalogo_items_urgencia_check', sql`urgencia_min between 1 and 3`),
+    check(
+      'catalogo_items_familia_ayuda_check',
+      sql`familia_ayuda is null or ${enLista('familia_ayuda', FAMILIAS_AYUDA)}`,
+    ),
   ],
 )

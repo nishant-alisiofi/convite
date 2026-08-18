@@ -19,6 +19,10 @@ export type ItemSemilla = {
   pideDetalle?: boolean
   urgenciaMin?: number
   entregable?: boolean
+  /** FR-45. Absent = not one of the three (honest, see FAMILIAS_AYUDA) — never guessed. */
+  familiaAyuda?: 'alimentos' | 'medicinas' | 'construccion'
+  /** FR-43. Whether counted node stock of this item always carries a shelf life. */
+  perecedero?: boolean
 }
 
 /**
@@ -63,6 +67,8 @@ export const CATALOGO_SEMILLA: ItemSemilla[] = [
     itemLabel: 'Mercado y alimentos',
     tipo: 'necesidad',
     ayudaTexto: 'Arroz, panela, aceite, granos y lo básico de la casa.',
+    familiaAyuda: 'alimentos',
+    perecedero: true,
   },
   {
     codigo: '12',
@@ -70,6 +76,7 @@ export const CATALOGO_SEMILLA: ItemSemilla[] = [
     itemLabel: 'Agua potable',
     tipo: 'necesidad',
     ayudaTexto: 'Agua en bidones o bolsas para tomar.',
+    familiaAyuda: 'alimentos',
   },
   {
     codigo: '13',
@@ -77,6 +84,8 @@ export const CATALOGO_SEMILLA: ItemSemilla[] = [
     itemLabel: 'Alimentación infantil',
     tipo: 'necesidad',
     ayudaTexto: 'Leche, bienestarina y comida para los más pequeños.',
+    familiaAyuda: 'alimentos',
+    perecedero: true,
   },
 
   // 2 — Salud
@@ -86,6 +95,8 @@ export const CATALOGO_SEMILLA: ItemSemilla[] = [
     itemLabel: 'Medicamento general',
     tipo: 'necesidad',
     ayudaTexto: 'Para fiebre, dolor, diarrea o gripa.',
+    familiaAyuda: 'medicinas',
+    perecedero: true,
   },
   {
     codigo: '22',
@@ -94,6 +105,8 @@ export const CATALOGO_SEMILLA: ItemSemilla[] = [
     tipo: 'necesidad',
     ayudaTexto: 'Para tensión, azúcar, epilepsia u otro tratamiento fijo. Díganos cuál.',
     pideDetalle: true,
+    familiaAyuda: 'medicinas',
+    perecedero: true,
   },
   {
     codigo: '23',
@@ -102,6 +115,7 @@ export const CATALOGO_SEMILLA: ItemSemilla[] = [
     tipo: 'necesidad',
     ayudaTexto: 'Alguien está grave y necesita que lo vean o lo saquen.',
     urgenciaMin: 3,
+    familiaAyuda: 'medicinas',
   },
   {
     codigo: '24',
@@ -109,6 +123,8 @@ export const CATALOGO_SEMILLA: ItemSemilla[] = [
     itemLabel: 'Insumos de curación',
     tipo: 'necesidad',
     ayudaTexto: 'Gasas, alcohol, vendas, guantes.',
+    familiaAyuda: 'medicinas',
+    perecedero: true,
   },
 
   // 3 — Albergue y abrigo
@@ -170,6 +186,7 @@ export const CATALOGO_SEMILLA: ItemSemilla[] = [
     itemLabel: 'Tratamiento de agua',
     tipo: 'necesidad',
     ayudaTexto: 'Pastillas o cloro para poder tomar el agua del río.',
+    perecedero: true,
   },
 
   // 5 — Niñez y bienestar
@@ -204,6 +221,8 @@ export const CATALOGO_SEMILLA: ItemSemilla[] = [
     itemLabel: 'Herramientas',
     tipo: 'necesidad',
     ayudaTexto: 'Machete, pala, clavos, martillo.',
+    // Same kind of good as the registry catalogue's «Herramientas básicas» (family 7, Vivienda).
+    familiaAyuda: 'construccion',
   },
   {
     codigo: '62',
@@ -211,6 +230,7 @@ export const CATALOGO_SEMILLA: ItemSemilla[] = [
     itemLabel: 'Semillas',
     tipo: 'necesidad',
     ayudaTexto: 'Para volver a sembrar el pancoger.',
+    familiaAyuda: 'alimentos',
   },
 
   // 9 — Daños. Reported, verified, and acted on by a coordinator; never loaded on a boat,

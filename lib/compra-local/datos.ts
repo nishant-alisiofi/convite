@@ -104,8 +104,11 @@ export type Proveedor = {
   id: string
   nombre: string
   comunidadId: string | null
+  comunidadNombre: string | null
   municipio: string | null
   suministra: string | null
+  /** FR-44. Whether this vendor's stock is tracked structurally (see `proveedor_existencias`). */
+  esFarmacia: boolean
   activo: boolean
 }
 
@@ -114,20 +117,26 @@ export async function listarProveedores(client: PoolClient): Promise<Proveedor[]
     id: string
     nombre: string
     comunidad_id: string | null
+    comunidad_nombre: string | null
     municipio: string | null
     suministra: string | null
+    es_farmacia: boolean
     activo: boolean
   }>(
-    `select id, nombre, comunidad_id, municipio, suministra, activo
-       from proveedores_locales
-      order by nombre`,
+    `select p.id, p.nombre, p.comunidad_id, c.nombre as comunidad_nombre, p.municipio,
+            p.suministra, p.es_farmacia, p.activo
+       from proveedores_locales p
+       left join comunidades c on c.id = p.comunidad_id
+      order by p.nombre`,
   )
   return rows.map((r) => ({
     id: r.id,
     nombre: r.nombre,
     comunidadId: r.comunidad_id,
+    comunidadNombre: r.comunidad_nombre,
     municipio: r.municipio,
     suministra: r.suministra,
+    esFarmacia: r.es_farmacia,
     activo: r.activo,
   }))
 }
@@ -139,6 +148,7 @@ export type NuevoProveedor = {
   municipio?: string | null
   suministra?: string | null
   contacto?: string | null
+  esFarmacia?: boolean
 }
 
 export async function crearProveedor(
@@ -148,8 +158,8 @@ export async function crearProveedor(
 ): Promise<string> {
   const { rows } = await client.query<{ id: string }>(
     `insert into proveedores_locales
-       (organizacion_id, nombre, comunidad_id, municipio, suministra, contacto, creado_por)
-     values ($1, $2, $3, $4, $5, $6, $7) returning id`,
+       (organizacion_id, nombre, comunidad_id, municipio, suministra, contacto, es_farmacia, creado_por)
+     values ($1, $2, $3, $4, $5, $6, $7, $8) returning id`,
     [
       entrada.organizacionId,
       entrada.nombre,
@@ -157,10 +167,120 @@ export async function crearProveedor(
       entrada.municipio ?? null,
       entrada.suministra ?? null,
       entrada.contacto ?? null,
+      entrada.esFarmacia ?? false,
       actorId,
     ],
   )
   return rows[0]!.id
+}
+
+// ── Pharmacy stock (FR-44) ──────────────────────────────────────────────────────────────────
+
+export type ExistenciaProveedor = {
+  id: string
+  proveedorId: string
+  proveedorNombre: string
+  comunidadNombre: string | null
+  codigoItem: string
+  itemLabel: string
+  cantidad: number
+  contadoEn: Date
+}
+
+/** Every pharmacy's structured stock, for the Existencias/Compra local screens. */
+export async function listarExistenciasFarmacias(client: PoolClient): Promise<ExistenciaProveedor[]> {
+  const { rows } = await client.query<{
+    id: string
+    proveedor_id: string
+    proveedor_nombre: string
+    comunidad_nombre: string | null
+    codigo_item: string
+    item_label: string
+    cantidad: number
+    contado_en: Date
+  }>(
+    `select pe.id, pe.proveedor_id, p.nombre as proveedor_nombre, c.nombre as comunidad_nombre,
+            pe.codigo_item, ci.item_label, pe.cantidad, pe.contado_en
+       from proveedor_existencias pe
+       join proveedores_locales p on p.id = pe.proveedor_id
+       left join comunidades c on c.id = p.comunidad_id
+       join catalogo_items ci on ci.codigo = pe.codigo_item
+      where p.es_farmacia and pe.cantidad > 0
+      order by ci.orden, p.nombre`,
+  )
+  return rows.map((r) => ({
+    id: r.id,
+    proveedorId: r.proveedor_id,
+    proveedorNombre: r.proveedor_nombre,
+    comunidadNombre: r.comunidad_nombre,
+    codigoItem: r.codigo_item,
+    itemLabel: r.item_label,
+    cantidad: r.cantidad,
+    contadoEn: r.contado_en,
+  }))
+}
+
+/**
+ * The pharmacies that can fulfil a given medical need locally (FR-44 AC #2) — the supply-side
+ * twin of `pedidosSinExistencia` above. Community-matched first so "the pharmacy across the
+ * street" outranks one three days upriver, but every pharmacy with stock is returned; the
+ * coordinator decides who is close enough to matter.
+ */
+export async function farmaciasConStock(
+  client: PoolClient,
+  codigoItem: string,
+  comunidadId?: string | null,
+): Promise<ExistenciaProveedor[]> {
+  const { rows } = await client.query<{
+    id: string
+    proveedor_id: string
+    proveedor_nombre: string
+    comunidad_nombre: string | null
+    codigo_item: string
+    item_label: string
+    cantidad: number
+    contado_en: Date
+  }>(
+    `select pe.id, pe.proveedor_id, p.nombre as proveedor_nombre, c.nombre as comunidad_nombre,
+            pe.codigo_item, ci.item_label, pe.cantidad, pe.contado_en
+       from proveedor_existencias pe
+       join proveedores_locales p on p.id = pe.proveedor_id
+       left join comunidades c on c.id = p.comunidad_id
+       join catalogo_items ci on ci.codigo = pe.codigo_item
+      where p.es_farmacia and pe.cantidad > 0 and pe.codigo_item = $1
+      order by (p.comunidad_id is not distinct from $2) desc, pe.cantidad desc`,
+    [codigoItem, comunidadId ?? null],
+  )
+  return rows.map((r) => ({
+    id: r.id,
+    proveedorId: r.proveedor_id,
+    proveedorNombre: r.proveedor_nombre,
+    comunidadNombre: r.comunidad_nombre,
+    codigoItem: r.codigo_item,
+    itemLabel: r.item_label,
+    cantidad: r.cantidad,
+    contadoEn: r.contado_en,
+  }))
+}
+
+export type NuevaExistenciaProveedor = { proveedorId: string; codigoItem: string; cantidad: number }
+
+/** Records or updates a pharmacy's stock count for one item. */
+export async function registrarExistenciaProveedor(
+  client: PoolClient,
+  organizacionId: string,
+  entrada: NuevaExistenciaProveedor,
+  actorId: string,
+): Promise<void> {
+  await client.query(
+    `insert into proveedor_existencias (organizacion_id, proveedor_id, codigo_item, cantidad, contado_por)
+       values ($1, $2, $3, $4, $5)
+     on conflict (proveedor_id, codigo_item) do update set
+       cantidad = excluded.cantidad,
+       contado_en = now(),
+       contado_por = excluded.contado_por`,
+    [organizacionId, entrada.proveedorId, entrada.codigoItem, entrada.cantidad, actorId],
+  )
 }
 
 // ── Purchases + the traceability chain ──────────────────────────────────────────────────────
