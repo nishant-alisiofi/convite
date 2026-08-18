@@ -1,4 +1,4 @@
-import { CheckCircle2, Circle, PackageCheck, ShoppingBasket, TriangleAlert, Wallet } from 'lucide-react'
+import { CheckCircle2, Circle, PackageCheck, ShoppingBasket, Store, TriangleAlert, Wallet } from 'lucide-react'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import {
@@ -11,13 +11,16 @@ import {
   crearProveedor,
   distribuirCompra,
   type EstadoCompraLocal,
+  type ExistenciaProveedor,
   type Fondo,
   listarCompras,
+  listarExistenciasFarmacias,
   listarFondos,
   listarProveedores,
   PASO_COMPRA_LOCAL,
   pasosCompletados,
   pedidosSinExistencia,
+  registrarExistenciaProveedor,
   registrarRecibo,
   verificarCompra,
 } from '@/lib/compra-local'
@@ -33,6 +36,10 @@ export const dynamic = 'force-dynamic'
  * against a funding pool (whose ceiling the database enforces), record the receipt, verify the
  * materials arrived, mark distribution, and close with photographic/documentary evidence. Every
  * step carries who did it and when; the authorisation is immutable once recorded.
+ *
+ * FR-44 folds in the supply-side twin: a local pharmacy already sitting in a community is a
+ * fulfilment option that costs nothing to ship, so it lives on the same screen as the fund it
+ * would otherwise draw from.
  */
 
 const PUEDEN_VER = ['coordinador', 'admin', 'despachador']
@@ -60,22 +67,26 @@ export default async function CompraLocal({ searchParams }: { searchParams: Para
     )
   }
 
-  const { fondos, proveedores, compras, pedidos, contactos, catalogo } = await conSesion(
-    sesion,
-    async (client) => {
+  const { fondos, proveedores, compras, pedidos, contactos, catalogo, comunidades, existenciasFarmacias } =
+    await conSesion(sesion, async (client) => {
       const fondos = await listarFondos(client)
       const proveedores = await listarProveedores(client)
       const compras = await listarCompras(client)
       const pedidos = await pedidosSinExistencia(client)
+      const existenciasFarmacias = await listarExistenciasFarmacias(client)
       const { rows: contactos } = await client.query<{ id: string; nombre: string }>(
         `select id, nombre from contactos order by nombre limit 300`,
       )
       const { rows: catalogo } = await client.query<{ codigo: string; item_label: string }>(
         `select codigo, item_label from catalogo_items order by codigo`,
       )
-      return { fondos, proveedores, compras, pedidos, contactos, catalogo }
-    },
-  )
+      // FR-44: a pharmacy has to be tied to a community (AC #1) — the picker for the vendor
+      // form.
+      const { rows: comunidades } = await client.query<{ id: string; nombre: string }>(
+        `select id, nombre from comunidades order by nombre`,
+      )
+      return { fondos, proveedores, compras, pedidos, contactos, catalogo, comunidades, existenciasFarmacias }
+    })
 
   async function registrarFondo(formData: FormData) {
     'use server'
@@ -120,6 +131,12 @@ export default async function CompraLocal({ searchParams }: { searchParams: Para
     }
     const nombre = String(formData.get('nombre') ?? '').trim()
     if (!nombre) redirect('/compra-local?error=Falta+el+nombre+del+proveedor')
+    const esFarmacia = formData.get('esFarmacia') === 'on'
+    const comunidadId = String(formData.get('comunidadId') ?? '') || null
+    // FR-44 AC #1: a pharmacy is a supply source tied to a community — not optional for one.
+    if (esFarmacia && !comunidadId) {
+      redirect('/compra-local?error=Una+farmacia+necesita+una+comunidad')
+    }
     try {
       await conSesion(
         sesion,
@@ -129,9 +146,11 @@ export default async function CompraLocal({ searchParams }: { searchParams: Para
             {
               organizacionId: sesion.organizacionId,
               nombre,
+              comunidadId,
               municipio: String(formData.get('municipio') ?? '').trim() || null,
               suministra: String(formData.get('suministra') ?? '').trim() || null,
               contacto: String(formData.get('contacto') ?? '').trim() || null,
+              esFarmacia,
             },
             sesion.authId,
           ),
@@ -267,6 +286,36 @@ export default async function CompraLocal({ searchParams }: { searchParams: Para
     redirect('/compra-local?ok=Evidencia+agregada')
   }
 
+  async function registrarStockFarmacia(formData: FormData) {
+    'use server'
+    const sesion = await sesionActual()
+    if (!sesion || !PUEDEN_VER.includes(sesion.rolStaff)) redirect('/compra-local?error=Sin+permiso')
+    const proveedorId = String(formData.get('proveedorId') ?? '')
+    const codigoItem = String(formData.get('codigoItem') ?? '')
+    const cantidad = Number(String(formData.get('cantidad') ?? '').replace(/[^\d]/g, ''))
+    if (!proveedorId || !codigoItem) redirect('/compra-local?error=Falta+la+farmacia+o+el+ítem')
+    if (!Number.isFinite(cantidad) || cantidad < 0) {
+      redirect('/compra-local?error=La+cantidad+debe+ser+cero+o+más')
+    }
+    try {
+      await conSesion(
+        sesion,
+        (client) =>
+          registrarExistenciaProveedor(
+            client,
+            sesion.organizacionId,
+            { proveedorId, codigoItem, cantidad },
+            sesion.authId,
+          ),
+        { escribe: true },
+      )
+    } catch {
+      redirect('/compra-local?error=No+se+pudo+registrar+la+existencia')
+    }
+    revalidatePath('/compra-local')
+    redirect('/compra-local?ok=Existencia+de+farmacia+registrada')
+  }
+
   return (
     <main>
       <h1 className="text-xl font-semibold text-barro-900">Compra local financiada</h1>
@@ -358,6 +407,7 @@ export default async function CompraLocal({ searchParams }: { searchParams: Para
                 {proveedores.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.nombre}
+                    {p.esFarmacia && ' (farmacia)'}
                   </option>
                 ))}
               </select>
@@ -429,9 +479,23 @@ export default async function CompraLocal({ searchParams }: { searchParams: Para
       {PUEDEN_FONDO.includes(sesion.rolStaff) && (
         <section className="mt-8">
           <h2 className="font-semibold text-barro-900">Proveedores locales</h2>
+          <p className="mt-1 max-w-2xl text-sm text-barro-600">
+            Una farmacia es un proveedor cuyo inventario se sigue ítem por ítem — abajo, en
+            «Farmacias locales» — en vez de solo el texto libre de «qué suministra».
+          </p>
           <form action={registrarProveedor} className="mt-3 grid gap-3 rounded-lg border border-barro-200 bg-white p-4 sm:grid-cols-4">
             <Campo etiqueta="Nombre">
               <input name="nombre" required className={CLASE_CAMPO} />
+            </Campo>
+            <Campo etiqueta="Comunidad" ayuda="Obligatoria si es farmacia.">
+              <select name="comunidadId" defaultValue="" className={CLASE_CAMPO}>
+                <option value="">Sin comunidad</option>
+                {comunidades.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.nombre}
+                  </option>
+                ))}
+              </select>
             </Campo>
             <Campo etiqueta="Municipio">
               <input name="municipio" className={CLASE_CAMPO} />
@@ -442,12 +506,56 @@ export default async function CompraLocal({ searchParams }: { searchParams: Para
             <Campo etiqueta="Contacto">
               <input name="contacto" className={CLASE_CAMPO} />
             </Campo>
+            <label className="flex items-center gap-2 self-end text-sm text-barro-800">
+              <input type="checkbox" name="esFarmacia" className="size-4" />
+              Es una farmacia
+            </label>
             <div className="sm:col-span-4">
               <button type="submit" className={CLASE_BOTON}>
                 Registrar proveedor
               </button>
             </div>
           </form>
+        </section>
+      )}
+
+      {/* FR-44: pharmacy stock — the supply-side twin of Compra local, tracked item by item */}
+      {PUEDEN_FONDO.includes(sesion.rolStaff) && (
+        <section className="mt-8">
+          <h2 className="flex items-center gap-2 font-semibold text-barro-900">
+            <Store className="size-4" aria-hidden />
+            Farmacias locales
+          </h2>
+          <p className="mt-1 max-w-2xl text-sm text-barro-700">
+            Medicina que ya está en la comunidad — más rápido y más barato que enviarla. Su
+            existencia también aparece en Inventario y como opción antes de autorizar una compra
+            local para una necesidad médica.
+          </p>
+
+          {proveedores.filter((p) => p.esFarmacia).length === 0 ? (
+            <p className="mt-3 rounded-lg border border-barro-200 bg-white px-4 py-3 text-sm text-barro-600">
+              Todavía no hay ninguna farmacia registrada. Márquela como «Es una farmacia» arriba.
+            </p>
+          ) : (
+            <ul className="mt-3 space-y-3">
+              {proveedores
+                .filter((p) => p.esFarmacia)
+                .map((p) => {
+                  const stock = existenciasFarmacias.filter((e) => e.proveedorId === p.id)
+                  return (
+                    <TarjetaFarmacia
+                      key={p.id}
+                      proveedorId={p.id}
+                      nombre={p.nombre}
+                      comunidadNombre={p.comunidadNombre}
+                      stock={stock}
+                      catalogo={catalogo}
+                      onRegistrar={registrarStockFarmacia}
+                    />
+                  )
+                })}
+            </ul>
+          )}
         </section>
       )}
     </main>
@@ -583,6 +691,66 @@ function PasoBoton({
         {texto}
       </button>
     </form>
+  )
+}
+
+function TarjetaFarmacia({
+  proveedorId,
+  nombre,
+  comunidadNombre,
+  stock,
+  catalogo,
+  onRegistrar,
+}: {
+  proveedorId: string
+  nombre: string
+  comunidadNombre: string | null
+  stock: ExistenciaProveedor[]
+  catalogo: { codigo: string; item_label: string }[]
+  onRegistrar: (fd: FormData) => void
+}) {
+  return (
+    <li className="rounded-lg border border-barro-200 bg-white px-4 py-3">
+      <div className="flex flex-wrap items-baseline gap-x-2 text-sm">
+        <span className="font-medium text-barro-900">{nombre}</span>
+        {comunidadNombre && <span className="text-barro-500">{comunidadNombre}</span>}
+      </div>
+
+      {stock.length === 0 ? (
+        <p className="mt-1 text-sm text-barro-500">Sin existencia registrada todavía.</p>
+      ) : (
+        <ul className="mt-1 space-y-0.5">
+          {stock.map((e) => (
+            <li key={e.codigoItem} className="text-sm text-barro-700">
+              {e.itemLabel} <span className="font-medium text-barro-900">· {e.cantidad}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <form action={onRegistrar} className="mt-2 flex flex-wrap items-end gap-2">
+        <input type="hidden" name="proveedorId" value={proveedorId} />
+        <select name="codigoItem" defaultValue="" required className="rounded border border-barro-200 px-2 py-1 text-sm">
+          <option value="" disabled>
+            Ítem
+          </option>
+          {catalogo.map((c) => (
+            <option key={c.codigo} value={c.codigo}>
+              {c.codigo} · {c.item_label}
+            </option>
+          ))}
+        </select>
+        <input
+          name="cantidad"
+          inputMode="numeric"
+          placeholder="Cantidad"
+          className="w-24 rounded border border-barro-200 px-2 py-1 text-sm"
+        />
+        <button type="submit" className="rounded border border-barro-300 px-3 py-1.5 text-sm font-medium text-barro-800 hover:bg-barro-50">
+          Registrar existencia
+        </button>
+      </form>
+    </li>
   )
 }
 

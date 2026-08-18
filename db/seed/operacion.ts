@@ -379,6 +379,34 @@ export const EXISTENCIAS_SEMILLA = [
 ]
 
 /**
+ * FR-43 — expiry lots for a subset of `EXISTENCIAS_SEMILLA` rows, covering the three states
+ * Inventario has to show honestly: a lot within the window (soon), one already past its date
+ * (expired), and one whose date nobody has recorded (`diasHastaVencer: null` → «sin fecha»,
+ * never a guess — 2.3, BUG-23). Lots do not have to sum to the parent's `cantidad`.
+ */
+export type LoteSemilla = {
+  nodo: string
+  codigoItem: string
+  cantidad: number
+  /** Negative = already expired. Null = unknown, shown «sin fecha». */
+  diasHastaVencer: number | null
+  contadoPor: string
+}
+
+export const LOTES_EXISTENCIA_SEMILLA: LoteSemilla[] = [
+  // Medicamento general at the Quibdó warehouse: part of the 40 units is about to turn —
+  // exactly the "move this first" signal the screen exists for.
+  { nodo: 'BOD-QBD', codigoItem: '21', cantidad: 15, diasHastaVencer: 5, contadoPor: BODEGUERO },
+  { nodo: 'BOD-QBD', codigoItem: '21', cantidad: 25, diasHastaVencer: 90, contadoPor: BODEGUERO },
+  // Alimentación infantil: one batch already spoiled and not yet pulled, one whose date was
+  // never logged.
+  { nodo: 'BOD-QBD', codigoItem: '13', cantidad: 10, diasHastaVencer: -3, contadoPor: BODEGUERO },
+  { nodo: 'BOD-QBD', codigoItem: '13', cantidad: 50, diasHastaVencer: null, contadoPor: BODEGUERO },
+  // Mercado y alimentos: comfortably ahead of its date, the unremarkable case.
+  { nodo: 'BOD-QBD', codigoItem: '11', cantidad: 180, diasHastaVencer: 60, contadoPor: BODEGUERO },
+]
+
+/**
  * Verified needs. Each one carries the verifier and the timestamp that promoted it, because
  * a `pedido` that nobody verified is exactly what M5 exists to prevent.
  *

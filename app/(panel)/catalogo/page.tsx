@@ -1,6 +1,7 @@
-import { BookText, MessageSquareText, ShipWheel, TriangleAlert } from 'lucide-react'
+import { BookText, MessageSquareText, PackageOpen, ShipWheel, TriangleAlert } from 'lucide-react'
 import { redirect } from 'next/navigation'
 import { conSesion, sesionActual } from '@/lib/sesion'
+import type { FamiliaAyuda } from '@/db/schema/vocabulario'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,14 +14,21 @@ export const dynamic = 'force-dynamic'
  * in a WhatsApp list («22 12 3»), how the item is counted out loud, and the two rules the
  * catalogue carries — its urgency floor and whether it is a thing you can load on a boat.
  *
- * It shows `entregable` and `pide_detalle` rather than a «perishable» flag: perishability is
- * a property of a specific donated offer (`ofertas.perecedero`), not of a catalogue line, so
- * inventing it here would be a field the data does not have. What the catalogue does carry is
- * the urgency floor (a medical transfer is never logged as routine) and deliverability (some
- * entries, like psychosocial support, are not loaded onto a lancha at all).
+ * It shows `entregable` and `pide_detalle` alongside two more recent fields (FR-45's
+ * `familia_ayuda`, FR-43's `perecedero`). `ofertas.perecedero` — a donor's specific free-text
+ * offer — is still a different thing from `catalogo_items.perecedero` here: the offer flag
+ * marks one particular gift (a cooked meal is perishable however its item code's usual stock
+ * behaves), while this one marks the catalogue LINE for counted node stock, where the code is
+ * a reliable signal of shelf life. Neither invents the other's field.
  */
 
 const PUEDEN_VER = ['verificador', 'despachador', 'coordinador', 'admin']
+
+const ETIQUETA_FAMILIA_AYUDA: Record<FamiliaAyuda, string> = {
+  alimentos: 'Alimentos',
+  medicinas: 'Medicinas',
+  construccion: 'Construcción',
+}
 
 const TIPO_ITEM: Record<string, string> = {
   necesidad: 'necesidad',
@@ -39,6 +47,8 @@ type Fila = {
   pide_detalle: boolean
   urgencia_min: number
   entregable: boolean
+  familia_ayuda: FamiliaAyuda | null
+  perecedero: boolean
 }
 
 export default async function Catalogo() {
@@ -57,7 +67,8 @@ export default async function Catalogo() {
   const filas = await conSesion(sesion, async (client) => {
     const { rows } = await client.query<Fila>(
       `select codigo, familia, familia_label, item_label, tipo, ayuda_texto,
-              unidad_singular, unidad_plural, pide_detalle, urgencia_min, entregable
+              unidad_singular, unidad_plural, pide_detalle, urgencia_min, entregable,
+              familia_ayuda, perecedero
          from catalogo_items
         where activo
         order by orden, codigo`,
@@ -131,6 +142,20 @@ function ItemFila({ f }: { f: Fila }) {
         <span className="rounded bg-barro-100 px-1.5 py-0.5 text-xs font-medium text-barro-600">
           {TIPO_ITEM[f.tipo] ?? f.tipo}
         </span>
+        {f.familia_ayuda && (
+          <span className="rounded bg-selva-100 px-1.5 py-0.5 text-xs font-medium text-selva-800">
+            {ETIQUETA_FAMILIA_AYUDA[f.familia_ayuda]}
+          </span>
+        )}
+        {f.perecedero && (
+          <span
+            className="flex items-center gap-1 rounded bg-barro-100 px-1.5 py-0.5 text-xs font-medium text-barro-600"
+            title="Las existencias contadas de este ítem suelen tener fecha de caducidad"
+          >
+            <PackageOpen className="size-3" aria-hidden />
+            perecedero
+          </span>
+        )}
         {f.urgencia_min > 1 && (
           <span
             className={

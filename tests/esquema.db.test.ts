@@ -199,6 +199,62 @@ conBase('las no negociables están en la base, no en el frontend', () => {
     )
     expect(mensaje).toMatch(/contado_en|contado_por/)
   })
+
+  it('FR-45 — familia_ayuda solo admite alimentos/medicinas/construcción, o nada', async () => {
+    const mensaje = await esperaRechazo(
+      `update catalogo_items set familia_ayuda = 'ropa' where codigo = '11'`,
+    )
+    expect(mensaje).toContain('catalogo_items_familia_ayuda_check')
+  })
+
+  it('FR-45 — la familia de Vivienda (materiales) del catálogo real resuelve a construcción', async () => {
+    const { rows } = await client.query<{ n: string }>(
+      `select count(*)::text as n from catalogo_items where familia = '7' and familia_ayuda <> 'construccion'`,
+    )
+    expect(rows[0]!.n).toBe('0')
+  })
+
+  it('FR-45 — un daño no es un bien de ayuda: familia_ayuda se queda honesto en null', async () => {
+    const { rows } = await client.query<{ n: string }>(
+      `select count(*)::text as n from catalogo_items where tipo = 'dano' and familia_ayuda is not null`,
+    )
+    expect(rows[0]!.n).toBe('0')
+  })
+
+  it('FR-43 — un lote sin fecha es legítimo (2.3, BUG-23): fecha_caducidad no es NOT NULL', async () => {
+    const existencia = await unId('existencias')
+    const usuario = await unId('usuarios')
+    const { rows } = await client.query<{ fecha_caducidad: Date | null }>(
+      `insert into existencia_lotes (existencia_id, cantidad, contado_por)
+         values ($1, 3, $2) returning fecha_caducidad`,
+      [existencia, usuario],
+    )
+    expect(rows[0]!.fecha_caducidad).toBeNull()
+  })
+
+  it('FR-43 — un lote rechaza cantidad cero o negativa', async () => {
+    const existencia = await unId('existencias')
+    const usuario = await unId('usuarios')
+    const mensaje = await esperaRechazo(
+      `insert into existencia_lotes (existencia_id, cantidad, contado_por) values ($1, 0, $2)`,
+      [existencia, usuario],
+    )
+    expect(mensaje).toContain('existencia_lotes_cantidad_check')
+  })
+
+  it('FR-44 — una farmacia solo lleva una fila de existencia por ítem', async () => {
+    const usuario = await unId('usuarios')
+    const { rows: proveedor } = await client.query<{ id: string; organizacion_id: string }>(
+      `select id, organizacion_id from proveedores_locales where es_farmacia limit 1`,
+    )
+    if (proveedor.length === 0) throw new Error('No hay farmacia sembrada. ¿Corrió pnpm db:seed?')
+    const mensaje = await esperaRechazo(
+      `insert into proveedor_existencias (organizacion_id, proveedor_id, codigo_item, cantidad, contado_por)
+         values ($1, $2, '21', 1, $3)`,
+      [proveedor[0]!.organizacion_id, proveedor[0]!.id, usuario],
+    )
+    expect(mensaje).toContain('proveedor_existencias_proveedor_item_key')
+  })
 })
 
 conBase('2.4 — el borde público es de la base de datos', () => {

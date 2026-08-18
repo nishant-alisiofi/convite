@@ -24,6 +24,8 @@ export type FondoCompraSemilla = {
   umbralAlertaCop: number | null
 }
 
+export type ProveedorExistenciaSemilla = { codigoItem: string; cantidad: number }
+
 export type ProveedorLocalSemilla = {
   id: string
   nombre: string
@@ -31,6 +33,9 @@ export type ProveedorLocalSemilla = {
   municipio: string | null
   suministra: string | null
   contacto: string | null
+  /** FR-44. A pharmacy's medical stock, tracked structurally rather than only in `suministra`. */
+  esFarmacia?: boolean
+  existencias?: ProveedorExistenciaSemilla[]
 }
 
 export type CompraLocalItemSemilla = { codigoItem: string; cantidad: number; costoCop: number | null }
@@ -90,6 +95,14 @@ export const PROVEEDORES_LOCALES_DEMO: ProveedorLocalSemilla[] = [
     municipio: 'Quibdó',
     suministra: 'Medicamentos generales y crónicos',
     contacto: 'Calle 26 con carrera 5, Quibdó',
+    // FR-44: a real pharmacy already sitting in the community, structurally tracked so it can
+    // be offered as a local fulfilment option for a medical need before shipping anything in.
+    esFarmacia: true,
+    existencias: [
+      { codigoItem: '21', cantidad: 60 },
+      { codigoItem: '22', cantidad: 25 },
+      { codigoItem: '24', cantidad: 40 },
+    ],
   },
   {
     id: PROV_DISTRIBUIDORA,
