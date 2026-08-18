@@ -17,6 +17,10 @@ import type { DominioEvaluacion, OrigenBom, ViaDeRespuesta } from '@/db/schema/e
  *   - Level 2 bill of materials: one matchable finding is costed in four components with partial
  *     coverage, so it reads «falta $X» — the number Apadrinar (PRD-12) prices against.
  *
+ *   - FR-48 technical-evaluation tickets: a request open (`solicitada`), one being worked
+ *     (`en_curso`), and one closed with a finding (`completada`) — so «Servicios de ingeniería»
+ *     shows the whole lifecycle instead of an empty state.
+ *
  * Idempotent: fixed UUIDs with `on conflict (id) do nothing`, and templates keyed on their
  * (organizacion, codigo) natural key. Every date is relative so a re-run stays coherent.
  */
@@ -200,6 +204,47 @@ export const HALLAZGOS_EVALUACION_DEMO: HallazgoSemilla[] = [
     severidad: 1,
     viaDeRespuesta: 'convite',
     derivacionDestino: null,
+  },
+]
+
+/** FR-48: a technical/engineering evaluation ticket — no total_estimado, tracked via `estado`. */
+export type EvaluacionTecnicaSemilla = {
+  id: string
+  comunidad: string
+  dominio: DominioEvaluacion
+  asignadoA: string
+  estado: 'solicitada' | 'en_curso' | 'completada'
+  detalle: string | null
+  notas: string | null
+}
+
+export const EVALUACIONES_TECNICAS_DEMO: EvaluacionTecnicaSemilla[] = [
+  {
+    id: 'd3000014-0000-4000-8000-000000000001',
+    comunidad: 'BET',
+    dominio: 'puente',
+    asignadoA: 'Sebastián Mosquera',
+    estado: 'solicitada',
+    detalle: null,
+    notas: 'La junta reporta el puente peatonal inestable tras la creciente.',
+  },
+  {
+    id: 'd3000014-0000-4000-8000-000000000002',
+    comunidad: 'TAG',
+    dominio: 'agua',
+    asignadoA: 'Comité de agua — ASOREDIPARCHOCÓ',
+    estado: 'en_curso',
+    detalle: null,
+    notas: 'Revisión del sistema de bombeo antes de la próxima temporada seca.',
+  },
+  {
+    id: 'd3000014-0000-4000-8000-000000000003',
+    comunidad: 'PAI',
+    dominio: 'electrico',
+    asignadoA: 'Sebastián Mosquera',
+    estado: 'completada',
+    detalle: 'Panel solar comunitario operativo; batería de respaldo requiere reemplazo en 6 meses.',
+    notas: 'Evaluación del sistema eléctrico del puesto de salud.',
   },
 ]
 

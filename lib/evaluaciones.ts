@@ -2,6 +2,8 @@ import type { PoolClient } from 'pg'
 import {
   DOMINIOS_EVALUACION,
   type DominioEvaluacion,
+  ESTADOS_EVALUACION,
+  type EstadoEvaluacion,
   ORIGENES_BOM,
   type OrigenBom,
   VIAS_DE_RESPUESTA,
@@ -10,7 +12,10 @@ import {
 
 /**
  * PRD-29 «Assessments and recovery» — reading and recording the assessment records, the coverage
- * rollup and the bill of materials.
+ * rollup and the bill of materials. FR-48 «Servicios de ingeniería y evaluación técnica» extends
+ * the same `evaluaciones` table (see db/schema/evaluaciones.ts) with a *ticket* shape — a request
+ * for a técnico to assess one piece of infrastructure — instead of a parallel table: everything
+ * below the «Evaluaciones técnicas (FR-48)» heading is that extension.
  *
  * Every query here runs against the client `conSesion()` hands it, so RLS (0044) is the real
  * boundary: reads are scoped to the caller's organisation, and writes have to satisfy the policies.
@@ -22,8 +27,8 @@ import {
  * so the row mappers convert with `Number()` (COP is far inside the safe-integer range).
  */
 
-export { DOMINIOS_EVALUACION, ORIGENES_BOM, VIAS_DE_RESPUESTA }
-export type { DominioEvaluacion, OrigenBom, ViaDeRespuesta }
+export { DOMINIOS_EVALUACION, ESTADOS_EVALUACION, ORIGENES_BOM, VIAS_DE_RESPUESTA }
+export type { DominioEvaluacion, EstadoEvaluacion, OrigenBom, ViaDeRespuesta }
 
 /** Roles the assessment screen is written for. RLS (0044) is the real boundary. */
 export const EVALUACION_ROLES = ['coordinador', 'admin'] as const
@@ -36,6 +41,8 @@ export const ETIQUETA_DOMINIO: Record<DominioEvaluacion, string> = {
   agua: 'Agua',
   ambiente: 'Ambiente',
   organizacional: 'Capacidad organizacional',
+  puente: 'Puente',
+  electrico: 'Eléctrico',
 }
 
 /** Human labels for the response routes. */
@@ -43,6 +50,13 @@ export const ETIQUETA_VIA: Record<ViaDeRespuesta, string> = {
   convite: 'Convite',
   derivacion: 'Derivación',
   sin_via: 'Sin vía',
+}
+
+/** Human labels for a FR-48 technical-evaluation ticket's lifecycle. */
+export const ETIQUETA_ESTADO_EVALUACION: Record<EstadoEvaluacion, string> = {
+  solicitada: 'Solicitada',
+  en_curso: 'En curso',
+  completada: 'Completada',
 }
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
@@ -179,6 +193,27 @@ export function estaVencida(venceEn: string | null, ahora: Date = new Date()): b
   // Compare on the calendar day: an assessment that expires «today» is expired at end of day.
   const hoy = ahora.toISOString().slice(0, 10)
   return venceEn < hoy
+}
+
+/**
+ * FR-48: the forward-only lifecycle of a technical-evaluation ticket. `solicitada` moves to
+ * `en_curso`, `en_curso` moves to `completada`; `completada` is terminal. Never back, never
+ * skipped — this is the single source of truth the panel's "advance" action checks against.
+ */
+const SIGUIENTE_ESTADO: Record<EstadoEvaluacion, EstadoEvaluacion | null> = {
+  solicitada: 'en_curso',
+  en_curso: 'completada',
+  completada: null,
+}
+
+/** The one state a ticket in `actual` may advance to next, or null when it is already terminal. */
+export function siguienteEstado(actual: EstadoEvaluacion): EstadoEvaluacion | null {
+  return SIGUIENTE_ESTADO[actual]
+}
+
+/** Whether advancing a ticket from `desde` to `hacia` is the one legal forward step. */
+export function transicionValida(desde: EstadoEvaluacion, hacia: EstadoEvaluacion): boolean {
+  return siguienteEstado(desde) === hacia
 }
 
 /** A flat sweep row, the input the coverage rollup aggregates. */
@@ -408,6 +443,9 @@ export async function listarEvaluaciones(client: PoolClient): Promise<Evaluacion
        from evaluaciones e
        join comunidades c on c.id = e.comunidad_id
        left join evaluacion_hallazgos h on h.evaluacion_id = e.id
+      -- FR-48 technical-evaluation tickets carry no total_estimado — they are not census sweeps
+      -- and stay out of the Barridos list / Level 4 coverage. See listarEvaluacionesTecnicas.
+      where e.total_estimado is not null
       group by e.id, c.nombre, c.municipio
       order by e.fecha_visita desc, c.nombre`,
   )
@@ -771,6 +809,8 @@ export async function filasCobertura(client: PoolClient): Promise<FilaCobertura[
        from evaluaciones e
        join comunidades c on c.id = e.comunidad_id
        left join evaluacion_hallazgos h on h.evaluacion_id = e.id
+      -- Same discriminator as listarEvaluaciones: a FR-48 ticket is not a surveyed item.
+      where e.total_estimado is not null
       group by e.id, c.nombre, c.municipio`,
   )
   return rows.map((r) => ({
@@ -783,4 +823,135 @@ export async function filasCobertura(client: PoolClient): Promise<FilaCobertura[
     evaluados: Number(r.evaluados),
     venceEn: r.vence_en,
   }))
+}
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+//  Evaluaciones técnicas (FR-48) — technical/engineering evaluation tickets
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * A technical/engineering evaluation ticket: a request to assess one piece of a community's
+ * infrastructure, assigned to a técnico, tracked to completion with a finding. Same table as the
+ * census sweep (`evaluaciones`), discriminated by `total_estimado is null` — see the table's doc
+ * comment in db/schema/evaluaciones.ts.
+ */
+export type EvaluacionTecnica = {
+  id: string
+  comunidadId: string
+  comunidadNombre: string
+  municipio: string
+  dominio: DominioEvaluacion
+  asignadoA: string | null
+  estado: EstadoEvaluacion
+  detalle: string | null
+  notas: string | null
+  creadoEn: Date
+}
+
+/** Every technical-evaluation ticket the caller may see, newest first. */
+export async function listarEvaluacionesTecnicas(client: PoolClient): Promise<EvaluacionTecnica[]> {
+  const { rows } = await client.query<{
+    id: string
+    comunidad_id: string
+    comunidad_nombre: string
+    municipio: string
+    dominio: DominioEvaluacion
+    asignado_a: string | null
+    estado: EstadoEvaluacion
+    detalle: string | null
+    notas: string | null
+    creado_en: Date
+  }>(
+    `select e.id,
+            e.comunidad_id,
+            c.nombre as comunidad_nombre,
+            c.municipio,
+            e.dominio,
+            e.asignado_a,
+            e.estado,
+            e.detalle,
+            e.notas,
+            e.creado_en
+       from evaluaciones e
+       join comunidades c on c.id = e.comunidad_id
+      -- The discriminator: a technical-evaluation ticket carries no census total_estimado.
+      where e.total_estimado is null
+      order by e.creado_en desc`,
+  )
+  return rows.map((r) => ({
+    id: r.id,
+    comunidadId: r.comunidad_id,
+    comunidadNombre: r.comunidad_nombre,
+    municipio: r.municipio,
+    dominio: r.dominio,
+    asignadoA: r.asignado_a,
+    estado: r.estado,
+    detalle: r.detalle,
+    notas: r.notas,
+    creadoEn: r.creado_en,
+  }))
+}
+
+export type NuevaEvaluacionTecnica = {
+  organizacionId: string
+  comunidadId: string
+  dominio: DominioEvaluacion
+  asignadoA?: string | null
+  notas?: string | null
+}
+
+/**
+ * Open a technical-evaluation ticket (AC #1): a community, a type and an assignee, `estado`
+ * starting at `solicitada` (the column default). No `total_estimado`/`fecha_visita`/
+ * `evaluador_nombre` — those belong to a census sweep (PRD-29), not a FR-48 ticket.
+ */
+export async function crearEvaluacionTecnica(
+  client: PoolClient,
+  entrada: NuevaEvaluacionTecnica,
+  actorId: string,
+): Promise<string> {
+  const { rows } = await client.query<{ id: string }>(
+    `insert into evaluaciones
+       (organizacion_id, comunidad_id, dominio, asignado_a, notas, registrado_por)
+     values ($1, $2, $3, $4, $5, $6)
+     returning id`,
+    [
+      entrada.organizacionId,
+      entrada.comunidadId,
+      entrada.dominio,
+      entrada.asignadoA ?? null,
+      entrada.notas ?? null,
+      actorId,
+    ],
+  )
+  return rows[0]!.id
+}
+
+export type AvanceEvaluacionTecnica = {
+  id: string
+  organizacionId: string
+  estado: EstadoEvaluacion
+  /** The finding note. Required by the panel when advancing to `completada` (AC #2). */
+  detalle?: string | null
+}
+
+/**
+ * Advance a technical-evaluation ticket's status (AC #2). The caller validates the transition
+ * with `transicionValida` before calling this — the write itself trusts the caller, the same way
+ * `crearHallazgo`/`guardarBom` do. `organizacionId` is redundant with RLS but scopes the statement
+ * to the right row defensively, matching the rest of this module.
+ */
+export async function avanzarEvaluacionTecnica(
+  client: PoolClient,
+  entrada: AvanceEvaluacionTecnica,
+): Promise<void> {
+  await client.query(
+    `update evaluaciones
+        set estado = $1,
+            detalle = coalesce($2, detalle)
+      where id = $3
+        and organizacion_id = $4
+        and total_estimado is null`,
+    [entrada.estado, entrada.detalle ?? null, entrada.id, entrada.organizacionId],
+  )
 }

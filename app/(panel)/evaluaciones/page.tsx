@@ -6,32 +6,41 @@ import {
   MapPinned,
   Share2,
   TriangleAlert,
+  Wrench,
 } from 'lucide-react'
 import Link from 'next/link'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import {
+  avanzarEvaluacionTecnica,
   bomDe,
   cobertura,
   comunidadesParaEvaluar,
   costoFundableCop,
   crearEvaluacion,
+  crearEvaluacionTecnica,
   crearHallazgo,
   crearPlantilla,
   DOMINIOS_EVALUACION,
   type DominioEvaluacion,
+  type EstadoEvaluacion,
   estadoReparacion,
   ETIQUETA_DOMINIO,
+  ETIQUETA_ESTADO_EVALUACION,
   ETIQUETA_VIA,
+  type EvaluacionTecnica,
   filasCobertura,
   generarBom,
   guardarBom,
   type Hallazgo,
   listarEvaluaciones,
+  listarEvaluacionesTecnicas,
   listarPlantillas,
   listarHallazgos,
   type Plantilla,
   saldoFundableCop,
+  siguienteEstado,
+  transicionValida,
   VIAS_DE_RESPUESTA,
   type ViaDeRespuesta,
 } from '@/lib/evaluaciones'
@@ -75,11 +84,11 @@ export default async function Evaluaciones({ searchParams }: { searchParams: Par
     )
   }
 
-  const { plantillas, evaluaciones, hallazgos, comunidades, cob, detalle } = await conSesion(
-    sesion,
-    async (client) => {
+  const { plantillas, evaluaciones, evaluacionesTecnicas, hallazgos, comunidades, cob, detalle } =
+    await conSesion(sesion, async (client) => {
       const plantillas = await listarPlantillas(client)
       const evaluaciones = await listarEvaluaciones(client)
+      const evaluacionesTecnicas = await listarEvaluacionesTecnicas(client)
       const hallazgos = await listarHallazgos(client)
       const comunidades = await comunidadesParaEvaluar(client)
       const cob = cobertura(await filasCobertura(client))
@@ -87,9 +96,8 @@ export default async function Evaluaciones({ searchParams }: { searchParams: Par
       const detalle = elegido
         ? { hallazgo: elegido, bom: await bomDe(client, elegido.id) }
         : null
-      return { plantillas, evaluaciones, hallazgos, comunidades, cob, detalle }
-    },
-  )
+      return { plantillas, evaluaciones, evaluacionesTecnicas, hallazgos, comunidades, cob, detalle }
+    })
 
   const porVia = (via: ViaDeRespuesta) => hallazgos.filter((h) => h.viaDeRespuesta === via)
 
@@ -235,6 +243,79 @@ export default async function Evaluaciones({ searchParams }: { searchParams: Par
     redirect('/evaluaciones')
   }
 
+  // FR-48 — servicios de ingeniería y evaluación técnica ───────────────────────────────────────
+  async function registrarEvaluacionTecnica(formData: FormData) {
+    'use server'
+    const sesion = await sesionActual()
+    if (!sesion || !PUEDEN_EVALUAR.includes(sesion.rolStaff)) {
+      redirect('/evaluaciones?error=Solo+coordinación+solicita+evaluaciones+técnicas')
+    }
+    const comunidadId = String(formData.get('comunidadId') ?? '')
+    const dominio = String(formData.get('dominio') ?? '') as DominioEvaluacion
+    const asignadoA = String(formData.get('asignadoA') ?? '').trim()
+    if (!comunidadId) redirect('/evaluaciones?error=Elija+la+comunidad')
+    if (!DOMINIOS_EVALUACION.includes(dominio)) redirect('/evaluaciones?error=Dominio+desconocido')
+    if (!asignadoA) redirect('/evaluaciones?error=Falta+el+técnico+asignado')
+    try {
+      await conSesion(
+        sesion,
+        (client) =>
+          crearEvaluacionTecnica(
+            client,
+            {
+              organizacionId: sesion.organizacionId,
+              comunidadId,
+              dominio,
+              asignadoA,
+              notas: String(formData.get('notas') ?? '').trim() || null,
+            },
+            sesion.authId,
+          ),
+        { escribe: true },
+      )
+    } catch {
+      redirect('/evaluaciones?error=No+se+pudo+solicitar+la+evaluación+técnica')
+    }
+    revalidatePath('/evaluaciones')
+    redirect('/evaluaciones')
+  }
+
+  async function avanzarEvaluacionTecnicaAccion(formData: FormData) {
+    'use server'
+    const sesion = await sesionActual()
+    if (!sesion || !PUEDEN_EVALUAR.includes(sesion.rolStaff)) {
+      redirect('/evaluaciones?error=Solo+coordinación+avanza+evaluaciones+técnicas')
+    }
+    const id = String(formData.get('id') ?? '')
+    const desde = String(formData.get('desde') ?? '') as EstadoEvaluacion
+    const hacia = String(formData.get('hacia') ?? '') as EstadoEvaluacion
+    const detalle = String(formData.get('detalle') ?? '').trim()
+    if (!id) redirect('/evaluaciones?error=Falta+la+evaluación+técnica')
+    if (!transicionValida(desde, hacia)) {
+      redirect('/evaluaciones?error=Ese+cambio+de+estado+no+es+válido')
+    }
+    if (hacia === 'completada' && !detalle) {
+      redirect('/evaluaciones?error=Falta+el+hallazgo+para+completar+la+evaluación')
+    }
+    try {
+      await conSesion(
+        sesion,
+        (client) =>
+          avanzarEvaluacionTecnica(client, {
+            id,
+            organizacionId: sesion.organizacionId,
+            estado: hacia,
+            detalle: hacia === 'completada' ? detalle : null,
+          }),
+        { escribe: true },
+      )
+    } catch {
+      redirect('/evaluaciones?error=No+se+pudo+avanzar+la+evaluación+técnica')
+    }
+    revalidatePath('/evaluaciones')
+    redirect('/evaluaciones')
+  }
+
   async function generarDesdePlantilla(formData: FormData) {
     'use server'
     const sesion = await sesionActual()
@@ -321,7 +402,11 @@ export default async function Evaluaciones({ searchParams }: { searchParams: Par
         <h1 className="text-xl font-semibold text-barro-900">Evaluaciones</h1>
         <p className="text-sm text-barro-600">
           {evaluaciones.length} {evaluaciones.length === 1 ? 'barrido' : 'barridos'} ·{' '}
-          {hallazgos.length} {hallazgos.length === 1 ? 'hallazgo' : 'hallazgos'}
+          {hallazgos.length} {hallazgos.length === 1 ? 'hallazgo' : 'hallazgos'} ·{' '}
+          {evaluacionesTecnicas.length}{' '}
+          {evaluacionesTecnicas.length === 1
+            ? 'evaluación técnica'
+            : 'evaluaciones técnicas'}
         </p>
       </div>
 
@@ -380,6 +465,14 @@ export default async function Evaluaciones({ searchParams }: { searchParams: Par
         )}
         <RegistrarBarrido action={registrarEvaluacion} comunidades={comunidades} />
       </section>
+
+      {/* FR-48 — servicios de ingeniería: technical/engineering evaluation tickets. */}
+      <ServiciosDeIngenieria
+        evaluacionesTecnicas={evaluacionesTecnicas}
+        comunidades={comunidades}
+        registrar={registrarEvaluacionTecnica}
+        avanzar={avanzarEvaluacionTecnicaAccion}
+      />
 
       {/* Level 3 — the findings, routed by via_de_respuesta. */}
       <section className="mt-8">
@@ -781,6 +874,165 @@ function RegistrarBarrido({
         </div>
       </form>
     </details>
+  )
+}
+
+/**
+ * FR-48 — servicios de ingeniería y evaluación técnica. A técnico assesses one piece of a
+ * community's infrastructure (agua, puente, vivienda, eléctrico…), tracked solicitada → en curso →
+ * completada, closed with a finding. Reuses PRD-29's `evaluaciones` table (a ticket, not a sweep —
+ * see lib/evaluaciones.ts), so it lives in the same screen right next to the sweeps it borrows from.
+ */
+function ServiciosDeIngenieria({
+  evaluacionesTecnicas,
+  comunidades,
+  registrar,
+  avanzar,
+}: {
+  evaluacionesTecnicas: EvaluacionTecnica[]
+  comunidades: { id: string; nombre: string; municipio: string }[]
+  registrar: (formData: FormData) => Promise<void>
+  avanzar: (formData: FormData) => Promise<void>
+}) {
+  return (
+    <section className="mt-8">
+      <h2 className="flex items-center gap-2 font-semibold text-barro-900">
+        <Wrench className="size-4" aria-hidden />
+        Servicios de ingeniería
+        <span className="font-normal text-barro-600">{evaluacionesTecnicas.length}</span>
+      </h2>
+      <p className="mt-0.5 max-w-2xl text-xs text-barro-600">
+        Evaluación técnica de infraestructura — ¿es segura esta obra, funciona este sistema, es
+        habitable esta vivienda? Se solicita, se asigna a un técnico y se sigue hasta un hallazgo.
+      </p>
+
+      {evaluacionesTecnicas.length === 0 ? (
+        <p className="mt-3 rounded-lg border border-barro-200 bg-white px-4 py-3 text-barro-700">
+          Todavía no hay evaluaciones técnicas solicitadas.
+        </p>
+      ) : (
+        <ul className="mt-3 divide-y divide-barro-200 rounded-lg border border-barro-200 bg-white">
+          {evaluacionesTecnicas.map((e) => (
+            <li key={e.id} className="px-4 py-3 text-sm">
+              <div className="flex flex-wrap items-baseline gap-x-2">
+                <span className="font-medium text-barro-900">{e.comunidadNombre}</span>
+                <span className="text-barro-500">{e.municipio}</span>
+                <DominioPill dominio={e.dominio} />
+                <EstadoPill estado={e.estado} />
+                {e.asignadoA && <span className="text-barro-600">→ {e.asignadoA}</span>}
+                <span className="ml-auto text-barro-500">
+                  {e.creadoEn.toISOString().slice(0, 10)}
+                </span>
+              </div>
+              {e.notas && <p className="mt-0.5 text-barro-700">{e.notas}</p>}
+              {e.detalle && (
+                <p className="mt-1 rounded bg-selva-50 px-2 py-1 text-selva-800">{e.detalle}</p>
+              )}
+              <AvanzarEvaluacionTecnica evaluacion={e} avanzar={avanzar} />
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <details className="mt-4">
+        <summary className="cursor-pointer text-sm font-medium text-selva-700">
+          Solicitar una evaluación técnica
+        </summary>
+        <form
+          action={registrar}
+          className="mt-3 grid gap-3 rounded-lg border border-barro-200 bg-white p-4 sm:grid-cols-2"
+        >
+          <Campo etiqueta="Comunidad">
+            <select name="comunidadId" defaultValue="" required className={CLASE_CAMPO}>
+              <option value="" disabled>
+                Elija una comunidad
+              </option>
+              {comunidades.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nombre} · {c.municipio}
+                </option>
+              ))}
+            </select>
+          </Campo>
+          <Campo etiqueta="Tipo de infraestructura">
+            <SelectDominio />
+          </Campo>
+          <Campo etiqueta="Técnico asignado" ayuda="Quién hace la evaluación.">
+            <input name="asignadoA" required className={CLASE_CAMPO} />
+          </Campo>
+          <Campo etiqueta="Notas (opcional)">
+            <input name="notas" className={CLASE_CAMPO} />
+          </Campo>
+          <div className="sm:col-span-2">
+            <button
+              type="submit"
+              className="rounded bg-selva-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-selva-700"
+            >
+              Solicitar evaluación
+            </button>
+          </div>
+        </form>
+      </details>
+    </section>
+  )
+}
+
+function EstadoPill({ estado }: { estado: EstadoEvaluacion }) {
+  const clase =
+    estado === 'completada'
+      ? 'bg-selva-100 text-selva-800'
+      : estado === 'en_curso'
+        ? 'bg-atrato-100 text-atrato-800'
+        : 'bg-barro-100 text-barro-700'
+  return (
+    <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${clase}`}>
+      {ETIQUETA_ESTADO_EVALUACION[estado]}
+    </span>
+  )
+}
+
+function AvanzarEvaluacionTecnica({
+  evaluacion,
+  avanzar,
+}: {
+  evaluacion: EvaluacionTecnica
+  avanzar: (formData: FormData) => Promise<void>
+}) {
+  const siguiente = siguienteEstado(evaluacion.estado)
+  if (!siguiente) return null
+
+  if (siguiente === 'completada') {
+    return (
+      <form action={avanzar} className="mt-2 flex flex-wrap items-end gap-2">
+        <input type="hidden" name="id" value={evaluacion.id} />
+        <input type="hidden" name="desde" value={evaluacion.estado} />
+        <input type="hidden" name="hacia" value={siguiente} />
+        <label className="block text-xs">
+          <span className="font-medium text-barro-700">Hallazgo</span>
+          <input name="detalle" required className={`${CLASE_CAMPO} w-64`} />
+        </label>
+        <button
+          type="submit"
+          className="rounded bg-selva-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-selva-700"
+        >
+          Completar
+        </button>
+      </form>
+    )
+  }
+
+  return (
+    <form action={avanzar} className="mt-2">
+      <input type="hidden" name="id" value={evaluacion.id} />
+      <input type="hidden" name="desde" value={evaluacion.estado} />
+      <input type="hidden" name="hacia" value={siguiente} />
+      <button
+        type="submit"
+        className="rounded border border-selva-600 px-3 py-1 text-xs font-medium text-selva-700 hover:bg-selva-50"
+      >
+        Iniciar
+      </button>
+    </form>
   )
 }
 

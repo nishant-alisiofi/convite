@@ -58,14 +58,17 @@ vi.mock('@/lib/sesion', () => ({
 
 // Imported after the mock is declared so the page picks up the mocked session helpers.
 import {
+  avanzarEvaluacionTecnica,
   bomDe,
   cobertura,
   crearEvaluacion,
+  crearEvaluacionTecnica,
   crearHallazgo,
   crearPlantilla,
   filasCobertura,
   generarBom,
   guardarBom,
+  listarEvaluacionesTecnicas,
   listarHallazgos,
   listarPlantillas,
 } from '@/lib/evaluaciones'
@@ -361,6 +364,83 @@ conBase('PRD-29 contra la base', () => {
     expect(vereda!.evaluados).toBe(3)
     expect(vereda!.totalEstimado).toBe(100)
     expect(vereda!.fecha).toBe('2026-08-01')
+  })
+
+  it('crea una evaluación técnica y no la cuenta como barrido censal (FR-48 AC #1/#3)', async () => {
+    const tecnicaId = await conSesion(
+      sesionActiva,
+      (c) =>
+        crearEvaluacionTecnica(
+          c,
+          {
+            organizacionId: sesionActiva.organizacionId,
+            comunidadId,
+            dominio: 'puente',
+            asignadoA: 'Sebastián (técnico)',
+            notas: 'Puente peatonal sobre la quebrada, reportado inestable.',
+          },
+          sesionActiva.authId,
+        ),
+      { escribe: true },
+    )
+
+    const tecnicas = await conSesion(sesionActiva, (c) => listarEvaluacionesTecnicas(c))
+    const creada = tecnicas.find((t) => t.id === tecnicaId)
+    expect(creada).toBeTruthy()
+    expect(creada?.estado).toBe('solicitada')
+    expect(creada?.asignadoA).toBe('Sebastián (técnico)')
+    expect(creada?.dominio).toBe('puente')
+
+    // Not a census sweep: it must not show up in the coverage rollup this org already has.
+    const filas = await conSesion(sesionActiva, (c) => filasCobertura(c))
+    expect(filas.some((f) => f.dominio === 'puente')).toBe(false)
+  })
+
+  it('avanza una evaluación técnica solicitada -> en curso -> completada con hallazgo (FR-48 AC #2)', async () => {
+    const tecnicaId = await conSesion(
+      sesionActiva,
+      (c) =>
+        crearEvaluacionTecnica(
+          c,
+          {
+            organizacionId: sesionActiva.organizacionId,
+            comunidadId,
+            dominio: 'agua',
+            asignadoA: 'Comité de agua (prueba)',
+          },
+          sesionActiva.authId,
+        ),
+      { escribe: true },
+    )
+
+    await conSesion(
+      sesionActiva,
+      (c) =>
+        avanzarEvaluacionTecnica(c, {
+          id: tecnicaId,
+          organizacionId: sesionActiva.organizacionId,
+          estado: 'en_curso',
+        }),
+      { escribe: true },
+    )
+    let tecnicas = await conSesion(sesionActiva, (c) => listarEvaluacionesTecnicas(c))
+    expect(tecnicas.find((t) => t.id === tecnicaId)?.estado).toBe('en_curso')
+
+    await conSesion(
+      sesionActiva,
+      (c) =>
+        avanzarEvaluacionTecnica(c, {
+          id: tecnicaId,
+          organizacionId: sesionActiva.organizacionId,
+          estado: 'completada',
+          detalle: 'Bomba revisada: sello dañado, requiere repuesto.',
+        }),
+      { escribe: true },
+    )
+    tecnicas = await conSesion(sesionActiva, (c) => listarEvaluacionesTecnicas(c))
+    const completada = tecnicas.find((t) => t.id === tecnicaId)
+    expect(completada?.estado).toBe('completada')
+    expect(completada?.detalle).toBe('Bomba revisada: sello dañado, requiere repuesto.')
   })
 
   it('dibuja la pantalla de evaluaciones con datos reales, sin filtrar entrañas', async () => {
