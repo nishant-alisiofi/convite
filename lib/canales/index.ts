@@ -59,10 +59,23 @@ export {
   proveedorVozSimulador,
 } from './voz/driver'
 export type { LlamadaEntrante, ProveedorVoz } from './voz/driver'
+export { CABECERA_SECRETO, PARAM_SECRETO, verificarSecretoVoz } from './voz/firma'
+export type { ResultadoSecreto } from './voz/firma'
 export { devolverLlamada, recibirLlamadaPerdida } from './voz/flujo'
 export type { Interaccion, ResultadoDevolucion, ResultadoPerdida } from './voz/flujo'
+export {
+  envioVozInfobipConfigurado,
+  olvidarProveedorVoz,
+  PROVEEDOR_VOZ_INFOBIP,
+  proveedorVozActivo,
+  proveedorVozInfobip,
+} from './voz/infobip'
+export type { ConfigVozInfobip } from './voz/infobip'
 export { dictarFolio, MENU, opcionDe, PROMPTS, tipoDeIntencion } from './voz/menu'
 export type { OpcionMenu } from './voz/menu'
+export { esLlamadaEntrante, interpretarWebhookVoz } from './voz/payload'
+export type { EventoVoz } from './voz/payload'
+export { manejadorWebhookVoz, MANEJADORES_VOZ } from './voz/trabajos'
 export {
   anotarActividad,
   anotarMedia,
@@ -75,6 +88,14 @@ export { CALIDAD_BUENA, CALIDAD_DEBIL, comoConfirmar, queSolicitar } from './pol
 export type { PerfilContacto, PlanRespuesta, PlanSolicitud, Solicitud } from './politica'
 export { PROVEEDOR_SMS_SIMULADOR, proveedorSmsSimulador, recibirSms } from './sms/driver'
 export type { PayloadSms, ProveedorSms, SmsEnviado } from './sms/driver'
+export {
+  envioSmsInfobipConfigurado,
+  olvidarProveedorSms,
+  PROVEEDOR_SMS_INFOBIP,
+  proveedorSmsActivo,
+  proveedorSmsInfobip,
+} from './sms/infobip'
+export type { ConfigSmsInfobip } from './sms/infobip'
 export { limiteDeUnSegmento, recortarAUnSegmento, segmentar } from './sms/segmentos'
 export type { Alfabeto, Segmentacion } from './sms/segmentos'
 export { esquemaPayloadSimulado, PROVEEDOR_SIMULADOR, recibirSimulado } from './simulador'

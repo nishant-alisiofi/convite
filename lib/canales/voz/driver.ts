@@ -28,6 +28,13 @@ export type LlamadaSaliente = {
 }
 
 export interface ProveedorVoz {
+  /**
+   * Which adapter this is — `PROVEEDOR_VOZ_SIMULADOR`, `PROVEEDOR_VOZ_INFOBIP` (voz/infobip.ts),
+   * or whatever comes after. Written into `llamadas.proveedor` by flujo.ts and despachador.ts
+   * instead of a hardcoded constant, so a call placed against the real aggregator is not
+   * permanently mislabelled as a simulator run once the credential is configured.
+   */
+  nombre: string
   /** Hang up without answering, so the caller is never billed. */
   rechazar(idLlamada: string): Promise<void>
   /** Ring them back. This is the call we pay for. */
@@ -58,6 +65,7 @@ export function proveedorVozSimulador(): ProveedorVoz & {
   let n = 0
 
   return {
+    nombre: PROVEEDOR_VOZ_SIMULADOR,
     rechazadas,
     llamadas,
     async rechazar(idLlamada) {
