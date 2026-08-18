@@ -144,14 +144,14 @@ account + Colombian voice number + account-manager activation of recordings/earl
 
 | ID | Title | Type | Priority | Status |
 |----|-------|------|----------|--------|
-| [PRD-15](PRD-15-gateways-sms-voz.md) | Infobip voice missed-call + SMS gateway (build) | PRD | P1 | 🔨 In progress (adapter; live test pending Infobip number) |
-| [FR-42](FR-42-busqueda-rapida-personas.md) | Fast person/beneficiary search | FR | P2 | 🔨 In progress |
-| [FR-43](FR-43-caducidad-perecederos-alertas.md) | Perishable expiry tracking + alerts | FR | P2 | 🔨 In progress |
-| [FR-44](FR-44-inventario-farmacias-locales.md) | Local pharmacy inventory | FR | P3 | 🔨 In progress |
-| [FR-45](FR-45-categorias-bienes-ayuda.md) | Relief-goods categories (food/medical/construction) | FR | P2 | 🔨 In progress |
-| [FR-46](FR-46-lanchas-costo-y-pago.md) | Paid boat (lancha) logistics: cost + operator pay | FR | P2 | 🔨 In progress |
-| [PRD-47](PRD-47-red-de-lancheros-datos.md) | Lanchero relay network for data collection | PRD | P3 | 🔨 In progress (assumptions — partner review) |
-| [FR-48](FR-48-servicios-de-ingenieria.md) | Engineering / technical evaluation services | FR | P3 | 🔨 In progress (extend PRD-29) |
+| [PRD-15](PRD-15-gateways-sms-voz.md) | Infobip voice missed-call + SMS gateway (build) | PRD | P1 | 🟡 Core built + deployed (reject→callback→spend-caps + SMS send + signed webhook); IVR capture + inbound-SMS route + live test pending Infobip account |
+| [FR-42](FR-42-busqueda-rapida-personas.md) | Fast person/beneficiary search | FR | P2 | ✅ Built + deployed (staging+prod, pending Codex) |
+| [FR-43](FR-43-caducidad-perecederos-alertas.md) | Perishable expiry tracking + alerts | FR | P2 | ✅ Built + deployed (staging+prod, pending Codex) |
+| [FR-44](FR-44-inventario-farmacias-locales.md) | Local pharmacy inventory | FR | P3 | ✅ Built + deployed (staging+prod, pending Codex) |
+| [FR-45](FR-45-categorias-bienes-ayuda.md) | Relief-goods categories (food/medical/construction) | FR | P2 | ✅ Built + deployed (staging+prod, pending Codex) |
+| [FR-46](FR-46-lanchas-costo-y-pago.md) | Paid boat (lancha) logistics: cost + operator pay | FR | P2 | ✅ Built + deployed (staging+prod, pending Codex) |
+| [PRD-47](PRD-47-red-de-lancheros-datos.md) | Lanchero relay network for data collection | PRD | P3 | ✅ Built + deployed (assumptions — partner review; pending Codex) |
+| [FR-48](FR-48-servicios-de-ingenieria.md) | Engineering / technical evaluation services | FR | P3 | ✅ Built + deployed (staging+prod, pending Codex) |
 
 **Also in this wrap-up (not a new WI):** WhatsApp live-number verification — number registered
 (+57 300 510 1284), production webhook green, env vars set on app + worker; blocked only on a real
