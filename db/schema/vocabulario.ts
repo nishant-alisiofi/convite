@@ -10,12 +10,20 @@
  * `catalogo_items` and must never appear here (non-negotiable 2.8).
  */
 
+/**
+ * FR-46/PRD-47: `lanchero` is a boat operator worth naming as their own contact role — the leg
+ * payee (FR-46) and, once registered against the communities on their route in
+ * `lancheros_comunidades`, a vetted relay for reports out of a dark community (PRD-47). Never
+ * self-signed up (PRD-47's stated assumption, mirroring FR-18's vetted stance) — a coordinador/
+ * admin registers one the same way any other contact is registered.
+ */
 export const ROLES_CONTACTO = [
   'reportante',
   'verificador',
   'transportista',
   'coordinador',
   'donante',
+  'lanchero',
 ] as const
 
 export const ROLES_STAFF = [
@@ -59,7 +67,22 @@ export const TIPOS_COMUNIDAD = [
  * channel attaches later as verification clears, and nothing already entered changes. Like
  * `web`, it is a staff-only channel, so it is not a contact preference.
  */
-export const CANALES = ['whatsapp', 'sms', 'ivr', 'radio', 'papel', 'web', 'manual'] as const
+/**
+ * PRD-47: `relevo` is the lanchero-relay channel — a registered lanchero carries a report out of
+ * a community with no channel at all and a coordinador/verificador/admin keys it in through
+ * `registrar_reporte_relevo`, recording both the lanchero and the origin community. Staff-gated
+ * like `manual`, never a contact preference.
+ */
+export const CANALES = [
+  'whatsapp',
+  'sms',
+  'ivr',
+  'radio',
+  'papel',
+  'web',
+  'manual',
+  'relevo',
+] as const
 
 /** Channels a contact can be reached on. `web` and `manual` are staff-only, not preferences. */
 export const CANALES_PREFERIDOS = ['whatsapp', 'sms', 'ivr', 'radio', 'papel'] as const
@@ -151,6 +174,9 @@ export const ESTADOS_CAPACIDAD = ['OFRECIDA', 'COMPROMETIDA', 'CANCELADA', 'COMP
  * dispatch-side commitment/completion lives on `capacidades`, not on the supply-side offer.
  */
 export const ESTADOS_OFERTA_TRANSPORTE = ['OFRECIDA', 'RETIRADA'] as const
+
+/** FR-46: a lanchero's payment for a leg is either still owed or already paid. */
+export const ESTADOS_PAGO_LANCHERO = ['pendiente', 'pagado'] as const
 
 /**
  * `SIN_CLASIFICAR` is a first-class state, not an error. «Muchas cosas!! De todo!!!» is a
@@ -288,6 +314,7 @@ export type Temporada = (typeof TEMPORADAS)[number]
 export type FuenteRuta = (typeof FUENTES_RUTA)[number]
 export type EstadoCapacidad = (typeof ESTADOS_CAPACIDAD)[number]
 export type EstadoOfertaTransporte = (typeof ESTADOS_OFERTA_TRANSPORTE)[number]
+export type EstadoPagoLanchero = (typeof ESTADOS_PAGO_LANCHERO)[number]
 export type EstadoOferta = (typeof ESTADOS_OFERTA)[number]
 export type EstadoMensaje = (typeof ESTADOS_MENSAJE)[number]
 export type TipoAdjunto = (typeof TIPOS_ADJUNTO)[number]

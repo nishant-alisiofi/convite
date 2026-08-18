@@ -36,6 +36,8 @@ export type Traslado = {
   estado: string
   motivo: string | null
   capacidadId: string | null
+  /** FR-46: the mode of the assigned vehicle, when one is assigned — 'lancha' surfaces cost/pay. */
+  capacidadModo: string | null
   despachadoEn: Date | null
   codigoLlegada: string | null
   llegadaConfirmadaEn: Date | null
@@ -68,6 +70,7 @@ export async function listarTraslados(client: PoolClient): Promise<Traslado[]> {
     estado: string
     motivo: string | null
     capacidad_id: string | null
+    capacidad_modo: string | null
     despachado_en: Date | null
     codigo_llegada: string | null
     llegada_confirmada_en: Date | null
@@ -82,12 +85,13 @@ export async function listarTraslados(client: PoolClient): Promise<Traslado[]> {
             t.ventana_desde, t.ventana_hasta,
             t.requiere_alojamiento, t.requiere_alimentacion, t.requiere_acompanamiento,
             t.requiere_regreso, t.regreso_ventana_desde, t.regreso_ventana_hasta,
-            t.estado, t.motivo, t.capacidad_id, t.despachado_en, t.codigo_llegada,
-            t.llegada_confirmada_en, t.regreso_despachado_en, t.codigo_regreso,
+            t.estado, t.motivo, t.capacidad_id, cap.modo as capacidad_modo, t.despachado_en,
+            t.codigo_llegada, t.llegada_confirmada_en, t.regreso_despachado_en, t.codigo_regreso,
             t.regreso_confirmado_en, t.creado_en
        from traslados_persona t
        left join comunidades co on co.id = t.origen_comunidad_id
        left join comunidades cd on cd.id = t.destino_comunidad_id
+       left join capacidades cap on cap.id = t.capacidad_id
       order by t.creado_en desc`,
   )
 
@@ -112,6 +116,7 @@ export async function listarTraslados(client: PoolClient): Promise<Traslado[]> {
     estado: r.estado,
     motivo: r.motivo,
     capacidadId: r.capacidad_id,
+    capacidadModo: r.capacidad_modo,
     despachadoEn: r.despachado_en,
     codigoLlegada: r.codigo_llegada,
     llegadaConfirmadaEn: r.llegada_confirmada_en,

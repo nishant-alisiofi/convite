@@ -7,6 +7,7 @@ import {
   PencilLine,
   PhoneMissed,
   Radio,
+  Ship,
   TriangleAlert,
   type LucideIcon,
 } from 'lucide-react'
@@ -39,6 +40,8 @@ export const CANAL_META: Record<Canal, { etiqueta: string; Icono: LucideIcon }> 
   web: { etiqueta: 'web', Icono: Globe },
   // PRD-35 (§29.3b): the zeroth channel — a report a coordinator typed in before any channel existed.
   manual: { etiqueta: 'manual', Icono: PencilLine },
+  // PRD-47: a registered lanchero carried this out of a community with no channel at all.
+  relevo: { etiqueta: 'relevo de lanchero', Icono: Ship },
 }
 
 /**

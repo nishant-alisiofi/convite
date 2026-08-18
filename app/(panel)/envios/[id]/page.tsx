@@ -1,4 +1,4 @@
-import { Clock, FileText, Scale, Send, TriangleAlert, X } from 'lucide-react'
+import { Clock, FileText, Scale, Send, Ship, TriangleAlert, X } from 'lucide-react'
 import Link from 'next/link'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
@@ -13,6 +13,12 @@ import {
   registrarDecision,
 } from '@/lib/despacho/plan'
 import { fechaHoraCorta } from '@/lib/fechas'
+import {
+  lancherosDisponibles,
+  marcarPagoLancheroPagado,
+  pagosDeEnvio,
+  registrarPagoLanchero,
+} from '@/lib/lanchero-pagos'
 import { conSesion, sesionActual } from '@/lib/sesion'
 import { temporadaVigente } from '@/lib/temporada'
 
@@ -46,9 +52,8 @@ export default async function Envio({
   const { cubrir, error } = await searchParams
   const puedeDespachar = PUEDEN_DESPACHAR.includes(sesion.rolStaff)
 
-  const { manifiesto, candidatos, cobertura, capacidadId } = await conSesion(
-    sesion,
-    async (client) => {
+  const { manifiesto, candidatos, cobertura, capacidadId, pagosLanchero, lancheroOpciones } =
+    await conSesion(sesion, async (client) => {
       const manifiesto = await cargarManifiesto(client, id)
       const { rows } = await client.query<{ id: string }>(
         `select c.id from capacidades c
@@ -68,9 +73,10 @@ export default async function Envio({
             ? await candidatosParaEnvio(client, capacidadId, await temporadaVigente(client))
             : [],
         cobertura: cubrir ? await coberturaDePedido(client, cubrir) : null,
+        pagosLanchero: await pagosDeEnvio(client, id),
+        lancheroOpciones: await lancherosDisponibles(client),
       }
-    },
-  )
+    })
 
   if (!manifiesto) redirect('/envios')
 
@@ -127,6 +133,29 @@ export default async function Envio({
           }
           case 'despachar':
             return despachar(client, id, sesion.authId)
+          case 'pago_registrar': {
+            const costoRaw = String(formData.get('costoTotalCop') ?? '').trim()
+            return registrarPagoLanchero(
+              client,
+              {
+                organizacionId: sesion.organizacionId,
+                envioId: id,
+                lancheroContactoId: String(formData.get('lancheroContactoId') ?? ''),
+                costoTotalCop: costoRaw ? Number(costoRaw) : null,
+                montoLancheroCop: Number(formData.get('montoLancheroCop')),
+                notas: String(formData.get('notas') ?? '').trim() || null,
+              },
+              sesion.authId,
+            )
+          }
+          case 'pago_pagar': {
+            const pagado = await marcarPagoLancheroPagado(
+              client,
+              String(formData.get('pagoId') ?? ''),
+              sesion.authId,
+            )
+            return pagado ? { ok: true as const } : { ok: false as const, error: 'No se pudo marcar el pago.' }
+          }
           default:
             return { ok: false as const, error: 'Acción desconocida.' }
         }
@@ -171,6 +200,106 @@ export default async function Envio({
         <p className="mt-4 rounded-lg border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-900">
           {error}
         </p>
+      )}
+
+      {manifiesto.modo === 'lancha' && (
+        <section className="mt-6 rounded-lg border border-barro-200 bg-white px-4 py-4">
+          <h2 className="flex items-center gap-2 font-semibold text-barro-900">
+            <Ship className="size-4" aria-hidden />
+            Costo y pago del lanchero
+          </h2>
+          <p className="mt-1 max-w-3xl text-sm text-barro-700">
+            Lo que costó el viaje y lo que se le debe al lanchero. Es solo registro — nada se paga
+            desde acá, como el fondo de compra local.
+          </p>
+
+          {pagosLanchero.length > 0 && (
+            <ul className="mt-3 divide-y divide-barro-200">
+              {pagosLanchero.map((p) => (
+                <li key={p.id} className="flex flex-wrap items-baseline gap-x-2 py-2 text-sm">
+                  <span className="font-medium text-barro-900">{p.lancheroNombre ?? p.lancheroTelefono}</span>
+                  <span className="text-barro-700">
+                    {p.montoLancheroCop.toLocaleString('es-CO')} COP
+                  </span>
+                  {p.costoTotalCop != null && (
+                    <span className="text-barro-500">
+                      (costo total {p.costoTotalCop.toLocaleString('es-CO')} COP)
+                    </span>
+                  )}
+                  <span
+                    className={`rounded px-1.5 py-0.5 text-xs font-medium ${
+                      p.estadoPago === 'pagado' ? 'bg-selva-50 text-selva-700' : 'bg-atrato-50 text-atrato-700'
+                    }`}
+                  >
+                    {p.estadoPago}
+                  </span>
+                  {puedeDespachar && p.estadoPago === 'pendiente' && (
+                    <form action={accion} className="ml-auto">
+                      <input type="hidden" name="accion" value="pago_pagar" />
+                      <input type="hidden" name="pagoId" value={p.id} />
+                      <button type="submit" className="text-barro-700 underline">
+                        Marcar pagado
+                      </button>
+                    </form>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {puedeDespachar && (
+            <form action={accion} className="mt-3 grid gap-3 sm:grid-cols-2">
+              <input type="hidden" name="accion" value="pago_registrar" />
+              <label className="block text-sm">
+                <span className="text-barro-700">Lanchero a pagar</span>
+                <select name="lancheroContactoId" required className="mt-1 block w-full rounded border border-barro-300 px-2 py-1.5 text-sm">
+                  <option value="">…</option>
+                  {lancheroOpciones.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.nombre} · {l.telefono}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block text-sm">
+                <span className="text-barro-700">Monto para el lanchero (COP)</span>
+                <input
+                  name="montoLancheroCop"
+                  type="number"
+                  min={1}
+                  required
+                  inputMode="numeric"
+                  className="mt-1 block w-full rounded border border-barro-300 px-2 py-1.5 text-sm"
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="text-barro-700">Costo total del viaje (COP, opcional)</span>
+                <input
+                  name="costoTotalCop"
+                  type="number"
+                  min={0}
+                  inputMode="numeric"
+                  className="mt-1 block w-full rounded border border-barro-300 px-2 py-1.5 text-sm"
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="text-barro-700">Notas (opcional)</span>
+                <input
+                  name="notas"
+                  className="mt-1 block w-full rounded border border-barro-300 px-2 py-1.5 text-sm"
+                />
+              </label>
+              <div className="sm:col-span-2">
+                <button
+                  type="submit"
+                  className="rounded bg-selva-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-selva-700"
+                >
+                  Registrar costo y pago
+                </button>
+              </div>
+            </form>
+          )}
+        </section>
       )}
 
       <section className="mt-6">

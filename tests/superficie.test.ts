@@ -122,6 +122,12 @@ const POLITICA: Record<string, 'publica' | 'autenticada'> = {
   '/envios': 'autenticada',
   '/envios/[id]': 'autenticada',
   '/envios/[id]/manifiesto': 'autenticada',
+  // PRD-13 offline basemap. Behind a session like the rest of the panel; the archive itself is a
+  // public static file with no key, but the screen that points at it is not.
+  '/mapa-offline': 'autenticada',
+  // PRD-47 the vetted lanchero relay: registering a lanchero and keying in what they relayed.
+  // Behind a session; each write goes through RLS or the registrar_reporte_relevo gated door.
+  '/relevo': 'autenticada',
 }
 
 /** Concrete values for the dynamic segments, so a real request can be made. */
