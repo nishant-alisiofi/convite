@@ -33,6 +33,10 @@ const COORDINADOR = '00000000-0000-4000-8000-000000000001'
 // inserts — the two identities the role-gated screens (/equipo, /centros) are written for.
 const ADMIN = '00000000-0000-4000-8000-000000000004'
 const PLATAFORMA = '00000000-0000-4000-8000-0000000000f0'
+// Open sign-in (0035): a `usuarios` row with no `invitaciones_staff` row at all — the shape
+// `vincular_usuario_staff()` creates for somebody nobody invited. convite_equipo() (0061) is
+// the only reason /equipo has anywhere to show this identity.
+const AUTOADMIN = '00000000-0000-4000-8000-000000000005'
 
 /**
  * The signed-in identity the mocked session returns. It is a mutable module value rather than a
@@ -204,6 +208,21 @@ beforeAll(async () => {
   await client.query(
     `insert into invitaciones_staff (correo, rol_staff, organizacion_id) values ($1, 'verificador', $2)`,
     ['nueva.verificadora@alisio.test', orgId],
+  )
+
+  // An open sign-in (0035) admin: a `usuarios` row and its `auth_user` identity, with no
+  // `invitaciones_staff` row anywhere — nobody invited this address, they just proved they
+  // control it. Before convite_equipo() (0061) this had no row on /equipo to show, and
+  // therefore no way to deactivate it.
+  await client.query(
+    `insert into auth_user (id, nombre, correo, correo_verificado)
+       values ($1, 'Admin sin invitación (prueba)', 'autoadmin@convite.test', true)`,
+    [AUTOADMIN],
+  )
+  await client.query(
+    `insert into usuarios (id, rol_staff, organizacion_id, es_plataforma, activo)
+       values ($1, 'admin', $2, false, true)`,
+    [AUTOADMIN, orgId],
   )
 }, 120_000)
 
@@ -446,6 +465,9 @@ conBase('cada pantalla del panel se dibuja con datos reales', () => {
     expect(marcado).not.toContain('Solo el admin de su centro gestiona al equipo')
     expect(marcado).not.toContain('Todavía no ha invitado a nadie')
     expect(marcado).toContain('nueva.verificadora@alisio.test')
+    // The open-sign-in admin (0035) has no invitation anywhere; convite_equipo() (0061) is the
+    // only reason this identity has a row here, with a «Desactivar» control like anybody else's.
+    expect(marcado).toContain('autoadmin@convite.test')
     sinEntrañas(marcado, 'equipo')
   })
 
