@@ -6,6 +6,7 @@ import {
   ESTADOS_PROGRAMA,
 } from '@/db/schema/programas'
 import type { Modo, Temporada } from '@/db/schema/vocabulario'
+import { fechaSqlADia } from '@/lib/fechas'
 import { Grafo } from '@/lib/matching/grafo'
 import type { RutaGrafo, TemporadaActual } from '@/lib/matching/tipos'
 
@@ -399,13 +400,19 @@ export async function feasibilidadDePrograma(
 ): Promise<Feasibilidad> {
   const { rows: prog } = await client.query<{
     cadencia: string
-    fecha_inicio: string | null
-    fecha_fin: string | null
+    // `date` columns come back from `pg` as a local-midnight `Date`, not a string — normalized
+    // below via `fechaSqlADia` before `ventana()` ever sees them (PRD-31: an un-normalized `Date`
+    // here made `ventana()`'s own `${fechaInicio}T00:00:00Z` re-parse produce `Invalid Date`,
+    // which turned into `NaN` months and emptied the whole calendar).
+    fecha_inicio: Date | string | null
+    fecha_fin: Date | string | null
   }>(`select cadencia, fecha_inicio, fecha_fin from programas where id = $1`, [programaId])
   const p = prog[0]
   if (!p) {
     return { meses: [], costoAnioCop: 0, brechas: [], costoSegundoSemestrePct: null, sinOrigenes: false }
   }
+  const fechaInicio = fechaSqlADia(p.fecha_inicio)
+  const fechaFin = fechaSqlADia(p.fecha_fin)
 
   const { rows: comunidades } = await client.query<{ comunidad_id: string; nombre: string | null }>(
     `select pc.comunidad_id, c.nombre
@@ -428,7 +435,7 @@ export async function feasibilidadDePrograma(
   )
 
   const alcances = alcancesDeComunidades(comunidades, rutas, origenes)
-  const { mesInicio, anioInicio, meses } = ventana(p.fecha_inicio, p.fecha_fin)
+  const { mesInicio, anioInicio, meses } = ventana(fechaInicio, fechaFin)
   return calcularFeasibilidad(alcances, p.cadencia, mesInicio, anioInicio, meses, origenes.length === 0)
 }
 
@@ -443,8 +450,10 @@ type FilaPrograma = {
   familias_objetivo: number | null
   cadencia: string
   estado: string
-  fecha_inicio: string | null
-  fecha_fin: string | null
+  // `date` columns: `pg` hands these back as a local-midnight `Date`, not a string — see
+  // `fechaSqlADia` in `lib/fechas.ts` (BUG-22).
+  fecha_inicio: Date | string | null
+  fecha_fin: Date | string | null
   renueva: boolean
   presupuesto_comprometido_cop: string
   aplicado_cop: string
@@ -469,8 +478,8 @@ function mapearPrograma(r: FilaPrograma): Programa {
     familiasObjetivo: r.familias_objetivo,
     cadencia: r.cadencia,
     estado: r.estado,
-    fechaInicio: r.fecha_inicio,
-    fechaFin: r.fecha_fin,
+    fechaInicio: fechaSqlADia(r.fecha_inicio),
+    fechaFin: fechaSqlADia(r.fecha_fin),
     renueva: r.renueva,
     presupuestoComprometidoCop: comprometido,
     aplicadoCop: aplicado,
@@ -563,6 +572,56 @@ export async function participantesDe(
     completadoEn: r.completado_en,
     asistencias: Number(r.asistencias),
     creadoEn: r.creado_en,
+  }))
+}
+
+export type ParticipanteConAsistencia = Participante & {
+  /** Whether this participant's attendance at THIS jornada is recorded, and as what — never
+   *  whether they attended for a reason (§22). `null` when nobody has marked it yet. */
+  asistioEnJornada: boolean | null
+}
+
+/**
+ * The programa's roster (§21b.3), each participant annotated with their attendance at one
+ * specific jornada — the session — so the jornada detail screen (PRD-30) can show and capture
+ * roster + attendance without a second round trip. `asistencias` still counts every session they
+ * have attended across the whole programa, same as `participantesDe`.
+ */
+export async function participantesConAsistencia(
+  client: PoolClient,
+  programaId: string,
+  jornadaId: string,
+): Promise<ParticipanteConAsistencia[]> {
+  const { rows } = await client.query<{
+    id: string
+    nombre: string
+    contacto: string | null
+    completado: boolean
+    completado_en: Date | null
+    asistencias: string
+    creado_en: Date
+    asistio_en_jornada: boolean | null
+  }>(
+    `select pp.id, pp.nombre, pp.contacto, pp.completado, pp.completado_en,
+            (select count(*) from programa_asistencias pas
+              where pas.participante_id = pp.id and pas.asistio) as asistencias,
+            pp.creado_en,
+            (select pas2.asistio from programa_asistencias pas2
+              where pas2.participante_id = pp.id and pas2.jornada_id = $2) as asistio_en_jornada
+       from programa_participantes pp
+      where pp.programa_id = $1
+      order by pp.nombre`,
+    [programaId, jornadaId],
+  )
+  return rows.map((r) => ({
+    id: r.id,
+    nombre: r.nombre,
+    contacto: r.contacto,
+    completado: r.completado,
+    completadoEn: r.completado_en,
+    asistencias: Number(r.asistencias),
+    creadoEn: r.creado_en,
+    asistioEnJornada: r.asistio_en_jornada,
   }))
 }
 

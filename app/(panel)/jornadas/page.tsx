@@ -1,4 +1,4 @@
-import { CalendarDays, MapPin, Plus, TriangleAlert } from 'lucide-react'
+import { CalendarDays, MapPin, Plus, TriangleAlert, UsersRound } from 'lucide-react'
 import Link from 'next/link'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
@@ -16,9 +16,17 @@ import {
   paradasDe,
   PAYLOAD_TIPO_JORNADA,
   quitarParada,
+  TIPOS_CON_ROSTER,
   TIPOS_JORNADA,
 } from '@/lib/jornadas'
 import type { EstadoJornada, TipoJornada } from '@/db/schema/vocabulario'
+import { fechaSoloDia } from '@/lib/fechas'
+import {
+  agregarParticipante,
+  marcarAsistencia,
+  type ParticipanteConAsistencia,
+  participantesConAsistencia,
+} from '@/lib/programas'
 import { conSesion, sesionActual } from '@/lib/sesion'
 
 export const dynamic = 'force-dynamic'
@@ -74,8 +82,16 @@ export default async function Jornadas({ searchParams }: { searchParams: Params 
       )
 
       const elegida = ver ? await jornadaPorId(client, ver) : null
+      const conRoster =
+        !!elegida?.programaId && TIPOS_CON_ROSTER.includes(elegida.tipo as (typeof TIPOS_CON_ROSTER)[number])
       const detalle = elegida
-        ? { jornada: elegida, paradas: await paradasDe(client, elegida.id) }
+        ? {
+            jornada: elegida,
+            paradas: await paradasDe(client, elegida.id),
+            roster: conRoster
+              ? await participantesConAsistencia(client, elegida.programaId!, elegida.id)
+              : null,
+          }
         : null
 
       return { jornadas, regiones, comunidades, programas, detalle }
@@ -209,6 +225,59 @@ export default async function Jornadas({ searchParams }: { searchParams: Params 
       await conSesion(sesion, (client) => quitarParada(client, paradaId), { escribe: true })
     } catch {
       redirect(`/jornadas?ver=${id}&error=No+se+pudo+quitar+la+parada`)
+    }
+    revalidatePath('/jornadas')
+    redirect(`/jornadas?ver=${id}`)
+  }
+
+  /** Roster + attendance (PRD-30 AC4 / PRD-31 §21b.3) — records only THAT someone attended. */
+  async function marcarAsistenciaAction(formData: FormData) {
+    'use server'
+    const sesion = await sesionActual()
+    if (
+      !sesion ||
+      !JORNADA_ROLES_ESCRITURA.includes(sesion.rolStaff as (typeof JORNADA_ROLES_ESCRITURA)[number])
+    ) {
+      redirect('/jornadas?error=Solo+coordinación+registra+asistencia')
+    }
+    const id = String(formData.get('jornadaId') ?? '')
+    const participanteId = String(formData.get('participanteId') ?? '')
+    const asistio = String(formData.get('asistio') ?? '') === '1'
+    if (!id || !participanteId) redirect(`/jornadas?ver=${id}&error=Falta+el+participante`)
+    try {
+      await conSesion(sesion, (client) => marcarAsistencia(client, participanteId, id, asistio), {
+        escribe: true,
+      })
+    } catch {
+      redirect(`/jornadas?ver=${id}&error=No+se+pudo+registrar+la+asistencia`)
+    }
+    revalidatePath('/jornadas')
+    redirect(`/jornadas?ver=${id}`)
+  }
+
+  async function agregarAlRosterAction(formData: FormData) {
+    'use server'
+    const sesion = await sesionActual()
+    if (
+      !sesion ||
+      !JORNADA_ROLES_ESCRITURA.includes(sesion.rolStaff as (typeof JORNADA_ROLES_ESCRITURA)[number])
+    ) {
+      redirect('/jornadas?error=Solo+coordinación+edita+el+roster')
+    }
+    const id = String(formData.get('jornadaId') ?? '')
+    const programaId = String(formData.get('programaId') ?? '')
+    const nombre = String(formData.get('nombre') ?? '').trim()
+    if (!id || !programaId) redirect(`/jornadas?ver=${id}&error=Falta+el+programa`)
+    if (!nombre) redirect(`/jornadas?ver=${id}&error=El+participante+necesita+un+nombre`)
+    try {
+      await conSesion(
+        sesion,
+        (client) =>
+          agregarParticipante(client, programaId, nombre, String(formData.get('contacto') ?? '').trim() || null),
+        { escribe: true },
+      )
+    } catch {
+      redirect(`/jornadas?ver=${id}&error=No+se+pudo+agregar+al+roster`)
     }
     revalidatePath('/jornadas')
     redirect(`/jornadas?ver=${id}`)
@@ -474,6 +543,59 @@ export default async function Jornadas({ searchParams }: { searchParams: Params 
               </form>
             )}
           </div>
+
+          {/* Roster + attendance (PRD-30 AC4 / PRD-31 §21b.3) — a taller/formación under a
+              programa carries the same participants across sessions; here is one session. */}
+          {detalle.roster !== null && (
+            <div className="mt-4 rounded-lg border border-barro-200 bg-white p-4">
+              <h3 className="flex items-center gap-2 text-sm font-semibold text-barro-900">
+                <UsersRound className="size-4" aria-hidden />
+                Roster y asistencia
+                <span className="font-normal text-barro-500">{detalle.roster.length}</span>
+              </h3>
+              <p className="mt-1 text-sm text-barro-600">
+                Se registra que asistieron a esta jornada, nunca a qué. El roster completo —
+                agregar o quitar participantes — se administra desde el programa.
+              </p>
+              {detalle.roster.length === 0 ? (
+                <p className="mt-2 text-sm text-barro-600">
+                  El programa todavía no tiene participantes en el roster.
+                </p>
+              ) : (
+                <ul className="mt-2 divide-y divide-barro-100">
+                  {detalle.roster.map((pt) => (
+                    <FilaRoster
+                      key={pt.id}
+                      participante={pt}
+                      jornadaId={detalle.jornada.id}
+                      puedeEscribir={puedeEscribir}
+                      accion={marcarAsistenciaAction}
+                    />
+                  ))}
+                </ul>
+              )}
+              {puedeEscribir && (
+                <form action={agregarAlRosterAction} className="mt-3 flex flex-wrap items-end gap-2">
+                  <input type="hidden" name="jornadaId" value={detalle.jornada.id} />
+                  <input type="hidden" name="programaId" value={detalle.jornada.programaId ?? ''} />
+                  <label className="block flex-1 text-sm">
+                    <span className="font-medium text-barro-800">Agregar al roster</span>
+                    <input name="nombre" required className={CLASE_CAMPO} placeholder="Nombre" />
+                  </label>
+                  <label className="block flex-1 text-sm">
+                    <span className="font-medium text-barro-800">Contacto (opcional)</span>
+                    <input name="contacto" className={CLASE_CAMPO} />
+                  </label>
+                  <button
+                    type="submit"
+                    className="rounded bg-selva-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-selva-700"
+                  >
+                    Agregar
+                  </button>
+                </form>
+              )}
+            </div>
+          )}
         </section>
       )}
     </main>
@@ -481,9 +603,53 @@ export default async function Jornadas({ searchParams }: { searchParams: Params 
 }
 
 function formatoFecha(fecha: string | null): string {
-  if (!fecha) return 'sin fecha'
-  const d = new Date(`${fecha}T00:00:00Z`)
-  return d.toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' })
+  return fecha ? fechaSoloDia(fecha) : 'sin fecha'
+}
+
+/** One roster row: the participant, their attendance at THIS jornada, and the toggle to record it. */
+function FilaRoster({
+  participante,
+  jornadaId,
+  puedeEscribir,
+  accion,
+}: {
+  participante: ParticipanteConAsistencia
+  jornadaId: string
+  puedeEscribir: boolean
+  accion: (f: FormData) => Promise<void>
+}) {
+  const asistio = participante.asistioEnJornada
+  return (
+    <li className="flex flex-wrap items-baseline gap-2 py-2 text-sm">
+      <span className="text-barro-900">{participante.nombre}</span>
+      <span className="text-barro-500">
+        {participante.asistencias} {participante.asistencias === 1 ? 'sesión' : 'sesiones'}
+      </span>
+      {asistio === true && <span className="text-xs text-selva-700">asistió</span>}
+      {asistio === false && <span className="text-xs text-rose-700">no asistió</span>}
+      {asistio === null && <span className="text-xs text-barro-400">sin registrar</span>}
+      {puedeEscribir && (
+        <div className="ml-auto flex items-center gap-3">
+          <form action={accion}>
+            <input type="hidden" name="jornadaId" value={jornadaId} />
+            <input type="hidden" name="participanteId" value={participante.id} />
+            <input type="hidden" name="asistio" value="1" />
+            <button type="submit" className="text-xs text-selva-700 underline-offset-2 hover:underline">
+              marcar asistió
+            </button>
+          </form>
+          <form action={accion}>
+            <input type="hidden" name="jornadaId" value={jornadaId} />
+            <input type="hidden" name="participanteId" value={participante.id} />
+            <input type="hidden" name="asistio" value="0" />
+            <button type="submit" className="text-xs text-rose-700 underline-offset-2 hover:underline">
+              marcar no asistió
+            </button>
+          </form>
+        </div>
+      )}
+    </li>
+  )
 }
 
 function EstadoPill({ estado }: { estado: string }) {
