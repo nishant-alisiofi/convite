@@ -64,12 +64,21 @@ const POLITICA: Record<string, 'publica' | 'autenticada'> = {
   // Setting a password. Behind a session on purpose: that is the whole mechanism.
   '/clave': 'autenticada',
   '/mapa': 'autenticada',
+  // PRD-13 offline basemap. Behind a session like every other panel screen; pre-existing gap in
+  // this list (the route shipped before this suite's classification was added to it), closed
+  // here only because it was left blocking `pnpm test` for every unrelated change since.
+  '/mapa-offline': 'autenticada',
   // The three panel read views: demand-vs-stock, the community registry, and the item
   // catalogue. All behind a session; RLS is the boundary, and each refuses the wrong role
   // with a legible note rather than a leak.
   '/inventario': 'autenticada',
   '/comunidades': 'autenticada',
   '/catalogo': 'autenticada',
+  // FR-42: person search and its detail page. Behind a session like Comunidades; RLS on
+  // `contactos`/`comunidades` (0017) is the boundary, and a stranger gets the same redirect
+  // every other panel screen gives, never a rendered name or number.
+  '/personas': 'autenticada',
+  '/personas/[id]': 'autenticada',
   // The centre-admin team screen (§2.4) and the platform approval screen (§2.5). Both behind a
   // session; RLS is the boundary, and each also refuses the wrong role with a legible note.
   '/equipo': 'autenticada',
