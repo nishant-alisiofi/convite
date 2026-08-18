@@ -1,4 +1,4 @@
-import { BedDouble, Soup, TriangleAlert, UserRound, Users } from 'lucide-react'
+import { BedDouble, Ship, Soup, TriangleAlert, UserRound, Users } from 'lucide-react'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import {
@@ -11,6 +11,14 @@ import {
   MOTIVOS_TRASLADO,
   type Traslado,
 } from '@/lib/traslados'
+import {
+  lancherosDisponibles,
+  type LancheroOpcion,
+  marcarPagoLancheroPagado,
+  type PagoLanchero,
+  pagosDeTraslado,
+  registrarPagoLanchero,
+} from '@/lib/lanchero-pagos'
 import { conSesion, sesionActual } from '@/lib/sesion'
 
 export const dynamic = 'force-dynamic'
@@ -60,13 +68,26 @@ export default async function Traslados({ searchParams }: { searchParams: Params
     )
   }
 
-  const { traslados, comunidades } = await conSesion(sesion, async (client) => {
-    const traslados = await listarTraslados(client)
-    const { rows: comunidades } = await client.query<{ id: string; nombre: string }>(
-      `select id, nombre from comunidades where activa order by nombre`,
-    )
-    return { traslados, comunidades }
-  })
+  const { traslados, comunidades, pagosPorTraslado, lancheroOpciones } = await conSesion(
+    sesion,
+    async (client) => {
+      const traslados = await listarTraslados(client)
+      const { rows: comunidades } = await client.query<{ id: string; nombre: string }>(
+        `select id, nombre from comunidades where activa order by nombre`,
+      )
+      const conLancha = traslados.filter((t) => t.capacidadModo === 'lancha')
+      const pagosPorTraslado: Record<string, PagoLanchero[]> = {}
+      for (const t of conLancha) {
+        pagosPorTraslado[t.id] = await pagosDeTraslado(client, t.id)
+      }
+      return {
+        traslados,
+        comunidades,
+        pagosPorTraslado,
+        lancheroOpciones: conLancha.length > 0 ? await lancherosDisponibles(client) : [],
+      }
+    },
+  )
 
   async function registrarTraslado(formData: FormData) {
     'use server'
@@ -199,6 +220,47 @@ export default async function Traslados({ searchParams }: { searchParams: Params
     redirect(ok ? '/traslados?ok=Regreso+confirmado' : '/traslados?error=El+código+no+coincide')
   }
 
+  async function accionRegistrarPago(formData: FormData) {
+    'use server'
+    const sesion = await sesionActual()
+    if (!sesion || !PUEDEN_VER.includes(sesion.rolStaff)) redirect('/traslados?error=Sin+permiso')
+    const trasladoPersonaId = String(formData.get('trasladoPersonaId') ?? '')
+    const costoRaw = String(formData.get('costoTotalCop') ?? '').trim()
+
+    const resultado = await conSesion(
+      sesion,
+      (client) =>
+        registrarPagoLanchero(
+          client,
+          {
+            organizacionId: sesion.organizacionId,
+            trasladoPersonaId,
+            lancheroContactoId: String(formData.get('lancheroContactoId') ?? ''),
+            costoTotalCop: costoRaw ? Number(costoRaw) : null,
+            montoLancheroCop: Number(formData.get('montoLancheroCop')),
+            notas: String(formData.get('notas') ?? '').trim() || null,
+          },
+          sesion.authId,
+        ),
+      { escribe: true },
+    )
+    if (!resultado.ok) redirect(`/traslados?error=${encodeURIComponent(resultado.error)}`)
+    revalidatePath('/traslados')
+    redirect('/traslados?ok=Costo+y+pago+registrados')
+  }
+
+  async function accionMarcarPagado(formData: FormData) {
+    'use server'
+    const sesion = await sesionActual()
+    if (!sesion || !PUEDEN_VER.includes(sesion.rolStaff)) redirect('/traslados?error=Sin+permiso')
+    const pagoId = String(formData.get('pagoId') ?? '')
+    await conSesion(sesion, (client) => marcarPagoLancheroPagado(client, pagoId, sesion.authId), {
+      escribe: true,
+    })
+    revalidatePath('/traslados')
+    redirect('/traslados?ok=Pago+marcado')
+  }
+
   const pendientes = traslados.filter((t) => !['REGRESADO', 'CERRADO', 'CANCELADO'].includes(t.estado))
 
   return (
@@ -327,6 +389,10 @@ export default async function Traslados({ searchParams }: { searchParams: Params
                 onConfirmarLlegada={accionConfirmarLlegada}
                 onDespacharRegreso={accionDespacharRegreso}
                 onConfirmarRegreso={accionConfirmarRegreso}
+                pagos={pagosPorTraslado[t.id] ?? []}
+                lancheroOpciones={lancheroOpciones}
+                onRegistrarPago={accionRegistrarPago}
+                onMarcarPagado={accionMarcarPagado}
               />
             ))}
           </ul>
@@ -349,12 +415,20 @@ function Tarjeta({
   onConfirmarLlegada,
   onDespacharRegreso,
   onConfirmarRegreso,
+  pagos,
+  lancheroOpciones,
+  onRegistrarPago,
+  onMarcarPagado,
 }: {
   t: Traslado
   onDespachar: (fd: FormData) => void
   onConfirmarLlegada: (fd: FormData) => void
   onDespacharRegreso: (fd: FormData) => void
   onConfirmarRegreso: (fd: FormData) => void
+  pagos: PagoLanchero[]
+  lancheroOpciones: LancheroOpcion[]
+  onRegistrarPago: (fd: FormData) => void
+  onMarcarPagado: (fd: FormData) => void
 }) {
   const preDespacho = ['SOLICITADO', 'SIN_RUTA', 'SIN_CAPACIDAD', 'LISTO'].includes(t.estado)
   const enViaje = ['DESPACHADO', 'EN_CAMINO'].includes(t.estado)
@@ -446,6 +520,84 @@ function Tarjeta({
 
         {t.estado === 'REGRESADO' && <span className="text-xs text-selva-700">De vuelta en casa.</span>}
       </div>
+
+      {t.capacidadModo === 'lancha' && (
+        <div className="mt-3 rounded border border-barro-200 bg-barro-50 px-3 py-2">
+          <p className="flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-barro-600">
+            <Ship className="size-3.5" aria-hidden />
+            Costo y pago del lanchero
+          </p>
+
+          {pagos.length > 0 && (
+            <ul className="mt-1.5 space-y-1">
+              {pagos.map((p) => (
+                <li key={p.id} className="flex flex-wrap items-baseline gap-x-2 text-sm">
+                  <span className="font-medium text-barro-900">{p.lancheroNombre ?? p.lancheroTelefono}</span>
+                  <span className="text-barro-700">{p.montoLancheroCop.toLocaleString('es-CO')} COP</span>
+                  <span
+                    className={`rounded px-1.5 py-0.5 text-xs font-medium ${
+                      p.estadoPago === 'pagado' ? 'bg-selva-50 text-selva-700' : 'bg-atrato-50 text-atrato-700'
+                    }`}
+                  >
+                    {p.estadoPago}
+                  </span>
+                  {p.estadoPago === 'pendiente' && (
+                    <form action={onMarcarPagado} className="ml-auto">
+                      <input type="hidden" name="pagoId" value={p.id} />
+                      <button type="submit" className="text-barro-700 underline">
+                        Marcar pagado
+                      </button>
+                    </form>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <form action={onRegistrarPago} className="mt-2 flex flex-wrap items-end gap-2">
+            <input type="hidden" name="trasladoPersonaId" value={t.id} />
+            <label className="text-xs">
+              <span className="block text-barro-600">Lanchero</span>
+              <select
+                name="lancheroContactoId"
+                required
+                className="mt-0.5 rounded border border-barro-300 px-2 py-1 text-sm"
+              >
+                <option value="">…</option>
+                {lancheroOpciones.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.nombre} · {l.telefono}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="text-xs">
+              <span className="block text-barro-600">Monto lanchero (COP)</span>
+              <input
+                name="montoLancheroCop"
+                type="number"
+                min={1}
+                required
+                inputMode="numeric"
+                className="mt-0.5 w-28 rounded border border-barro-300 px-2 py-1 text-sm"
+              />
+            </label>
+            <label className="text-xs">
+              <span className="block text-barro-600">Costo total (opcional)</span>
+              <input
+                name="costoTotalCop"
+                type="number"
+                min={0}
+                inputMode="numeric"
+                className="mt-0.5 w-28 rounded border border-barro-300 px-2 py-1 text-sm"
+              />
+            </label>
+            <button type="submit" className={CLASE_BOTON}>
+              Registrar
+            </button>
+          </form>
+        </div>
+      )}
     </li>
   )
 }

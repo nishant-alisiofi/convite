@@ -61,6 +61,14 @@ export const reportes = pgTable(
     verificadoEn: timestamp('verificado_en', { withTimezone: true, mode: 'date' }),
     /** Set when a coordinator marks this report a duplicate of an earlier one (Section 9.5). */
     reportePadreId: uuid('reporte_padre_id').references((): AnyPgColumn => reportes.id),
+    /**
+     * PRD-47: the registered lanchero who relayed this report, set only when `canal = 'relevo'`.
+     * `comunidadId` above carries the origin community they relayed it for — together a verifier
+     * sees the full chain (who relayed, for which community). Written only through
+     * `registrar_reporte_relevo` (migration 0056), which also checks the lanchero is vetted for
+     * that community via `lancheros_comunidades`.
+     */
+    relevoLancheroId: uuid('relevo_lanchero_id').references(() => contactos.id),
     /** Whatever the provider sent, untouched, so a parser bug is always recoverable. */
     payloadCrudo: jsonb('payload_crudo'),
     creadoEn: creadoEn(),
@@ -112,6 +120,14 @@ export const reportes = pgTable(
       sql`estado in ('RECIBIDO', 'CANCELADO') or verificado_por is not null`,
     ),
     check('reportes_duplicado_check', sql`estado <> 'DUPLICADO' or reporte_padre_id is not null`),
+    // PRD-47: a relay always names its lanchero, and only a relay does (mirrors the
+    // verificacion_check shape — the column and the channel that requires it move together).
+    check(
+      'reportes_relevo_lanchero_check',
+      sql`(canal = 'relevo') = (relevo_lanchero_id is not null)`,
+    ),
+    // Attribution to an origin community is the point of a relay — it cannot be left blank.
+    check('reportes_relevo_comunidad_check', sql`canal <> 'relevo' or comunidad_id is not null`),
     // The daily queue: what is waiting, worst first (Section 4.5).
     index('reportes_bandeja_idx')
       .on(sql`urgencia desc nulls last`, t.creadoEn)
