@@ -314,6 +314,17 @@ export default function Inicio() {
       <footer className="border-t border-barro-200">
         <div className="mx-auto flex max-w-4xl flex-col gap-3 px-5 py-8 text-sm text-barro-500 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <Marca />
+          <nav className="flex flex-wrap gap-x-4 gap-y-1">
+            <a href="/privacidad" className="hover:text-barro-700 hover:underline">
+              Privacidad
+            </a>
+            <a href="/terminos" className="hover:text-barro-700 hover:underline">
+              Términos
+            </a>
+            <a href="/eliminar-datos" className="hover:text-barro-700 hover:underline">
+              Eliminar mis datos
+            </a>
+          </nav>
           <p>Chocó y el Pacífico colombiano.</p>
         </div>
       </footer>

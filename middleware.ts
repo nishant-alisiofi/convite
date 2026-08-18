@@ -53,6 +53,13 @@ export const PUBLICAS = [
   // The aggregate response page. The landing at `/` is public via the `ruta === '/'` clause
   // below; this covers the page it links to.
   '/respuesta',
+  // Public legal pages, required both by Ley 1581 (política de tratamiento) and by Meta's
+  // WhatsApp Business app review, which needs publicly reachable Privacy Policy, Terms of
+  // Service, and Data-Deletion-Instructions URLs. Meta's crawler holds no cookie, so gating
+  // these behind a session would 307 the review to a login page it cannot use.
+  '/privacidad',
+  '/terminos',
+  '/eliminar-datos',
 ]
 
 /**

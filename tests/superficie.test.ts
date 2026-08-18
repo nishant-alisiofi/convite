@@ -44,6 +44,11 @@ const POLITICA: Record<string, 'publica' | 'autenticada'> = {
   // so RLS never hands it a household address. The leak-pattern assertions below cover both.
   '/transportar': 'publica',
   '/transportar/registro': 'publica',
+  // Public legal pages (Ley 1581 + Meta WhatsApp app review): privacy policy, terms of service,
+  // and data-deletion instructions. Reachable with no session so Meta's crawler can read them.
+  '/privacidad': 'publica',
+  '/terminos': 'publica',
+  '/eliminar-datos': 'publica',
   '/auth/callback': 'publica',
   // Where a password-reset link lands. Public by necessity — somebody who cannot sign in has
   // to reach it — and safe for the same reason the magic link is: getting here with a usable
