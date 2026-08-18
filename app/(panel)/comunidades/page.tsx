@@ -183,7 +183,9 @@ function ComunidadFila({ c }: { c: Fila }) {
   const contactoRoto = nuncaVista && c.tier <= 2
 
   return (
-    <li className="px-4 py-3">
+    // FR-42: a stable jump target so a person search result can link straight at their
+    // community's row (`/comunidades#comunidad-<id>`) instead of only the flat list.
+    <li id={`comunidad-${c.id}`} className="scroll-mt-4 px-4 py-3">
       <div className="flex flex-wrap items-baseline gap-x-2">
         <span className="font-mono text-sm text-barro-500">{c.codigo}</span>
         <span className="font-medium text-barro-900">{c.nombre}</span>
