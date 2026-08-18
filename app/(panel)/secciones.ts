@@ -110,9 +110,11 @@ export const SECCIONES: SeccionNav[] = [
     ver: rol(['verificador', 'coordinador', 'admin']),
     items: [
       { href: '/comunidades', etiqueta: 'Red', listo: true, ver: VE_REGISTRO },
+      { href: '/personas', etiqueta: 'Personas', listo: true, ver: VE_REGISTRO }, // FR-42
       { href: '/radio', etiqueta: 'Radio', listo: true }, // PRD-11
       { href: '/manual', etiqueta: 'Entrada manual', listo: true }, // PRD-35
       { href: '/registro', etiqueta: 'Correcciones del registro', listo: true }, // PRD-35
+      { href: '/relevo', etiqueta: 'Red de lancheros', listo: true, ver: VE_VERIFICACION }, // PRD-47
       { href: '/estado#silencio', etiqueta: 'Silencio', listo: true, ver: VE_SILENCIO },
     ],
   },
@@ -147,7 +149,7 @@ export const SECCIONES: SeccionNav[] = [
     etiqueta: 'Informes',
     ver: rol(['coordinador', 'admin', 'lectura']),
     items: [
-      { href: '/coordinacion', etiqueta: 'Cobertura', listo: true }, // PRD-35
+      { href: '/coordinacion', etiqueta: 'Cobertura', listo: true, ver: rol(['coordinador', 'admin']) }, // PRD-35
       { href: '', etiqueta: 'Entregas y evidencia' }, // §18
       { href: '/apadrinar', etiqueta: 'Apadrinamientos', listo: true, ver: VE_APADRINAR },
       { href: '', etiqueta: 'Exportes' }, // §18
