@@ -56,3 +56,43 @@ export function vencimientoAproximado(fecha: Date): string {
   const dia = partes(fecha, { weekday: 'long' }).weekday
   return `${dia} en la ${franjaDelDia(fecha)}`
 }
+
+/**
+ * Normalizes a Postgres `date` column's value to `YYYY-MM-DD`.
+ *
+ * `pg` has no custom type parser registered (see `db/client.ts`), so a `date` column — no time,
+ * no timezone — comes back from a raw `client.query()` as a JS `Date` at local midnight, not the
+ * ISO string every `fecha_inicio`/`fecha_fin` mapper in this codebase types it as (BUG-22). The
+ * mismatch only surfaces once the value is used: a re-parse like `` `${fecha}T00:00:00Z` `` gets
+ * fed `Date.prototype.toString()` instead of `2026-08-25`, and produces `Invalid Date` — and, in
+ * `lib/programas.ts`'s `ventana()`, an `Invalid Date` that propagates to `NaN`, which empties the
+ * whole twelve-month feasibility calendar (PRD-31) rather than merely mis-rendering one field.
+ *
+ * Call this once, at the row-mapping boundary (`mapear()` / `mapearPrograma()`), so the
+ * `string | null` type the rest of the app already declares is actually true rather than a lie.
+ * Local `Date` getters, not UTC ones: `postgres-date` builds the object with
+ * `new Date(year, month, day)` in whatever timezone the Node process runs in, so reading it back
+ * with the matching local getters round-trips the calendar day exactly, on any server timezone.
+ */
+export function fechaSqlADia(v: Date | string | null): string | null {
+  if (v === null) return null
+  if (!(v instanceof Date)) return v
+  const anio = v.getFullYear()
+  const mes = String(v.getMonth() + 1).padStart(2, '0')
+  const dia = String(v.getDate()).padStart(2, '0')
+  return `${anio}-${mes}-${dia}`
+}
+
+/**
+ * «16/08/2026» from a date-ONLY value — a Postgres `date` column (already normalized to
+ * `YYYY-MM-DD` by `fechaSqlADia`) or the same string a `<input type="date">` submits.
+ *
+ * Deliberately does not reuse `fechaCorta`'s own timezone conversion on a midnight-UTC instant:
+ * América/Bogotá is UTC-5, so a `Date` built from `${fecha}T00:00:00Z` would format as the
+ * PREVIOUS calendar day once shown in that timezone. Anchoring at noon UTC instead keeps the
+ * whole day inside the same América/Bogotá date no matter the zone, which is what a value with no
+ * time component — and so no real instant — should mean.
+ */
+export function fechaSoloDia(fecha: string): string {
+  return fechaCorta(new Date(`${fecha}T12:00:00Z`))
+}

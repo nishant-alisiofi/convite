@@ -14,6 +14,7 @@ import { redirect } from 'next/navigation'
 import type { CadenciaPrograma, EstadoPrograma } from '@/db/schema/programas'
 import { ETIQUETA_TIPO_JORNADA } from '@/lib/jornadas'
 import type { TipoJornada } from '@/db/schema/vocabulario'
+import { fechaCorta, fechaSoloDia } from '@/lib/fechas'
 import { listarJornadas } from '@/lib/jornadas'
 import {
   actualizarApadrinamiento,
@@ -747,7 +748,9 @@ function Detalle({
                 </Link>
                 <span className="text-barro-500">{ETIQUETA_TIPO_JORNADA[j.tipo as TipoJornada] ?? j.tipo}</span>
                 <EstadoPill estado={j.estado} pequeno />
-                <span className="ml-auto text-barro-500">{fechaCorta(j.fechaInicio)}</span>
+                <span className="ml-auto text-barro-500">
+                  {j.fechaInicio ? fechaSoloDia(j.fechaInicio) : 'sin fecha'}
+                </span>
               </li>
             ))}
           </ul>
@@ -925,7 +928,7 @@ function Detalle({
                 {a.apadrinamientoEtiqueta && <span className="text-barro-600">{a.apadrinamientoEtiqueta}</span>}
                 {a.jornadaTitulo && <span className="text-barro-500">{a.jornadaTitulo}</span>}
                 {a.concepto && <span className="text-barro-500">«{a.concepto}»</span>}
-                <span className="ml-auto text-barro-500">{fechaCorta(fechaDe(a.creadoEn))}</span>
+                <span className="ml-auto text-barro-500">{fechaCorta(a.creadoEn)}</span>
               </li>
             ))}
           </ol>
@@ -1054,19 +1057,6 @@ function CalendarioFeasibilidad({ f, comunidades }: { f: Feasibilidad; comunidad
 }
 
 // ── Small shared pieces ────────────────────────────────────────────────────────────────────────
-
-function fechaDe(v: Date): string {
-  return v instanceof Date ? v.toISOString().slice(0, 10) : String(v).slice(0, 10)
-}
-
-function fechaCorta(fecha: string | null): string {
-  if (!fecha) return 'sin fecha'
-  return new Date(`${fecha}T00:00:00Z`).toLocaleDateString('es-CO', {
-    day: '2-digit',
-    month: 'short',
-    timeZone: 'UTC',
-  })
-}
 
 function familiaONull(v: FormDataEntryValue | null): number | null {
   const limpio = String(v ?? '').replace(/[^\d]/g, '')

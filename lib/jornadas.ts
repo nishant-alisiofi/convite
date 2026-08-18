@@ -5,6 +5,7 @@ import {
   type TipoJornada,
   TIPOS_JORNADA,
 } from '@/db/schema/vocabulario'
+import { fechaSqlADia } from '@/lib/fechas'
 
 /**
  * PRD-30 (§22) — jornadas: one occurrence, at a place, on a date, of a given type.
@@ -91,8 +92,10 @@ type FilaJornada = {
   region_nombre: string | null
   programa_id: string | null
   programa_titulo: string | null
-  fecha_inicio: string | null
-  fecha_fin: string | null
+  // `date` columns: `pg` hands these back as a local-midnight `Date`, not a string — see
+  // `fechaSqlADia` in `lib/fechas.ts` (BUG-22).
+  fecha_inicio: Date | string | null
+  fecha_fin: Date | string | null
   familias_atendidas: number | null
   notas: string | null
   paradas: string
@@ -110,8 +113,8 @@ function mapear(r: FilaJornada): Jornada {
     regionNombre: r.region_nombre,
     programaId: r.programa_id,
     programaTitulo: r.programa_titulo,
-    fechaInicio: r.fecha_inicio,
-    fechaFin: r.fecha_fin,
+    fechaInicio: fechaSqlADia(r.fecha_inicio),
+    fechaFin: fechaSqlADia(r.fecha_fin),
     familiasAtendidas: r.familias_atendidas,
     notas: r.notas,
     paradas: Number(r.paradas),
