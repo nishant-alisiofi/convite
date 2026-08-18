@@ -1,4 +1,5 @@
 import type { PoolClient } from 'pg'
+import { MODOS_FLUVIALES } from '@/db/schema/vocabulario'
 
 /**
  * FR-46 — boat-leg cost + lanchero payment (record-keeping only).
@@ -12,6 +13,16 @@ import type { PoolClient } from 'pg'
  *
  * Money is plain COP; pg returns `bigint` as a string, so the mappers convert with `Number()`.
  */
+
+/**
+ * True when `modo` is a river-boat mode — `lancha` or `chalupa` (Section 7.3's
+ * `MODOS_FLUVIALES`). A leg by either counts as a boat leg for cost + lanchero-payment purposes;
+ * gating on the single literal `'lancha'` left `chalupa` legs — which the transporter self-signup
+ * form and the seed data both use — unable to record a cost or a payment.
+ */
+export function esModoFluvial(modo: string | null | undefined): boolean {
+  return modo != null && (MODOS_FLUVIALES as readonly string[]).includes(modo)
+}
 
 export type PagoLanchero = {
   id: string

@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation'
 import { fechaCorta } from '@/lib/fechas'
 import { panoramaCoordinacion } from '@/lib/coordinacion'
 import { conSesion, sesionActual } from '@/lib/sesion'
+import type { FamiliaAyuda } from '@/db/schema/vocabulario'
+import { FAMILIAS_AYUDA } from '@/db/schema/vocabulario'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,13 +17,29 @@ export const dynamic = 'force-dynamic'
  * across every organisation — never another organisation's community-level operational detail,
  * which is negotiated bilaterally and is never default. The value is coordination at zero privacy
  * cost: nobody sends three convoys to Bellavista while nobody goes to Winandó.
+ *
+ * FR-45: the demand counts can be narrowed to one of the three coarse aid families — coverage and
+ * closed legs are not goods-shaped, so they stay basin-wide regardless of the filter.
  */
 
-export default async function Coordinacion() {
+const ETIQUETA_FAMILIA: Record<FamiliaAyuda, string> = {
+  alimentos: 'Alimentos',
+  medicinas: 'Medicinas',
+  construccion: 'Construcción',
+}
+
+type Params = Promise<{ familia?: string }>
+
+export default async function Coordinacion({ searchParams }: { searchParams?: Params }) {
   const sesion = await sesionActual()
   if (!sesion) redirect('/entrar')
 
-  const panorama = await conSesion(sesion, (client) => panoramaCoordinacion(client))
+  const params = (await searchParams) ?? {}
+  const familiaFiltro = FAMILIAS_AYUDA.includes(params.familia as FamiliaAyuda)
+    ? (params.familia as FamiliaAyuda)
+    : null
+
+  const panorama = await conSesion(sesion, (client) => panoramaCoordinacion(client, familiaFiltro))
 
   return (
     <main>
@@ -48,6 +66,19 @@ export default async function Coordinacion() {
         el detalle a nivel de comunidad de otra organización, que se acuerda de forma bilateral y
         nunca por defecto.
       </p>
+
+      {/* FR-45: filter the demand counts by the three coarse aid families */}
+      <nav className="mt-4 flex flex-wrap gap-2" aria-label="Filtrar necesidades por familia">
+        <FiltroFamilia etiqueta="Todas" activo={familiaFiltro === null} href="/coordinacion" />
+        {FAMILIAS_AYUDA.map((familia) => (
+          <FiltroFamilia
+            key={familia}
+            etiqueta={ETIQUETA_FAMILIA[familia]}
+            activo={familiaFiltro === familia}
+            href={`/coordinacion?familia=${familia}`}
+          />
+        ))}
+      </nav>
 
       {/* ── Basin totals ─────────────────────────────────────────────────────────────────── */}
       <dl className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -138,5 +169,20 @@ export default async function Coordinacion() {
         )}
       </section>
     </main>
+  )
+}
+
+function FiltroFamilia({ etiqueta, activo, href }: { etiqueta: string; activo: boolean; href: string }) {
+  return (
+    <a
+      href={href}
+      className={
+        activo
+          ? 'rounded-full bg-selva-700 px-3 py-1.5 text-xs font-medium text-white'
+          : 'rounded-full border border-barro-200 bg-white px-3 py-1.5 text-xs font-medium text-barro-700 hover:bg-barro-50'
+      }
+    >
+      {etiqueta}
+    </a>
   )
 }

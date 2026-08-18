@@ -269,7 +269,7 @@ export default async function CompraLocal({ searchParams }: { searchParams: Para
     const tipo = String(formData.get('tipo') ?? 'foto')
     const referencia = String(formData.get('referencia') ?? '').trim()
     if (!id || !referencia) redirect('/compra-local?error=Falta+la+referencia+de+la+evidencia')
-    await conSesion(
+    const resultado = await conSesion(
       sesion,
       (client) =>
         agregarEvidencia(
@@ -282,6 +282,7 @@ export default async function CompraLocal({ searchParams }: { searchParams: Para
         ),
       { escribe: true },
     )
+    if (!resultado.ok) redirect(`/compra-local?error=${encodeURIComponent(resultado.error)}`)
     revalidatePath('/compra-local')
     redirect('/compra-local?ok=Evidencia+agregada')
   }
@@ -653,19 +654,25 @@ function TarjetaCompra({
             <PasoBoton onAvanzar={onAvanzar} id={c.id} paso="cerrar" texto="Cerrar con evidencia" />
           )}
 
-          {/* Evidence can be added at any live step (steps 3 and 6). */}
-          <form action={onEvidencia} className="flex flex-wrap items-end gap-2">
-            <input type="hidden" name="id" value={c.id} />
-            <select name="tipo" defaultValue="foto" className="rounded border border-barro-200 px-2 py-1 text-sm">
-              <option value="foto">Foto</option>
-              <option value="documento">Documento</option>
-              <option value="acta">Acta</option>
-            </select>
-            <input name="referencia" placeholder="Enlace o referencia" className="w-48 rounded border border-barro-200 px-2 py-1 text-sm" />
-            <button type="submit" className="rounded border border-barro-300 px-3 py-1.5 text-sm font-medium text-barro-800 hover:bg-barro-50">
-              Agregar evidencia
-            </button>
-          </form>
+          {/* Step 6's closing evidence (foto/documento/acta) — step 3's recibo evidence is filed
+              automatically by "Registrar recibo". Only offered once verification is done: the
+              chain cannot skip a step, and the server refuses this form's insert until then
+              (RLS, migration 0060) — hiding the form before that keeps a coordinator from
+              hitting that refusal in the first place. */}
+          {(c.estado === 'VERIFICADA' || c.estado === 'DISTRIBUIDA' || c.estado === 'CERRADA') && (
+            <form action={onEvidencia} className="flex flex-wrap items-end gap-2">
+              <input type="hidden" name="id" value={c.id} />
+              <select name="tipo" defaultValue="foto" className="rounded border border-barro-200 px-2 py-1 text-sm">
+                <option value="foto">Foto</option>
+                <option value="documento">Documento</option>
+                <option value="acta">Acta</option>
+              </select>
+              <input name="referencia" placeholder="Enlace o referencia" className="w-48 rounded border border-barro-200 px-2 py-1 text-sm" />
+              <button type="submit" className="rounded border border-barro-300 px-3 py-1.5 text-sm font-medium text-barro-800 hover:bg-barro-50">
+                Agregar evidencia
+              </button>
+            </form>
+          )}
         </div>
       )}
     </li>

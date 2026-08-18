@@ -82,6 +82,12 @@ export type FilaBandeja = {
   comunidad: string | null
   municipio: string | null
   contacto: string | null
+  /**
+   * PRD-47: for a `canal = 'relevo'` report, the registered lanchero who carried it out of the
+   * origin community — distinct from `contacto`, which a relayed report never carries (the
+   * report is attributed to the lanchero, not a reporting contact). Null for every other channel.
+   */
+  relevoLancheroNombre: string | null
   codigoItem: string | null
   item: string | null
   /** Section 4.5: items that ask for detail and did not get any do not enter the queue. */
@@ -106,11 +112,13 @@ const SELECCION = `
          extract(day from now() - r.creado_en)::int as dias,
          c.nombre as comunidad, c.municipio,
          ct.nombre as contacto,
+         ln.nombre as relevo_lanchero_nombre,
          ci.item_label as item, ci.pide_detalle, ci.entregable, ci.urgencia_min,
          exists (select 1 from pedidos p where p.reporte_id = r.id) as ya_es_pedido
     from reportes r
     left join comunidades c on c.id = r.comunidad_id
     left join contactos ct on ct.id = r.contacto_id
+    left join contactos ln on ln.id = r.relevo_lanchero_id
     left join catalogo_items ci on ci.codigo = r.codigo_item
 `
 
@@ -152,6 +160,7 @@ function aFila(
     comunidad: (r.comunidad as string) ?? null,
     municipio: (r.municipio as string) ?? null,
     contacto: (r.contacto as string) ?? null,
+    relevoLancheroNombre: (r.relevo_lanchero_nombre as string) ?? null,
     codigoItem: (r.codigo_item as string) ?? null,
     item: (r.item as string) ?? null,
     pideDetalle: Boolean(r.pide_detalle),

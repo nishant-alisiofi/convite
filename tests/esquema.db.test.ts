@@ -221,6 +221,15 @@ conBase('las no negociables están en la base, no en el frontend', () => {
     expect(rows[0]!.n).toBe('0')
   })
 
+  it('FR-45 — «plásticos y tejas» (33) es material de reparación de techo: resuelve a construcción', async () => {
+    // Regresión: 0054 dejó toda la familia 3 (abrigo/albergue) en null, incluida esta — el
+    // mismo tipo de bien que las láminas de zinc de la familia 7, no ropa de cama. 0060 lo corrige.
+    const { rows } = await client.query<{ familia_ayuda: string | null }>(
+      `select familia_ayuda from catalogo_items where codigo = '33'`,
+    )
+    expect(rows[0]?.familia_ayuda).toBe('construccion')
+  })
+
   it('FR-43 — un lote sin fecha es legítimo (2.3, BUG-23): fecha_caducidad no es NOT NULL', async () => {
     const existencia = await unId('existencias')
     const usuario = await unId('usuarios')
