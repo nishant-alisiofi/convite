@@ -289,6 +289,35 @@ export default function MapaCuenca({ datos, planificacion, fase = 'emergencia', 
       })
       mapaRef.current = m
 
+      // TEMP diagnostic (staging only, never on the production apex): the map-overlay bug can
+      // only be observed in a real render, which the CI/agent environment cannot produce, so
+      // this logs the layer/source/rendered-feature state to the console for a person to read.
+      // Remove once BUG-39/PRD-2 map overlays are confirmed rendering.
+      if (typeof window !== 'undefined' && window.location.hostname !== 'convite.ai') {
+        ;(window as unknown as { __convMapa?: unknown }).__convMapa = m
+        m.once('idle', () => {
+          const estilo = m.getStyle()
+          const cuenta = (id: string) => {
+            try {
+              return m.queryRenderedFeatures({ layers: [id] }).length
+            } catch {
+              return 'n/a'
+            }
+          }
+          const src = m.getSource('tramos') as { _data?: { features?: unknown[] } } | undefined
+          console.log('[CONV-MAPA] capas:', estilo.layers.map((l) => l.id).join(','))
+          console.log('[CONV-MAPA] tramos source features:', src?._data?.features?.length ?? '?')
+          console.log(
+            '[CONV-MAPA] rendered — tramos-linea:',
+            cuenta('tramos-linea'),
+            '| circulos-solido-borde:',
+            cuenta('circulos-solido-borde'),
+            '| pines-punto:',
+            cuenta('pines-punto'),
+          )
+        })
+      }
+
       // Frame the data instead of a fixed viewport: at a hardcoded basin-wide zoom a
       // kilometre-wide accuracy circle is a single pixel, and the map quietly becomes the
       // dot map it exists not to be.
