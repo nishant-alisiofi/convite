@@ -35,17 +35,27 @@ import { jornadas } from './territorio'
  *             date* — «forty of a hundred houses surveyed» is a different claim from «forty
  *             damaged houses».
  *
+ * FR-48 — engineering/technical evaluations (agua, puente, vivienda, eléctrico…) reuse the same
+ * `evaluaciones` row, shaped as a *ticket* instead of a sweep: a request for a técnico to assess
+ * one piece of infrastructure, tracked through `estado` (solicitada → en curso → completada) with
+ * `asignado_a` (the technical contact) and `detalle` (the finding, recorded on completion). A
+ * ticket carries no `total_estimado` — it is not a census item — and that is exactly what tells
+ * the census queries (`listarEvaluaciones`, `filasCobertura`) to leave it out of Level 4 coverage,
+ * which stays a claim about surveyed items, never about open engineering requests.
+ *
  * Four tables, all org-scoped exactly like the other operational tables (0017/0030/0041/0043):
  *   plantillas_evaluacion  — the multi-domain templates the assessment and the BoM are driven by
- *   evaluaciones           — one sweep = a visit to a place, for a domain, on a date, that
- *                            estimated N in-scope items and carries the expiry for its findings
+ *   evaluaciones           — either a sweep (a visit to a place, for a domain, on a date, that
+ *                            estimated N in-scope items) or a technical-evaluation ticket
+ *                            (FR-48: no total_estimado, tracked via `estado`)
  *   evaluacion_hallazgos   — the findings; each carries `via_de_respuesta`
  *                            (convite | derivacion | sin_via)
  *   hallazgo_bom           — the four-component repair estimate for a matchable finding
  *
  * The Drizzle mirror below is the typed surface application code reads; the RLS floor, the audit
- * trigger and the `tocar` trigger live in db/migrations/0044_evaluaciones_y_recuperacion.sql,
- * which drizzle-kit does not generate. `pnpm db:check` diffs the two so the columns stay in step.
+ * trigger and the `tocar` trigger live in db/migrations/0044_evaluaciones_y_recuperacion.sql
+ * (extended for FR-48 by db/migrations/0057_evaluaciones_servicios_de_ingenieria.sql), which
+ * drizzle-kit does not generate. `pnpm db:check` diffs the two so the columns stay in step.
  */
 
 /**
@@ -61,6 +71,10 @@ export const DOMINIOS_EVALUACION = [
   'agua',
   'ambiente',
   'organizacional',
+  // FR-48: engineering/technical evaluation domains — infrastructure a técnico assesses that the
+  // original census domains did not name (a bridge, an electrical system).
+  'puente',
+  'electrico',
 ] as const
 
 /**
@@ -76,9 +90,19 @@ export const VIAS_DE_RESPUESTA = ['convite', 'derivacion', 'sin_via'] as const
 /** Where a bill of materials came from: proposed from a template, or entered by hand. */
 export const ORIGENES_BOM = ['plantilla', 'manual'] as const
 
+/**
+ * FR-48: the lifecycle of a technical/engineering evaluation ticket. `solicitada` is where every
+ * ticket starts (the DB default); it moves forward only, one step at a time — never back, never
+ * skipped — enforced by `siguienteEstado`/`transicionValida` in lib/evaluaciones.ts. A census
+ * sweep row also carries `estado` (schema-wide default `solicitada`) but the panel never surfaces
+ * or advances it — sweeps are identified by having a `total_estimado`, tickets by not.
+ */
+export const ESTADOS_EVALUACION = ['solicitada', 'en_curso', 'completada'] as const
+
 export type DominioEvaluacion = (typeof DOMINIOS_EVALUACION)[number]
 export type ViaDeRespuesta = (typeof VIAS_DE_RESPUESTA)[number]
 export type OrigenBom = (typeof ORIGENES_BOM)[number]
+export type EstadoEvaluacion = (typeof ESTADOS_EVALUACION)[number]
 
 /**
  * §21 / AC #1, #5: a template names a domain and proposes the baseline four components for a
@@ -134,6 +158,13 @@ export const plantillasEvaluacion = pgTable(
  *
  * Coverage is per (community, domain): the housing coverage of a vereda is a different claim from
  * its water coverage, so each sweep names its domain.
+ *
+ * FR-48: the same row also models a technical/engineering evaluation *ticket* — a request to
+ * assess one piece of infrastructure, not a census. A ticket has no `total_estimado` (there is
+ * nothing to count coverage against), `estado` tracks it solicitada → en curso → completada,
+ * `asignado_a` names the técnico it is assigned to (light identity by name, the same posture as
+ * `evaluador_nombre`), and `detalle` records the finding on completion. `total_estimado is null`
+ * is what tells a sweep row from a ticket row apart everywhere this table is queried.
  */
 export const evaluaciones = pgTable(
   'evaluaciones',
@@ -150,14 +181,28 @@ export const evaluaciones = pgTable(
     jornadaId: uuid('jornada_id').references(() => jornadas.id),
     /**
      * The visitor. Light identity by name — the offline `evaluador` login is §29.3 / PRD-13 and
-     * out of this WI; here provenance is «a visitor with a date», recorded as text.
+     * out of this WI; here provenance is «a visitor with a date», recorded as text. NULL on a
+     * FR-48 ticket until the visit that closes it actually happens.
      */
-    evaluadorNombre: text('evaluador_nombre').notNull(),
-    fechaVisita: date('fecha_visita').notNull(),
-    /** In-scope items the surveyor estimates at this place (coverage denominator). */
-    totalEstimado: integer('total_estimado').notNull(),
+    evaluadorNombre: text('evaluador_nombre'),
+    /** NULL on a FR-48 ticket until it has actually been visited. */
+    fechaVisita: date('fecha_visita'),
+    /**
+     * In-scope items the surveyor estimates at this place (coverage denominator). NULL marks a
+     * FR-48 technical-evaluation ticket rather than a census sweep — see the table doc comment.
+     */
+    totalEstimado: integer('total_estimado'),
     /** When the findings of this sweep go stale. A finding expires; it is not a permanent truth. */
     venceEn: date('vence_en'),
+    /**
+     * FR-48: the lifecycle of a technical-evaluation ticket. Defaults `solicitada` on every row;
+     * a census sweep carries the default too but the panel never reads or advances it there.
+     */
+    estado: text('estado').notNull().default('solicitada'),
+    /** FR-48: the technical contact/assignee, by name — the same light-identity posture above. */
+    asignadoA: text('asignado_a'),
+    /** FR-48: the finding/detail note, recorded as the ticket reaches `completada`. */
+    detalle: text('detalle'),
     /** Who recorded the sweep (2.1). Signed against auth.uid() by the insert policy. */
     registradoPor: uuid('registrado_por').references(() => usuarios.id),
     notas: text('notas'),
@@ -169,8 +214,10 @@ export const evaluaciones = pgTable(
     index('evaluaciones_comunidad_idx').on(t.comunidadId),
     index('evaluaciones_dominio_idx').on(t.dominio),
     index('evaluaciones_jornada_idx').on(t.jornadaId),
+    index('evaluaciones_estado_idx').on(t.estado),
     check('evaluaciones_dominio_check', enLista('dominio', DOMINIOS_EVALUACION)),
-    check('evaluaciones_total_check', sql`total_estimado > 0`),
+    check('evaluaciones_estado_check', enLista('estado', ESTADOS_EVALUACION)),
+    check('evaluaciones_total_check', sql`total_estimado is null or total_estimado > 0`),
     // An assessment that expires before it happened is a data error.
     check('evaluaciones_vence_check', sql`vence_en is null or vence_en >= fecha_visita`),
   ],

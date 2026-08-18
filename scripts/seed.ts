@@ -35,6 +35,7 @@ import { APADRINAMIENTOS_DEMO } from '@/db/seed/apadrinamiento'
 import { CENTRO_PENDIENTE_DEMO } from '@/db/seed/centros'
 import {
   EVALUACIONES_DEMO,
+  EVALUACIONES_TECNICAS_DEMO,
   HALLAZGO_BOM_DEMO,
   HALLAZGOS_EVALUACION_DEMO,
   PLANTILLAS_EVALUACION_DEMO,
@@ -1120,6 +1121,23 @@ async function sembrarEvaluaciones(
       ],
     )
   }
+
+  // FR-48 — servicios de ingeniería: technical-evaluation tickets. No total_estimado (that is
+  // what marks a row as a ticket rather than a census sweep — see lib/evaluaciones.ts).
+  for (const e of EVALUACIONES_TECNICAS_DEMO) {
+    const comunidadId = comunidades.get(e.comunidad)
+    if (!comunidadId) throw new Error(`Evaluación técnica ${e.id}: comunidad ${e.comunidad} desconocida.`)
+    await client.query(
+      `insert into evaluaciones
+         (id, organizacion_id, comunidad_id, dominio, asignado_a, estado, detalle, notas, registrado_por)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+       on conflict (id) do nothing`,
+      [
+        e.id, organizacionId, comunidadId, e.dominio, marcado(e.asignadoA), e.estado,
+        e.detalle ? marcado(e.detalle) : null, e.notas ? marcado(e.notas) : null, ID_COORDINADOR,
+      ],
+    )
+  }
 }
 
 /**
@@ -1835,7 +1853,8 @@ async function resumen(): Promise<void> {
 
   const { rows: prdv3 } = await pool.query<{ tabla: string; filas: string }>(`
     select 'plantillas evaluación' as tabla, count(*)::text as filas from plantillas_evaluacion
-    union all select 'evaluaciones (barridos)', count(*)::text from evaluaciones
+    union all select 'evaluaciones (barridos)', count(*)::text from evaluaciones where total_estimado is not null
+    union all select 'evaluaciones técnicas (FR-48)', count(*)::text from evaluaciones where total_estimado is null
     union all select 'hallazgos',              count(*)::text from evaluacion_hallazgos
     union all select 'hallazgo BoM',           count(*)::text from hallazgo_bom
     union all select 'programas',              count(*)::text from programas

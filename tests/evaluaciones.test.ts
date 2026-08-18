@@ -10,6 +10,8 @@ import {
   fondosAplicadosCop,
   generarBom,
   saldoFundableCop,
+  siguienteEstado,
+  transicionValida,
 } from '@/lib/evaluaciones'
 
 /**
@@ -242,5 +244,28 @@ describe('cobertura (Level 4, AC #3)', () => {
   it('flags an expired sweep in the coverage row', () => {
     const cob = cobertura([fila({ venceEn: '2026-08-10' })], ahora)
     expect(cob.veredas[0]!.vencida).toBe(true)
+  })
+})
+
+describe('siguienteEstado / transicionValida (FR-48, AC #2)', () => {
+  it('moves solicitada -> en_curso -> completada, one step at a time', () => {
+    expect(siguienteEstado('solicitada')).toBe('en_curso')
+    expect(siguienteEstado('en_curso')).toBe('completada')
+  })
+
+  it('completada is terminal', () => {
+    expect(siguienteEstado('completada')).toBeNull()
+  })
+
+  it('accepts only the one legal forward step', () => {
+    expect(transicionValida('solicitada', 'en_curso')).toBe(true)
+    expect(transicionValida('en_curso', 'completada')).toBe(true)
+  })
+
+  it('rejects skipping a step, going backwards, or moving off a terminal state', () => {
+    expect(transicionValida('solicitada', 'completada')).toBe(false)
+    expect(transicionValida('en_curso', 'solicitada')).toBe(false)
+    expect(transicionValida('completada', 'en_curso')).toBe(false)
+    expect(transicionValida('solicitada', 'solicitada')).toBe(false)
   })
 })
