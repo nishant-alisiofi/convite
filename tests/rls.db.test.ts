@@ -410,12 +410,114 @@ conBase('los centros los decide un admin', () => {
     })
   })
 
-  it('FR-43: un verificador SÍ lee los lotes, coherente con leer existencias', async () => {
+  it('FR-43: un verificador SÍ lee los lotes de SU organización', async () => {
     await como('verificador', async () => {
       const { rowCount } = await client.query(`select 1 from existencia_lotes limit 1`)
       // No assertion on rowCount beyond "no se rechazó" — puede no haber lotes sembrados en
-      // este punto de la transacción; lo que importa es que la política de lectura no bloquea.
+      // este punto de la transacción; lo que importa es que la política de lectura no bloquea
+      // dentro de la propia organización. (0058 la acotó por organización — ya no es "lo mismo
+      // que leer existencias", que sigue siendo compartido entre organizaciones.)
       expect(rowCount).not.toBeNull()
+    })
+  })
+
+  it('seguridad (0058): un coordinador NO ve ni escribe el lote de existencias de otra organización', async () => {
+    // Segunda organización con su propio nodo, existencia y lote — fuera de la organización
+    // ancla que ID.coordinador integra.
+    const { rows: otraOrg } = await client.query<{ id: string }>(
+      `insert into organizaciones (nombre, tipo, activo) values ('Otra red de lotes', 'red_comunitaria', true) returning id`,
+    )
+    const { rows: otraComunidad } = await client.query<{ id: string }>(
+      `insert into comunidades (organizacion_id, codigo, nombre, tipo, municipio)
+         values ($1, 'OTRA-LOTE', 'Otra comunidad de lotes', 'vereda', 'Otro municipio') returning id`,
+      [otraOrg[0]!.id],
+    )
+    const { rows: otroNodo } = await client.query<{ id: string }>(
+      `insert into nodos (comunidad_id, nombre, tipo) values ($1, 'Bodega de otra org', 'bodega') returning id`,
+      [otraComunidad[0]!.id],
+    )
+    const { rows: otraExistencia } = await client.query<{ id: string }>(
+      `insert into existencias (nodo_id, codigo_item, cantidad, contado_en, contado_por)
+         values ($1, '21', 10, now(), $2) returning id`,
+      [otroNodo[0]!.id, ID.coordinador],
+    )
+    const { rows: otroLote } = await client.query<{ id: string }>(
+      `insert into existencia_lotes (existencia_id, cantidad, contado_por) values ($1, 5, $2) returning id`,
+      [otraExistencia[0]!.id, ID.coordinador],
+    )
+
+    await como('coordinador', async () => {
+      const { rows } = await client.query(`select 1 from existencia_lotes where id = $1`, [
+        otroLote[0]!.id,
+      ])
+      expect(rows).toHaveLength(0)
+
+      expect(
+        await rechazado(
+          `insert into existencia_lotes (existencia_id, cantidad, contado_por) values ($1, 5, $2)`,
+          [otraExistencia[0]!.id, ID.coordinador],
+        ),
+      ).toBe(true)
+
+      expect(
+        await rechazado(`update existencia_lotes set cantidad = 1 where id = $1`, [otroLote[0]!.id]),
+      ).toBe(true)
+    })
+  })
+
+  it('seguridad (0058): un coordinador NO ve la capacidad de frío de un nodo de otra organización', async () => {
+    const { rows: otraOrg } = await client.query<{ id: string }>(
+      `insert into organizaciones (nombre, tipo, activo) values ('Otra red de frío', 'red_comunitaria', true) returning id`,
+    )
+    const { rows: otraComunidad } = await client.query<{ id: string }>(
+      `insert into comunidades (organizacion_id, codigo, nombre, tipo, municipio)
+         values ($1, 'OTRA-FRIO', 'Otra comunidad de frío', 'vereda', 'Otro municipio') returning id`,
+      [otraOrg[0]!.id],
+    )
+    const { rows: otroNodo } = await client.query<{ id: string }>(
+      `insert into nodos (comunidad_id, nombre, tipo) values ($1, 'Bodega fría de otra org', 'bodega') returning id`,
+      [otraComunidad[0]!.id],
+    )
+    await client.query(
+      `insert into nodos_almacenamiento_frio (nodo_id, apta_cadena_frio) values ($1, true)`,
+      [otroNodo[0]!.id],
+    )
+
+    await como('coordinador', async () => {
+      const { rows } = await client.query(
+        `select 1 from nodos_almacenamiento_frio where nodo_id = $1`,
+        [otroNodo[0]!.id],
+      )
+      expect(rows).toHaveLength(0)
+    })
+  })
+
+  it('seguridad (0058): un coordinador NO ve la restricción de frío de una ruta ajena a su organización', async () => {
+    const { rows: otraOrg } = await client.query<{ id: string }>(
+      `insert into organizaciones (nombre, tipo, activo) values ('Otra red de rutas', 'red_comunitaria', true) returning id`,
+    )
+    const { rows: comunidadesAjenas } = await client.query<{ id: string }>(
+      `insert into comunidades (organizacion_id, codigo, nombre, tipo, municipio)
+         values ($1, 'OTRA-RUTA-A', 'Origen ajeno', 'vereda', 'Otro municipio'),
+                ($1, 'OTRA-RUTA-B', 'Destino ajeno', 'vereda', 'Otro municipio')
+         returning id`,
+      [otraOrg[0]!.id],
+    )
+    const { rows: otraRuta } = await client.query<{ id: string }>(
+      `insert into rutas (origen_id, destino_id, modo) values ($1, $2, 'carretera') returning id`,
+      [comunidadesAjenas[0]!.id, comunidadesAjenas[1]!.id],
+    )
+    await client.query(
+      `insert into rutas_restriccion_cadena_frio (ruta_id, apta_cadena_frio) values ($1, true)`,
+      [otraRuta[0]!.id],
+    )
+
+    await como('coordinador', async () => {
+      const { rows } = await client.query(
+        `select 1 from rutas_restriccion_cadena_frio where ruta_id = $1`,
+        [otraRuta[0]!.id],
+      )
+      expect(rows).toHaveLength(0)
     })
   })
 

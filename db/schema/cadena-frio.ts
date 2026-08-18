@@ -67,6 +67,13 @@ export const catalogoRequisitosAlmacenamiento = pgTable(
 // One row per route (leg) that has been assessed for cold chain. Absence = not assessed = not
 // apt (fail-closed): an unassessed open boat never carries insulin. Only read for cold-chain
 // items, so it is invisible to every existing match.
+//
+// RLS (0058): read is scoped to an organisation that owns either endpoint community of the
+// route (plus a platform-admin read) — a route has no single owning org of its own. Originally
+// shipped role-only; tightened after a staging security review found any organisation could
+// read another's cold-chain routing data. Write is intentionally left role-only, matching
+// `rutas_coordina` (0017): a route is shared infrastructure, coordinated by whichever org is
+// moving something along it.
 
 export const rutasRestriccionCadenaFrio = pgTable('rutas_restriccion_cadena_frio', {
   rutaId: uuid('ruta_id')
@@ -84,6 +91,11 @@ export const rutasRestriccionCadenaFrio = pgTable('rutas_restriccion_cadena_frio
 // One row per node that can hold cold chain (has cold storage). Absence = cannot (fail-closed).
 // §34 (what storage actually exists at nodes) is open; this is a declared capability flag, not
 // telemetry.
+//
+// RLS (0058): read is scoped through `nodo_id -> nodos.comunidad_id -> comunidades.organizacion_id`
+// (plus a platform-admin read) — the same chain the write policy already used. Originally
+// shipped role-only on read; tightened after a staging security review found any organisation
+// could read another's node cold-storage capability.
 
 export const nodosAlmacenamientoFrio = pgTable('nodos_almacenamiento_frio', {
   nodoId: uuid('nodo_id')

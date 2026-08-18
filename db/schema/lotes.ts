@@ -23,6 +23,12 @@ import { existencias } from './marketplace'
  * date. Only `catalogo_items.perecedero` items are expected to carry one in practice, but nothing
  * here forces that at the database level; a lot with no date is simply not flagged or sorted by
  * urgency, which is the honest state.
+ *
+ * RLS (0058): scoped through `existencia_id -> existencias.nodo_id -> nodos.comunidad_id ->
+ * comunidades.organizacion_id` — the table carries no `organizacion_id` of its own. Originally
+ * shipped role-only, matching `existencias` itself; tightened to org-scoped (plus a
+ * platform-admin read) after a staging security review found it let one organisation read and
+ * write another's lots.
  */
 export const existenciaLotes = pgTable(
   'existencia_lotes',
