@@ -19,6 +19,12 @@ export const dynamic = 'force-dynamic'
  *
  * The invitation is an allowlist entry, not an account. The person still signs in through the
  * ordinary /entrar flow and proves they own the address or the number (§4).
+ *
+ * The listing below is not only invitations, though. Open sign-in (0035) lets somebody become
+ * staff with no invitation at all — possession of an address or a number is enough, and they
+ * land here with a default `admin` role. `convite_equipo()` (0061) surfaces that account
+ * alongside invited ones so it has somewhere to be deactivated; the invite form on this page
+ * still only ever creates an invitation, which stays a pre-assignment, never a gate.
  */
 
 const ROL_ETIQUETA: Record<string, string> = {
@@ -47,8 +53,16 @@ type MiembroFila = {
   usuario_activo: boolean | null
 }
 
+/**
+ * Whether somebody has actually joined is `usuario_id` being set — not `usado_en`. That held
+ * by coincidence for every row before open sign-in (0035): a row only ever got a `usuario_id`
+ * by spending the invitation, which is the same moment `usado_en` was written. It stops
+ * holding for an open-sign-in member, who has a `usuario_id` (they signed in and got a
+ * `usuarios` row) but no invitation to have spent, so no `usado_en` at all — reading that as
+ * "still Invitado" is exactly the bug this fixes.
+ */
 function estadoDe(m: MiembroFila): { etiqueta: string; clase: string } {
-  if (!m.usado_en) return { etiqueta: 'Invitado', clase: 'bg-atrato-50 text-barro-700' }
+  if (!m.usuario_id) return { etiqueta: 'Invitado', clase: 'bg-atrato-50 text-barro-700' }
   if (m.usuario_activo) return { etiqueta: 'Activo', clase: 'bg-selva-50 text-selva-800' }
   return { etiqueta: 'Desactivado', clase: 'bg-barro-100 text-barro-600' }
 }
@@ -76,16 +90,13 @@ export default async function Equipo({
     )
   }
 
+  // `convite_equipo()` (0061) lists every staff row of this organisation — invited (via
+  // invitaciones_staff, including a still-pending one nobody has claimed) and open-sign-in
+  // (0035: no invitation at all, e.g. an uninvited admin who only proved possession of an
+  // address). The plain invitaciones_staff join used before this had no way to surface the
+  // second kind, so an uninvited account had panel access and no row anywhere to deactivate.
   const miembros = await conSesion(sesion, async (client) => {
-    const { rows } = await client.query<MiembroFila>(
-      `select i.id, i.correo, i.telefono, i.rol_staff, i.usado_en, i.usuario_id,
-              u.activo as usuario_activo
-         from invitaciones_staff i
-         left join usuarios u on u.id = i.usuario_id
-        where i.organizacion_id = $1 and i.es_plataforma = false
-        order by i.creado_en`,
-      [sesion.organizacionId],
-    )
+    const { rows } = await client.query<MiembroFila>('select * from convite_equipo()')
     return rows
   })
 
