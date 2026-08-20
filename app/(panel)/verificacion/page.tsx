@@ -15,6 +15,7 @@ import {
   type FiltroTipo,
 } from '@/lib/verificacion/bandeja'
 import { rutasAfectadasPor, type RutaAfectada } from '@/lib/verificacion/danos'
+import { marcarReporteSensibleManual } from '@/lib/verificacion/sensibles'
 import Tarjeta from './tarjeta'
 import { conSesion, sesionActual } from '@/lib/sesion'
 import { temporadaVigente } from '@/lib/temporada'
@@ -120,6 +121,8 @@ export default async function Verificacion({ searchParams }: { searchParams: Par
               String(formData.get('texto') ?? ''),
               sesion.authId,
             )
+          case 'marcar_sensible':
+            return marcarReporteSensibleManual(client, reporteId)
           default:
             return { ok: false as const, error: 'Acción desconocida.' }
         }

@@ -1,6 +1,11 @@
 import type { PoolClient } from 'pg'
 import { encolar } from '@/lib/jobs/cola'
 import { type Catalogo, cargarCatalogo } from '@/lib/normalizador'
+import {
+  cargarTerminosActivos,
+  coincideTerminoRiesgo,
+  marcarProtegidoAlIngresar,
+} from '@/lib/verificacion/sensibles'
 import { registrarEntrante } from './bitacora'
 import {
   confirmarConCodigo,
@@ -52,6 +57,12 @@ export type DepsIntake = {
   /** Injected by tests; otherwise read from `catalogo_items`, which is data (2.8). */
   catalogo?: Catalogo
   ahora?: Date
+  /**
+   * PRD-49: the active distress-term list, injected by tests; otherwise read from
+   * `terminos_riesgo` (PARTNER DATA — empty until the real list arrives, so the default here is
+   * the empty array in practice, not a real fixture).
+   */
+  terminosRiesgo?: string[]
 }
 
 type Registrado = {
@@ -238,6 +249,7 @@ export async function recibirSobre(
   const ahora = deps.ahora ?? new Date()
   const catalogo = deps.catalogo ?? (await cargarCatalogo(client))
   const normalizador = deps.normalizador ?? normalizadorLexico(catalogo)
+  const terminosRiesgo = deps.terminosRiesgo ?? (await cargarTerminosActivos(client))
 
   // 2.7, first and before anything else. A retried webhook stops here.
   const registro = await registrarEntrante(client, sobre, organizacionId)
@@ -338,20 +350,30 @@ export async function recibirSobre(
   const tipoDelCanal = sobre.tipo === 'necesidad' || sobre.tipo === 'dano' ? sobre.tipo : null
   const tipo = confiable ? (propuesta.tipo ?? 'necesidad') : (tipoDelCanal ?? 'sin_clasificar')
 
+  // PRD-49: a routing decision, never a diagnosis (v3 §27b.3) — checked against the configured
+  // (partner-provided, empty by default) distress-term list. Classification (tipo/codigo_item/
+  // urgencia/severidad/familias) is unaffected either way; only the identifying content below is
+  // ever withheld from the base row.
+  const sensible = coincideTerminoRiesgo(sobre.contenido.texto, terminosRiesgo)
+
   const { rows: filasReporte } = await client.query<{ id: string; folio: number }>(
     `insert into reportes
        (organizacion_id, tipo, canal, contacto_id, comunidad_id, codigo_item, familias, urgencia,
-        severidad, detalle_libre, ubicacion, ubicacion_fuente, ubicacion_precision_m, payload_crudo)
+        severidad, detalle_libre, ubicacion, ubicacion_fuente, ubicacion_precision_m, payload_crudo,
+        sensible, sensible_motivo)
      values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
        case when $11::double precision is null then null
             else st_setsrid(st_makepoint($12::double precision, $11::double precision), 4326) end,
-       $13, $14, $15)
+       $13, $14, $15, $16, $17)
      returning id, folio`,
     [
       organizacionId,
       tipo,
       sobre.canal,
-      contacto?.id ?? null,
+      // PRD-49: identifying content NEVER lands on the base row for a sensible report — moved
+      // into reportes_contenido_protegido below instead, in the same transaction, so it is never
+      // readable from `reportes` even for an instant.
+      sensible ? null : (contacto?.id ?? null),
       contacto?.comunidadId ?? null,
       confiable ? propuesta.codigoItem : null,
       // A count of households is a fact the person stated; it does not depend on our having
@@ -362,15 +384,31 @@ export async function recibirSobre(
       confiable ? propuesta.severidad : null,
       // texto_original: written once, never overwritten (PRD §4 M4). Transcripts and
       // clarifications land elsewhere.
-      sobre.contenido.texto,
-      sobre.ubicacion?.lat ?? null,
-      sobre.ubicacion?.lon ?? null,
-      sobre.ubicacion?.fuente ?? null,
-      sobre.ubicacion?.precisionM ?? null,
+      sensible ? null : sobre.contenido.texto,
+      sensible ? null : (sobre.ubicacion?.lat ?? null),
+      sensible ? null : (sobre.ubicacion?.lon ?? null),
+      sensible ? null : (sobre.ubicacion?.fuente ?? null),
+      sensible ? null : (sobre.ubicacion?.precisionM ?? null),
       JSON.stringify(sobre.payloadCrudo),
+      sensible,
+      sensible ? 'termino_detectado' : null,
     ],
   )
   const reporte = filasReporte[0]!
+
+  if (sensible) {
+    await marcarProtegidoAlIngresar(client, {
+      reporteId: reporte.id,
+      organizacionId,
+      folio: reporte.folio,
+      detalleLibre: sobre.contenido.texto,
+      lat: sobre.ubicacion?.lat ?? null,
+      lon: sobre.ubicacion?.lon ?? null,
+      ubicacionFuente: sobre.ubicacion?.fuente ?? null,
+      ubicacionPrecisionM: sobre.ubicacion?.precisionM ?? null,
+      contactoId: contacto?.id ?? null,
+    })
+  }
 
   await client.query('update mensajes set contacto_id = $2, reporte_id = $3 where id = $1', [
     registro.mensajeId,

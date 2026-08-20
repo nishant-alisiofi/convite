@@ -97,6 +97,13 @@ export type FilaBandeja = {
   urgenciaMin: number | null
   adjuntos: AdjuntoBandeja[]
   yaEsPedido: boolean
+  /**
+   * PRD-49 §6.3: flagged for urgent, out-of-cadence handling. `detalleLibre`/`descripcion`/
+   * `contacto` above are already redacted by the time they get here — physically absent from
+   * `reportes` itself (migration 0063) — so this is purely a "surface it first, mark it urgent"
+   * signal, never a place this row's UI would try to show the withheld content.
+   */
+  sensible: boolean
 }
 
 export type Bandeja = {
@@ -108,7 +115,7 @@ export type Bandeja = {
 
 const SELECCION = `
   select r.id, r.folio, r.tipo, r.canal, r.estado, r.descripcion, r.detalle_libre,
-         r.familias, r.urgencia, r.severidad, r.comunidad_id, r.codigo_item,
+         r.familias, r.urgencia, r.severidad, r.comunidad_id, r.codigo_item, r.sensible,
          extract(day from now() - r.creado_en)::int as dias,
          c.nombre as comunidad, c.municipio,
          ct.nombre as contacto,
@@ -168,6 +175,7 @@ function aFila(
     urgenciaMin: (r.urgencia_min as number) ?? null,
     adjuntos,
     yaEsPedido: Boolean(r.ya_es_pedido),
+    sensible: Boolean(r.sensible),
   }
 }
 
@@ -212,6 +220,12 @@ export type FiltroTipo = 'todo' | TipoReporteRegistrado
  *
  * Sorted by urgency then age, and nothing filters by community here: a verificador scoped to
  * the Atrato medio sees their own because RLS says so, not because this query narrowed it.
+ *
+ * PRD-49 §6.3: `sensible` sorts first, ahead of urgencia entirely — a flagged report bypasses
+ * the ordinary cadence, it does not merely compete well within it. Content is unaffected by
+ * this ordering: a flagged row's detalle/descripcion/contacto are already NULL by the time they
+ * reach this query (migration 0063 physically moved them), so this only changes which row a
+ * verificador/coordinador/despachador sees first, never what it shows them.
  */
 export async function cargarBandeja(
   client: PoolClient,
@@ -221,7 +235,7 @@ export async function cargarBandeja(
     `${SELECCION}
       where r.estado = 'RECIBIDO'
         and ($1 = 'todo' or r.tipo = $1)
-      order by r.urgencia desc nulls last, r.creado_en`,
+      order by r.sensible desc, r.urgencia desc nulls last, r.creado_en`,
     [filtro],
   )
 

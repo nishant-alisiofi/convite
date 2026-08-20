@@ -25,6 +25,7 @@ import {
   ESTADOS_MENSAJE,
   ESTADOS_REPORTE,
   FUENTES_UBICACION,
+  MOTIVOS_SENSIBLE,
   TIPOS_ADJUNTO,
   TIPOS_REPORTE_REGISTRADO,
 } from './vocabulario'
@@ -71,6 +72,20 @@ export const reportes = pgTable(
     relevoLancheroId: uuid('relevo_lanchero_id').references(() => contactos.id),
     /** Whatever the provider sent, untouched, so a parser bug is always recoverable. */
     payloadCrudo: jsonb('payload_crudo'),
+    /**
+     * PRD-49: a routing flag, never a diagnosis (v3 §27b.3) — set by a distress-term match at
+     * intake or by hand by a verifier. Redaction of `detalleLibre`/`descripcion`/`ubicacion*`/
+     * `contactoId` for a flagged report happens by PHYSICALLY MOVING those values out to
+     * `reportesContenidoProtegido` (migration 0063) — the columns above read NULL for anyone,
+     * including this row's own SELECT, once `sensible` is true. That is the enforcement; this
+     * flag is what routes and displays as urgent.
+     */
+    sensible: boolean('sensible').notNull().default(false),
+    /** `termino_detectado` (automated) or `manual` (a verifier flagged it). */
+    sensibleMotivo: text('sensible_motivo'),
+    /** Who flagged it by hand. NULL for an automated term match — there is no human to name. */
+    sensibleMarcadoPor: uuid('sensible_marcado_por').references(() => usuarios.id),
+    sensibleMarcadoEn: timestamp('sensible_marcado_en', { withTimezone: true, mode: 'date' }),
     creadoEn: creadoEn(),
     actualizadoEn: actualizadoEn(),
   },
@@ -128,10 +143,27 @@ export const reportes = pgTable(
     ),
     // Attribution to an origin community is the point of a relay — it cannot be left blank.
     check('reportes_relevo_comunidad_check', sql`canal <> 'relevo' or comunidad_id is not null`),
+    // PRD-49: a manual flag carries a name (2.1's «a judgement carries a name», same shape as
+    // reportes_verificacion_check); an automated term match never has one to give.
+    check(
+      'reportes_sensible_motivo_check',
+      sql`sensible_motivo is null or ${enLista('sensible_motivo', MOTIVOS_SENSIBLE)}`,
+    ),
+    check(
+      'reportes_sensible_marcado_check',
+      sql`(not sensible) = (sensible_motivo is null and sensible_marcado_en is null)`,
+    ),
+    check(
+      'reportes_sensible_manual_check',
+      sql`sensible_motivo is distinct from 'manual' or sensible_marcado_por is not null`,
+    ),
     // The daily queue: what is waiting, worst first (Section 4.5).
     index('reportes_bandeja_idx')
       .on(sql`urgencia desc nulls last`, t.creadoEn)
       .where(sql`estado = 'RECIBIDO'`),
+    // PRD-49 §6.3: the escalation surface — flagged reports, worst first, bypassing the
+    // ordinary bandeja cadence.
+    index('reportes_sensible_idx').on(t.creadoEn).where(sql`sensible`),
   ],
 )
 
