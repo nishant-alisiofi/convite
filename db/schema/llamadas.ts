@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm'
 import {
+  type AnyPgColumn,
   check,
   index,
   integer,
@@ -49,6 +50,14 @@ export const llamadas = pgTable(
       .notNull()
       .defaultNow(),
     finalizadaEn: timestamp('finalizada_en', { withTimezone: true, mode: 'date' }),
+    /**
+     * §6.1 (v4 supplement): on a `devolucion` row, the `perdida` row that triggered it. The
+     * Adaptive Retry Protocol's 2-hour TTL reads `iniciadaEn` off THIS row, not off the
+     * callback's own — see lib/canales/voz/reintento.ts.
+     */
+    llamadaOrigenId: uuid('llamada_origen_id').references((): AnyPgColumn => llamadas.id),
+    /** §6.1: when the one allowed SMS retry actually went out. Null = not sent (yet, or ever). */
+    smsReintentoEn: timestamp('sms_reintento_en', { withTimezone: true, mode: 'date' }),
     creadoEn: creadoEn(),
   },
   (t) => [
@@ -68,5 +77,6 @@ export const llamadas = pgTable(
       'llamadas_sin_costo_check',
       sql`estado not in ('bloqueada', 'rechazada') or duracion_seg = 0`,
     ),
+    check('llamadas_origen_check', sql`llamada_origen_id is null or tipo = 'devolucion'`),
   ],
 )

@@ -5,6 +5,7 @@ import type { ProveedorVoz } from './driver'
 import { recibirLlamadaPerdida } from './flujo'
 import { proveedorVozActivo } from './infobip'
 import { esLlamadaEntrante, interpretarWebhookVoz } from './payload'
+import { MANEJADORES_REINTENTO_VOZ } from './reintento'
 
 /**
  * The voice webhook, processed off the request — the same contract
@@ -26,6 +27,10 @@ import { esLlamadaEntrante, interpretarWebhookVoz } from './payload'
  * are logged and skipped rather than acted on — once the account has that turned on, driving
  * them is the natural next step, correlating by `proveedor_llamada_id` against the
  * `llamadas` row `llamarDeVuelta` already writes for the callback (`estado = 'marcando'`).
+ *
+ * What this DOES do about a callback that never gets that far: the Adaptive Retry Protocol
+ * (§6.1, voz/reintento.ts) needs no confirmed webhook shape at all, because its trigger is a
+ * timeout rather than a parsed event — see `MANEJADORES_REINTENTO_VOZ` below.
  */
 export function manejadorWebhookVoz(deps: { proveedor: ProveedorVoz }): ManejadorJob {
   return async (job, client) => {
@@ -58,7 +63,13 @@ export function manejadorWebhookVoz(deps: { proveedor: ProveedorVoz }): Manejado
       // 2.7: a retried CALL_RECEIVED must not dial a second callback for the same ring.
       if (perdida.duplicada) continue
 
-      await llamarDeVuelta(client, { telefono: perdida.telefono, organizacionId }, deps)
+      // llamadaOrigenId links the callback to this missed call — the Adaptive Retry
+      // Protocol's TTL (§6.1, voz/reintento.ts) measures from here, not from the callback.
+      await llamarDeVuelta(
+        client,
+        { telefono: perdida.telefono, organizacionId, llamadaOrigenId: perdida.llamadaId },
+        deps,
+      )
     }
   }
 }
@@ -70,4 +81,7 @@ function depsVozPorDefecto(): { proveedor: ProveedorVoz } {
 
 export const MANEJADORES_VOZ: Record<string, ManejadorJob> = {
   procesar_webhook_voz: (job, client) => manejadorWebhookVoz(depsVozPorDefecto())(job, client),
+  // §6.1 (v4 supplement): the Adaptive Retry Protocol's two follow-up jobs, scheduled by
+  // llamarDeVuelta and revisarLlamadaMarcando respectively. See voz/reintento.ts.
+  ...MANEJADORES_REINTENTO_VOZ,
 }

@@ -27,6 +27,15 @@ export type LlamadaSaliente = {
   idExterno: string
 }
 
+/**
+ * §6.2 (v4 supplement): a hard cap on IVR audio recordings, enforced at capture time — not
+ * the noise-suppression step that later runs on the resulting audio before Whisper (PRD-14).
+ * Controls both processing latency and storage cost. Passed on every `grabar()` call rather
+ * than left as an implicit provider default, so the cap is visible in the request itself and
+ * a test can assert it was actually sent, not merely documented.
+ */
+export const TOPE_GRABACION_SEG = 60
+
 export interface ProveedorVoz {
   /**
    * Which adapter this is — `PROVEEDOR_VOZ_SIMULADOR`, `PROVEEDOR_VOZ_INFOBIP` (voz/infobip.ts),
@@ -39,6 +48,11 @@ export interface ProveedorVoz {
   rechazar(idLlamada: string): Promise<void>
   /** Ring them back. This is the call we pay for. */
   llamar(a: string): Promise<LlamadaSaliente>
+  /**
+   * Starts recording the answered callback leg, capped at `TOPE_GRABACION_SEG` (§6.2). Takes
+   * no caller-supplied duration — the cap is not something a call site may raise.
+   */
+  grabar(idLlamada: string): Promise<void>
 }
 
 export function aE164(numero: string): string {
@@ -56,18 +70,23 @@ export type LlamadaSimulada = { a: string; idExterno: string }
  * hang up before answering», and a simulator that collapsed the two would let a provider
  * adapter that answers first pass.
  */
+export type GrabacionSimulada = { idLlamada: string; topeSeg: number }
+
 export function proveedorVozSimulador(): ProveedorVoz & {
   rechazadas: string[]
   llamadas: LlamadaSimulada[]
+  grabaciones: GrabacionSimulada[]
 } {
   const rechazadas: string[] = []
   const llamadas: LlamadaSimulada[] = []
+  const grabaciones: GrabacionSimulada[] = []
   let n = 0
 
   return {
     nombre: PROVEEDOR_VOZ_SIMULADOR,
     rechazadas,
     llamadas,
+    grabaciones,
     async rechazar(idLlamada) {
       rechazadas.push(idLlamada)
     },
@@ -76,6 +95,9 @@ export function proveedorVozSimulador(): ProveedorVoz & {
       const salida = { a, idExterno: `sim-voz-${a.slice(-4)}-${n}` }
       llamadas.push(salida)
       return salida
+    },
+    async grabar(idLlamada) {
+      grabaciones.push({ idLlamada, topeSeg: TOPE_GRABACION_SEG })
     },
   }
 }

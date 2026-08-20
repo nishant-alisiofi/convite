@@ -1,9 +1,11 @@
 import type { Pool, PoolClient } from 'pg'
 import type { Canal } from '@/db/schema/vocabulario'
+import { encolar } from '../jobs/cola'
 import { comoConfirmar, type PerfilContacto } from './politica'
 import { recortarAUnSegmento, segmentar } from './sms/segmentos'
 import { type EstadoPresupuesto, revisarTopes } from './topes'
 import type { ProveedorVoz } from './voz/driver'
+import { ESPERA_CONFIRMAR_CALLBACK_SEG } from './voz/reintento'
 import { type ContextoVentana, decidirSalida, type DecisionVentana, type Plantilla } from './ventana'
 
 /**
@@ -225,10 +227,20 @@ export type ResultadoLlamada =
  * A refusal writes a `llamadas` row with the reason. A cap that silently declines to call
  * someone back is indistinguishable from an outage, and the person waiting by the phone
  * cannot tell the difference either.
+ *
+ * Every placed callback also schedules its own `revisar_llamada_marcando` job
+ * (`ESPERA_CONFIRMAR_CALLBACK_SEG` out, voz/reintento.ts) — the Adaptive Retry Protocol's
+ * (§6.1) entry point. `llamadaOrigenId`, when the caller has it, links the callback to the
+ * `perdida` row it answers, which is what the retry's 2-hour TTL measures against.
  */
 export async function llamarDeVuelta(
   ejecutor: Pool | PoolClient,
-  destino: { telefono: string; organizacionId: string; contactoId?: string | null },
+  destino: {
+    telefono: string
+    organizacionId: string
+    contactoId?: string | null
+    llamadaOrigenId?: string | null
+  },
   deps: { proveedor: ProveedorVoz },
   ahora: Date = new Date(),
 ): Promise<ResultadoLlamada> {
@@ -261,8 +273,9 @@ export async function llamarDeVuelta(
 
   const { rows } = await ejecutor.query<{ id: string }>(
     `insert into llamadas
-       (organizacion_id, proveedor, proveedor_llamada_id, contacto_id, telefono, tipo, estado, iniciada_en)
-     values ($1, $2, $3, $4, $5, 'devolucion', 'marcando', $6)
+       (organizacion_id, proveedor, proveedor_llamada_id, contacto_id, telefono, tipo, estado,
+        iniciada_en, llamada_origen_id)
+     values ($1, $2, $3, $4, $5, 'devolucion', 'marcando', $6, $7)
      returning id`,
     [
       destino.organizacionId,
@@ -271,12 +284,23 @@ export async function llamarDeVuelta(
       destino.contactoId ?? null,
       destino.telefono,
       ahora,
+      destino.llamadaOrigenId ?? null,
     ],
+  )
+  const llamadaId = rows[0]!.id
+
+  // §6.1: the only trigger for "did this callback fail" that needs no provider-specific
+  // webhook shape — see voz/reintento.ts's header for why a timeout is the honest choice here.
+  await encolar(
+    ejecutor,
+    'revisar_llamada_marcando',
+    { llamadaId },
+    new Date(ahora.getTime() + ESPERA_CONFIRMAR_CALLBACK_SEG * 1_000),
   )
 
   return {
     estado: 'marcando',
-    llamadaId: rows[0]!.id,
+    llamadaId,
     idExterno: salida.idExterno,
     presupuesto: veredicto.presupuesto,
   }

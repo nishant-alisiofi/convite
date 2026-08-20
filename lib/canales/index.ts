@@ -57,24 +57,39 @@ export {
   aE164,
   PROVEEDOR_VOZ_SIMULADOR,
   proveedorVozSimulador,
+  TOPE_GRABACION_SEG,
 } from './voz/driver'
-export type { LlamadaEntrante, ProveedorVoz } from './voz/driver'
+export type { GrabacionSimulada, LlamadaEntrante, ProveedorVoz } from './voz/driver'
 export { CABECERA_SECRETO, PARAM_SECRETO, verificarSecretoVoz } from './voz/firma'
 export type { ResultadoSecreto } from './voz/firma'
 export { devolverLlamada, recibirLlamadaPerdida } from './voz/flujo'
 export type { Interaccion, ResultadoDevolucion, ResultadoPerdida } from './voz/flujo'
 export {
+  descargarGrabacionInfobip,
   envioVozInfobipConfigurado,
   olvidarProveedorVoz,
+  proveedorMediaVozInfobip,
   PROVEEDOR_VOZ_INFOBIP,
   proveedorVozActivo,
   proveedorVozInfobip,
+  REQUISITO_CLASIFICADOR_TRAFICO_INFOBIP,
+  RUTA_GRABACIONES,
 } from './voz/infobip'
 export type { ConfigVozInfobip } from './voz/infobip'
 export { dictarFolio, MENU, opcionDe, PROMPTS, tipoDeIntencion } from './voz/menu'
 export type { OpcionMenu } from './voz/menu'
 export { esLlamadaEntrante, interpretarWebhookVoz } from './voz/payload'
 export type { EventoVoz } from './voz/payload'
+export {
+  dentroDeTtl,
+  enviarReintentoSms,
+  ESPERA_CONFIRMAR_CALLBACK_SEG,
+  ESPERA_REINTENTO_SMS_MIN,
+  MANEJADORES_REINTENTO_VOZ,
+  revisarLlamadaMarcando,
+  TTL_CALLBACK_HORAS,
+} from './voz/reintento'
+export type { ResultadoReintentoSms, ResultadoRevision } from './voz/reintento'
 export { manejadorWebhookVoz, MANEJADORES_VOZ } from './voz/trabajos'
 export {
   anotarActividad,

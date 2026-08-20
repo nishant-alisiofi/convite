@@ -35,4 +35,11 @@ export const COPIA = {
 
   /** One segment. Drops the second sentence, keeps the number, which is the whole point. */
   folioSms: (folio: number) => `Recibimos su reporte. Quedó con el número ${folio}.`,
+
+  /**
+   * §6.1 (v4 supplement, Adaptive Retry Protocol): the one SMS retry a failed callback earns,
+   * sent 5 minutes after the callback is given up on. One segment, and it does not repeat
+   * the menu — someone who could not take a call is asked for the plainest possible reply.
+   */
+  reintentoLlamada: 'No pudimos llamarlo. Cuéntenos aquí qué necesita.',
 } as const
