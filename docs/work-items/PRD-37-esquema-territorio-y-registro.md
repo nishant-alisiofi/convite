@@ -76,3 +76,19 @@ After the migration, confirm `drizzle-kit generate` is empty, the ERD is updated
 loads with no error (this is PRD-38's acceptance). Confirm no existing community/route data was
 dropped. Never run `drizzle-kit push` against staging/production; migrations only. Never validate on
 production.
+
+---
+
+## PRD v4 update (2026-08-19) — Supplement §3: ceiling flag for `verificador_vulnerable`
+
+**New key, small.** PRD-49 (new) and PRD-16's role-table addition need a capability-ceiling flag scoping
+who may hold the `verificador_vulnerable` role and see un-redacted sensitive-report content. Add to the
+**In — new schema** list:
+
+- **`organizaciones.techo_permisos`** (already scoped above, §29.4) — extend the jsonb shape with one
+  more boolean key: `acceso_sensible` (may this org's staff hold `verificador_vulnerable` at all).
+  Enforcement is PRD-16/PRD-49; this WI only ensures the column shape accommodates the new key (no new
+  migration beyond what §29.4 already adds, since `techo_permisos` is jsonb — this is a documented key,
+  not a new column).
+
+Cross-ref **PRD-49** (the feature that reads this flag), **PRD-16** (enforcement).

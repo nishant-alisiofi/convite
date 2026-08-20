@@ -72,3 +72,26 @@ Seed/enter a verified `93`; generate a bill of materials from a template and edi
 assessment sweep and confirm coverage renders as assessed/total with a date; confirm a `derivacion`
 finding lands in Derivaciones and never in despacho; confirm a costed repair is fundable via Apadrinar.
 Never validate on production.
+
+---
+
+## PRD v4 update (2026-08-19) — Supplement §5: concrete field-level BOM examples per template
+
+**Sharpens, not new.** v4 §5 gives concrete example fields for the multi-domain templates already
+scoped above (v3 §21: "housing, education infrastructure, health posts, water, environment,
+organisational capacity"):
+- **Structural Damage Diagnostic** (housing/bridges/roads): bill-of-materials examples — zinc sheets,
+  wood, cement.
+- **Health Post & Basic Needs**: chronic-medication stock, cold-chain capacity, urgent medical supplies.
+- **Educational & Community Infrastructure**: school repair requirements, water access, sanitation
+  needs.
+
+Use these as the starting field set when building the Level 2 (§21) template-driven bill-of-materials
+generator — they are examples, not the full catalogue; templates remain editable, per the existing
+"template-driven, adjusted by whoever does the asistencia técnica" scope.
+
+**v4 also confirms the field-assessor flow already scoped via the `evaluador` role and PRD-13.** v4's
+persona table (§2) says the field assessor's offline flow must "queue photos for upload upon signal
+return" — the offline sync queue (already in scope, acceptance criterion 2) explicitly carries
+photographic evidence, not just form data. No new acceptance criterion; this clarifies what the sync
+queue carries.

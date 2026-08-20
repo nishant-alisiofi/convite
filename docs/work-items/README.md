@@ -5,7 +5,7 @@ self-contained markdown. Each file carries its own acceptance criteria and, for 
 ordered **Codex validation** checklist that a validator runs on **`staging.convite.ai`**.
 
 **Numbering:** one shared sequence, type-prefixed (`PRD-` feature/scoped, `BUG-` defect,
-`FR-` open request). IDs are forever — never renumber. Highest allocated ID: **FR-48**.
+`FR-` open request). IDs are forever — never renumber. Highest allocated ID: **PRD-49**.
 
 > **Governing spec:** `docs/PRD_Convite_v3.md` (v3.0, Aug 2026) **supersedes the earlier PRDs**
 > (`docs/PRD.md` and the v1.0/v2 vision) as the canonical product specification. v3 is written
@@ -156,6 +156,75 @@ account + Colombian voice number + account-manager activation of recordings/earl
 **Also in this wrap-up (not a new WI):** WhatsApp live-number verification — number registered
 (+57 300 510 1284), production webhook green, env vars set on app + worker; blocked only on a real
 inbound test (needs a phone + confirming the `messages` field is subscribed + the app is published).
+
+---
+
+## PRD v3 (external copy) + Supplement v4.0 reconciliation (2026-08-19)
+
+Two founder-supplied documents were diffed against the tracked spec and work-item set:
+
+- **`PRD_Convite_v3 (1).md`** (external copy) is **byte-identical** to the repo's governing
+  `docs/PRD_Convite_v3.md` — already fully tracked (see the Aug 15 pass above, `PRD-28..38` +
+  `BUG-19..27` + the enrichments of `PRD-8/9/12/13/14/15/16` + `FR-17/18`). No new WIs came from it.
+- **`prd_supplement_v4.pdf`** ("PRD Supplement v4.0 — Technical Requirements & Architecture") is new
+  content: Infobip pipeline technical detail, a multi-persona/access-tier table, GBV/sensitive-data
+  RBAC, Google Workspace/Calendar detail, field-diagnostic template examples, and five telephony/audio
+  edge cases. **v4 supplements and corrects v3** — every correction is called out below and in the
+  enriched WI itself.
+
+**New WI (genuinely new scope — no existing WI covered GBV/sensitive-disclosure handling):**
+
+| ID | Title | Type | Source | Priority | Status |
+|----|-------|------|--------|----------|--------|
+| [PRD-49](PRD-49-reportes-sensibles-y-violencia-de-genero.md) | Sensitive-disclosure handling: redaction, escalation, `verificador_vulnerable` role | PRD | Supplement v4 §3, §6.3 | P1 | Backlog |
+
+**Enriched (dated "PRD v4 update (2026-08-19)" section added, not duplicated):**
+
+| ID | What v4 added |
+|----|----------------|
+| [PRD-15](PRD-15-gateways-sms-voz.md) | Corrected recording-download endpoint (plural path — **v4 corrects v3**); Adaptive Retry Protocol + 2h callback TTL for weak-2G false positives (§6.1); Infobip MNO traffic-classifier requirement (§6.4); 60s IVR recording cap (§6.2) |
+| [PRD-14](PRD-14-whisper-autohospedado.md) | Noise-suppression audio filter required before Whisper, to prevent hallucinations from riverboat/rain noise (§6.2) |
+| [PRD-34](PRD-34-grupos-e-integraciones.md) | Confirms Calendar/Meet/Forms-Sheets scope (no change to acceptance); flags the Meet-auto-gen phrasing as needing founder confirmation; confirms **Gmail and Drive are not in v4** despite being an expected theme |
+| [PRD-29](PRD-29-evaluaciones-y-recuperacion.md) | Concrete BOM field examples per assessment-template domain (§5); confirms offline photo queueing for field assessors |
+| [PRD-13](PRD-13-mapas-offline-pmtiles.md) | Corroborates the transporter offline persona (pre-downloaded PMTiles + GPS, public collection points only) — no scope change |
+| [PRD-16](PRD-16-membresia-multi-org.md) | New role `verificador_vulnerable` added to the §29.3 roles table (behaviour spec lives in PRD-49) |
+| [PRD-37](PRD-37-esquema-territorio-y-registro.md) | New `techo_permisos` jsonb key (`acceso_sensible`) gating the new role |
+
+### v4-corrects-v3 points (recorded explicitly so engineering reads them as corrections, not options)
+
+1. **Recording-download endpoint.** v3 §4.1.7: `GET /calls/1/recording/file/:file-id` (singular). v4
+   §1.1/§1.2: `GET /calls/1/recordings/files/{fileId}` (plural — matches Infobip's actual REST
+   convention). **v4 wins** — build against the plural path (PRD-15).
+2. **IVR recording duration.** Not in v3 at all. v4 adds a hard **60-second cap** at capture time
+   (PRD-15) plus a required **noise-suppression filter** before Whisper (PRD-14) — v3 had no audio-
+   quality handling in the pipeline.
+3. **Callback failure handling.** Not in v3. v4 adds an explicit **retry-once-via-SMS after 5 min, 2h
+   TTL** protocol for weak-2G false-positive callback loops (PRD-15) — v3's adaptive-link-quality
+   section (§20/§4.1.2) covers *which channel to use*, never *what to do when the call itself fails*.
+4. **MNO carrier-level blocking.** Not in v3 (only implicit in the §34 open question about per-operator
+   termination rates). v4 adds a concrete fix: register numbers under Infobip's Emergency Humanitarian
+   Transactional Traffic Classifier (PRD-15).
+
+### Ambiguous — needs a founder decision (not resolved in any WI above)
+
+- **Reportante-facing "e-Catalog."** v4's persona table (§2) says the Community/Recipient persona can
+  "Access e-Catalog of available supplies at nearby nodes; log needs without phone credit." **No
+  existing WI covers this**, and it sits in tension with two v3 principles: #6 "Inventory is never a
+  promise" and #8 "Show less in public, on purpose" (public surfaces intentionally withhold detail,
+  §17). Showing reporters live nearby-stock detail risks the exact over-promising problem principle 6
+  warns about, on an account-less channel. **Not filed as a WI** — recommend the founder decide scope
+  (if anything) before it becomes one.
+- **Meet auto-generation sequencing.** v4 describes Calendar entries as including "auto-generated
+  Google Meet links… when bandwidth permits," which reads as baseline behaviour rather than v3's
+  explicit tier-4-last, manual-first build order (§28.2, PRD-34). Likely just v4 describing the
+  full-built end state, but flagged for founder confirmation rather than silently resequencing PRD-34's
+  build order.
+- **Protection-lead contacts and the distress-term list (PRD-49).** Who gets alerted per partner org,
+  and what terms trigger the alert, are partner-informed decisions (Red de Mujeres / ASOREDIPARCHOCÓ),
+  not engineering defaults — both are called out as open questions inside PRD-49 rather than guessed.
+- **`CALL_STARTED` vs `CALL_RECEIVED`.** Both v3 and v4 name the inbound-leg event `CALL_RECEIVED`
+  consistently — flagged in PRD-15 only as a build-time reminder to confirm against Infobip's live event
+  catalogue, not a founder decision.
 
 ---
 

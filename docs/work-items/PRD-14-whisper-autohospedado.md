@@ -63,3 +63,26 @@ Also: **multichannel recording / speaker diarization is not needed** for a singl
 alone — it becomes relevant later for **radio nets** (PRD-11) or any call carrying a coordinator + a
 reportante together. Cross-ref **PRD-15** (§4.1 Infobip recording pipeline that hands audio to this
 engine).
+
+---
+
+## PRD v4 update (2026-08-19) — Supplement §6.2: noise suppression before Whisper
+
+**New, not in v3.** Chocó riverboat engine noise and heavy rain degrade IVR recording quality enough to
+cause **Whisper transcription hallucinations** — the model confidently produces text that was never
+said, which is worse than a low-confidence correct guess because it doesn't visibly signal "unsure"
+(BUG-20's threshold logic only helps if the confidence score itself is honest). Add a required
+pre-processing step: run an automated **high-pass / noise-suppression audio filter** on the extracted
+recording **before** it is fed to Whisper. This is a pipeline addition upstream of transcription, not a
+change to the Whisper model itself.
+
+**Add to scope:** the noise-suppression filter as a pipeline stage between audio extraction (PRD-15's
+`DELETE`-from-provider step) and the Whisper call.
+
+**Add to acceptance criteria:**
+5. A recording captured with background engine/rain noise is run through the noise-suppression filter
+   before Whisper; the pipeline stage is present and ordered correctly (extraction → noise filter →
+   Whisper), not skippable.
+
+Cross-ref **PRD-15** (§6.2 also sets the 60-second recording cap at capture time, upstream of this
+filter).
