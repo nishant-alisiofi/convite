@@ -125,6 +125,7 @@ export const SECCIONES: SeccionNav[] = [
     items: [
       { href: '/programas', etiqueta: 'Programas', listo: true }, // PRD-31
       { href: '/jornadas', etiqueta: 'Jornadas', listo: true }, // PRD-30
+      { href: '/agenda', etiqueta: 'Mi calendario', listo: true }, // PRD-34 (.ics subscribe link)
       { href: '', etiqueta: 'Citas' }, // FR-17
       { href: '/envios', etiqueta: 'Envíos', listo: true },
       { href: '/traslados', etiqueta: 'Traslado de personas', listo: true }, // PRD-8
@@ -152,7 +153,7 @@ export const SECCIONES: SeccionNav[] = [
       { href: '/coordinacion', etiqueta: 'Cobertura', listo: true, ver: rol(['coordinador', 'admin']) }, // PRD-35
       { href: '', etiqueta: 'Entregas y evidencia' }, // §18
       { href: '/apadrinar', etiqueta: 'Apadrinamientos', listo: true, ver: VE_APADRINAR },
-      { href: '', etiqueta: 'Exportes' }, // §18
+      { href: '/exportes', etiqueta: 'Exportes', listo: true, ver: rol(['coordinador', 'admin']) }, // PRD-34 (CSV export)
     ],
   },
   {
