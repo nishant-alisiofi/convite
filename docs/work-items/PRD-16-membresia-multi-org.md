@@ -109,3 +109,27 @@ must survive convenience arguments.
 
 Cross-ref **PRD-37** (schema), **PRD-35** (tier/vouch sets the ceiling), **PRD-34** (feed revocation),
 **PRD-13** (run cancellation), **PRD-28** (role-scoped nav).
+
+---
+
+## PRD v4 update (2026-08-19) — Supplement §3: new role `verificador_vulnerable`
+
+**New role, added to the §29.3 roles table.** v4 §3 requires a role-gated inbox for GBV/sensitive-
+disclosure reports, distinct from the standard `verificador`: only explicitly **vouched**
+`verificador_vulnerable` accounts, within their organisation's ceiling, may see un-redacted audio,
+transcript, or address on a report flagged sensitive. Every other role — including standard
+`verificador` and `despachador` — sees the redacted view (PII and disclosure text stripped).
+
+**Add to the §29.3 roles table:**
+
+| Role | Account | Sees |
+|---|---|---|
+| `verificador_vulnerable` | Login, vouched | Un-redacted audio/transcript/address for reports flagged sensitive, within their org's ceiling — nothing else beyond standard `verificador` scope |
+
+**Separation of duties still applies (§29.7, unchanged):** `verificador_vulnerable` cannot dispatch.
+
+The full redaction pipeline, the escalation trigger, and this role's behavioural spec are **PRD-49**
+(new). This WI's addition is scoped narrowly: **the role itself belongs in the roles table and inherits
+the standard ceiling/membership/offboarding mechanics already built here** — no new permission
+*mechanism*, just a new *role value* with a narrower default "sees" scope than `verificador`. Schema:
+the ceiling flag that gates it is added by **PRD-37**.

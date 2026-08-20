@@ -73,3 +73,29 @@ Subscribe a coordinator .ics in a test calendar; confirm scope, folio-only title
 offboard the membership and confirm the feed stops. Paste a Meet link into a cita. Import a small test
 Sheet as a partera directory. Confirm Drive writes are refused without the sharing gate. Never validate
 on production.
+
+---
+
+## PRD v4 update (2026-08-19) — Supplement §4: confirms Calendar/Meet scope; Gmail/Drive not added
+
+**Mostly confirms, not new.** v4 §4 restates what v3 §28.1/§28.2/§28.3 already specify: per-person
+.ics/OAuth calendar feeds for jornadas/citas/envíos, a "Privacy Guard" identical to v3's discretion rule
+(secret revoked-on-offboard URLs, folio-only titles like "Cita #472 - Puerto Meluk"), and Google
+Forms/Sheets import for existing field diagnostics and directories. No change to acceptance criteria 1,
+2, or 6 above.
+
+**One phrasing to flag, not silently resolve.** v4 describes Calendar entries as automatically including
+"auto-generated Google Meet links for remote appointments when bandwidth permits." Read literally, that
+treats OAuth-driven auto-Meet-generation (v3's build-order **tier 4**, §28.4) as baseline behaviour
+rather than the last, most-deferred tier behind manual paste-in (tier 3, already acceptance criterion 4).
+This may just be v4 describing the fully-built end state rather than asking to resequence the build
+order — but it reads differently enough from v3's explicit **"Start manual… Meet is never the
+default"** framing that it should be confirmed with the founder before treating tier 4 as anything but
+the last build step. **Not resolved here — see the batch-level open questions.**
+
+**Confirmed absent from v4, despite being an expected theme going in:** v4's Workspace section is titled
+"Google Workspace & Calendar Integration" but its actual content covers only Calendar/Meet and
+Forms/Sheets import — **it does not mention Gmail anywhere**, and Drive-for-evidence (v3 §28.4's
+EXIF-stripping/sharing-gate item) also doesn't appear in v4. Nothing added to this WI's Drive-gate scope
+(still deferred behind the explicit sharing-config gate, acceptance criterion 7) or to Gmail (never
+scoped in v3 either — not added here).

@@ -96,3 +96,16 @@ completion, remote wipe. `/mapa-offline` states this on screen.
 (basemap composition + honesty invariant + OSM fallback) and existing `tests/mapa.test.ts` green;
 SW range-slice math verified. Full offline PMTiles render needs a built `.pmtiles` artifact (the
 `pmtiles` CLI) + a device/DevTools-offline pass — steps in `docs/mapas-offline.md`.
+
+---
+
+## PRD v4 update (2026-08-19) — Supplement §2: confirms transporter-persona offline behaviour
+
+**Confirms, not new.** v4's persona/access-tier table (§2) describes the Transporter/Delivery persona
+identically to what's already scoped here (the v3 §26 update above) and in PRD-16 (§29.3 roles):
+"Mobile Web Map + Encrypted Run Bundle" online, "Pre-downloaded PMTiles Map & GPS" offline, and — the
+access boundary that matters — "View offline route stops and delivery manifests; access public
+collection points only (**never household addresses**)." That last clause is `transportista_abierto`'s
+exact scope in PRD-16 §29.3; `transportista_avalado`'s time-boxed exact-address access on their own
+active run is the exception, not the default. No scope change here — this is corroborating language
+from a second source document. Cross-ref PRD-16.

@@ -118,3 +118,48 @@ account team (started in parallel with the Meta trámite).
 Cross-ref **PRD-14** (Whisper in the pipeline), **PRD-11** (radio audio through the same pipeline),
 **PRD-10** (connection-point origin informs reply routing), **FR-17** (§27b.2 reachability window
 reuses the learned activity profile).
+
+---
+
+## PRD v4 update (2026-08-19) — Supplement §1/§6.1/§6.4: endpoint correction, retry protocol, MNO classifier
+
+**v4 corrects v3's recording-download endpoint.** v3 §4.1.7 gives `GET /calls/1/recording/file/:file-id`
+(singular). v4 §1.1/§1.2 gives `GET /calls/1/recordings/files/{fileId}` (plural, matching Infobip's
+actual REST convention). **v4 wins where they conflict — build against the plural path**; treat v3's
+singular form as a typo/shorthand, not a second valid endpoint.
+
+**Event-name note.** Both v3 (§4.1.7: `CALL_RECEIVED`) and v4 (§1.1 diagram: `CALL_RECEIVED` on the
+inbound leg, `CALL_FINISHED` on the completed recording) agree on `CALL_RECEIVED` for the inbound
+trigger. Confirm this against Infobip's live event catalogue at implementation time rather than either
+document — Infobip's naming can differ by API version or account configuration.
+
+**Adaptive Retry Protocol (§6.1) — new, not in v3.** Weak 2G causes two related failure modes: the
+outbound IVR call drops before the webhook fires, or a delayed callback rings hours after the person has
+moved out of coverage. Add: if an outbound IVR call fails, **wait 5 minutes and retry once via an SMS
+prompt** (not a second immediate voice call) before attempting a second voice callback. Enforce a strict
+**callback TTL of 2 hours max** — past that window, do not ring; wait for the next inbound signal instead
+of an unbounded queue of stale callbacks. This sits on top of, and does not relax, the existing spend
+caps (§4.1.5, already acceptance criterion 4).
+
+**MNO traffic classification (§6.4) — new, not in v3, sharpens the §34 open question.** Claro/Tigo/WOM
+flag high-volume, short-duration outbound callbacks as marketing spam and can block the virtual number
+outright — a failure mode with no in-app symptom until numbers start silently failing. Add to the
+Infobip account-manager conversation (already required for early media + recordings, §4.1.6): **register
+all Colombian virtual numbers under Infobip's Emergency Humanitarian Transactional Traffic Classifier**
+(or the closest equivalent Infobip offers) to get MNO routing priority instead of spam-filtering. This is
+a provisioning/account-setup requirement, not application code — track it alongside the other Infobip
+account-manager asks (recordings, early media, termination rates).
+
+**IVR recording cap (§6.2) — new, not in v3.** Enforce a **hard 60-second cap** on IVR audio recordings
+at capture time (an Infobip call-recording parameter), independent of the noise-suppression step that
+runs on the resulting audio before Whisper (PRD-14). Controls both processing latency and storage cost.
+
+**Add to acceptance criteria:**
+5. A failed outbound IVR call retries once via SMS after a 5-minute wait before a second voice attempt,
+   and no callback rings past a 2-hour TTL from the original missed call.
+6. IVR recordings are capped at 60 seconds at capture time.
+7. The recording-download call uses `GET /calls/1/recordings/files/{fileId}` (plural path, matching
+   Infobip's actual API — corrects the v3 draft's singular form).
+
+Cross-ref **PRD-14** (noise suppression runs on the audio this WI captures, before Whisper), **PRD-49**
+(the GBV escalation trigger reads the same normalized-report stream this WI produces).
