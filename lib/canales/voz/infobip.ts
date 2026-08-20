@@ -1,4 +1,11 @@
-import { aE164, type LlamadaSaliente, type ProveedorVoz, proveedorVozSimulador } from './driver'
+import type { MediaDescargada, ProveedorMedia } from '../media'
+import {
+  aE164,
+  type LlamadaSaliente,
+  type ProveedorVoz,
+  proveedorVozSimulador,
+  TOPE_GRABACION_SEG,
+} from './driver'
 
 /**
  * The real voice provider (PRD v3 §4.1.6): Infobip, chosen specifically because its Calls API
@@ -17,18 +24,61 @@ import { aE164, type LlamadaSaliente, type ProveedorVoz, proveedorVozSimulador }
  *     answer supervision (confirmed: "handle early media... before full answer supervision
  *     is established")
  *   - `POST /calls/1/calls/{callId}/say` — text-to-speech playback
+ *   - `POST /calls/1/calls/{callId}/record` — start recording the answered leg, capped at
+ *     `TOPE_GRABACION_SEG` (§6.2, v4 supplement). Built against the same
+ *     `/calls/1/calls/{callId}/<action>` sub-resource convention `hangup`/`pre-answer`/`say`
+ *     already confirm, with `maxDuration` as the parameter name Infobip's own docs use
+ *     elsewhere for capping recording length — verify both against the account's own OpenAPI
+ *     spec before this drives anything live (same caveat SMS's status-object parsing already
+ *     holds itself to, see sms/infobip.ts).
+ *   - `GET /calls/1/recordings/files/{fileId}` — download a finished recording as a raw
+ *     bytestream (`descargarGrabacionInfobip`). **v4 corrects v3 here**: v3 §4.1.7 drafted
+ *     the singular `/calls/1/recording/file/:file-id`; v4 §1.1/§1.2 gives the plural path
+ *     above, which matches Infobip's actual REST convention. v4 wins — this is the plural
+ *     path, and nothing in this codebase ever shipped the singular one.
+ *   - `DELETE /calls/1/recordings/files/{fileId}` — removes the copy from the provider once
+ *     we hold our own (PRD v3 §4.1.7's non-relaxable rule: audio never sits on a vendor
+ *     platform once we have it).
  *
  * What is NOT in this file: driving the live IVR once the callback is answered (menu
- * prompt, DTMF capture, recording). §4.1.6 is explicit that "recordings/dialogs/media
- * streaming must be activated by an account manager", and the webhook event shapes for
- * DTMF_CAPTURED / CALL_RECORDING_READY are not published in enough detail to implement
- * against with confidence — see lib/canales/voz/trabajos.ts for exactly where that tail
- * picks up once the account has that turned on and the live event shapes can be pinned
- * against the account's own OpenAPI spec instead of guessed at here.
+ * prompt, DTMF capture, correlating a finished-recording event back to a `llamadas` row).
+ * §4.1.6 is explicit that "recordings/dialogs/media streaming must be activated by an
+ * account manager", and the webhook event shapes for DTMF_CAPTURED / CALL_RECORDING_READY
+ * are not published in enough detail to implement against with confidence — see
+ * lib/canales/voz/trabajos.ts for exactly where that tail picks up once the account has that
+ * turned on and the live event shapes can be pinned against the account's own OpenAPI spec
+ * instead of guessed at here. `grabar` and `descargarGrabacionInfobip` below are the pieces
+ * that ARE confirmed (or, for `grabar`, confirmed enough to build against per the same
+ * convention as the other actions) — they exist ready for that wiring, not as part of it yet.
  */
 
 /** The API version this was written against. Pinned: Infobip's own docs warn endpoints move. */
 const RUTA_CALLS = '/calls/1/calls'
+
+/**
+ * The recording-download/delete endpoint (v4 §1.1/§1.2, plural — see the header comment for
+ * the v3-vs-v4 correction this pins). Kept as its own constant, distinct from `RUTA_CALLS`,
+ * because it is not a `{callId}` sub-resource — recordings are addressed by `fileId`. Exported
+ * so tests/voz.test.ts can pin the plural path directly rather than only through behaviour.
+ */
+export const RUTA_GRABACIONES = '/calls/1/recordings/files'
+
+/**
+ * §6.4 (v4 supplement) — MNO traffic classification. Claro/Tigo/WOM flag high-volume,
+ * short-duration outbound callbacks as marketing spam and can block the virtual number
+ * outright, with no in-app symptom until numbers start silently failing. This is a
+ * provisioning/account-setup requirement, not application code: **register every Colombian
+ * virtual number Infobip issues us under their Emergency Humanitarian Transactional Traffic
+ * Classifier** (or the closest equivalent they offer), raised in the same account-manager
+ * conversation as early media, recordings and Colombian termination rates (§4.1.6). Nothing
+ * in this file calls an API for this, and it has no live effect until an account exists —
+ * this constant exists so the requirement is tracked next to the code it protects rather
+ * than only in the PRD.
+ */
+export const REQUISITO_CLASIFICADOR_TRAFICO_INFOBIP =
+  'Registrar cada número virtual colombiano de Infobip bajo su Emergency Humanitarian ' +
+  'Transactional Traffic Classifier (o el equivalente más cercano que ofrezcan), junto con ' +
+  'early media, grabaciones y tarifas de terminación colombianas (§4.1.6).'
 
 export const PROVEEDOR_VOZ_INFOBIP = 'infobip_voz'
 
@@ -149,6 +199,74 @@ export function proveedorVozInfobip(config: ConfigVozInfobip): ProveedorVoz {
       if (!respuesta.id) throw new Error(`Infobip Calls no devolvió un id de llamada para ${a}.`)
 
       return { idExterno: respuesta.id }
+    },
+
+    async grabar(idLlamada) {
+      // §6.2: the cap travels on every request, never left to whatever the account's
+      // default happens to be — so a config drift on Infobip's side cannot silently produce
+      // a longer recording than the pipeline was sized for.
+      await pedirInfobip(config, `${RUTA_CALLS}/${idLlamada}/record`, {
+        maxDuration: TOPE_GRABACION_SEG,
+      })
+    },
+  }
+}
+
+/**
+ * Downloads a finished recording as a raw bytestream, then deletes it from the provider.
+ *
+ * Order matters and is not negotiable (PRD v3 §4.1.7's two non-relaxable rules): we hold our
+ * own bytes before we ask Infobip to forget theirs, and provider-side transcription stays
+ * off, so this is the only path a recording's audio ever leaves Infobip's infrastructure by.
+ * The delete is best-effort — once we hold the bytes, a failed delete costs Infobip storage
+ * hygiene, never the report itself, so it is logged rather than thrown.
+ */
+export async function descargarGrabacionInfobip(
+  config: ConfigVozInfobip,
+  fileId: string,
+): Promise<{ bytes: Buffer; mime: string | null }> {
+  const respuesta = await fetch(`${config.baseUrl}${RUTA_GRABACIONES}/${fileId}`, {
+    headers: { authorization: `App ${config.apiKey}` },
+    signal: AbortSignal.timeout(30_000),
+  })
+  if (!respuesta.ok) {
+    const texto = await respuesta.text().catch(() => '')
+    throw new Error(
+      `Infobip no devolvió la grabación ${fileId}: HTTP ${respuesta.status} ${texto.slice(0, 500)}`,
+    )
+  }
+
+  const bytes = Buffer.from(await respuesta.arrayBuffer())
+  const mime = respuesta.headers.get('content-type')
+
+  try {
+    const borrado = await fetch(`${config.baseUrl}${RUTA_GRABACIONES}/${fileId}`, {
+      method: 'DELETE',
+      headers: { authorization: `App ${config.apiKey}` },
+      signal: AbortSignal.timeout(15_000),
+    })
+    if (!borrado.ok) {
+      console.warn(`[voz] Infobip respondió ${borrado.status} al borrar la grabación ${fileId}.`)
+    }
+  } catch (error) {
+    const mensaje = error instanceof Error ? error.message : String(error)
+    console.warn(`[voz] no se pudo borrar la grabación ${fileId} en Infobip: ${mensaje}`)
+  }
+
+  return { bytes, mime }
+}
+
+/**
+ * `descargarGrabacionInfobip` behind the same `ProveedorMedia` port a WhatsApp voice note
+ * downloads through (lib/canales/media.ts) — so once the live IVR is driven, a recording
+ * reaches storage through `procesarMedia()` exactly like every other attachment, `ref` being
+ * the recording's `fileId` instead of a WhatsApp media id.
+ */
+export function proveedorMediaVozInfobip(config: ConfigVozInfobip): ProveedorMedia {
+  return {
+    async descargar(fileId): Promise<MediaDescargada> {
+      const { bytes, mime } = await descargarGrabacionInfobip(config, fileId)
+      return { bytes, mime }
     },
   }
 }

@@ -6,7 +6,9 @@ import {
   opcionDe,
   PROMPTS,
   proveedorVozSimulador,
+  RUTA_GRABACIONES,
   tipoDeIntencion,
+  TOPE_GRABACION_SEG,
 } from '@/lib/canales'
 
 /**
@@ -94,5 +96,24 @@ describe('el driver de voz', () => {
     const salida = await proveedor.llamar('+573000000001')
     expect(proveedor.llamadas).toEqual([{ a: '+573000000001', idExterno: salida.idExterno }])
     expect(proveedor.rechazadas).toEqual([])
+  })
+})
+
+describe('la grabación (§6.2, v4 supplement)', () => {
+  it('el tope de 60 segundos viaja en cada solicitud de grabar', async () => {
+    // §6.2: the cap is enforced at capture time, on the request itself — not left as an
+    // implicit provider default nobody can verify was actually applied.
+    const proveedor = proveedorVozSimulador()
+    await proveedor.grabar('llamada-1')
+    expect(proveedor.grabaciones).toEqual([{ idLlamada: 'llamada-1', topeSeg: 60 }])
+    expect(TOPE_GRABACION_SEG).toBe(60)
+  })
+
+  it('el endpoint de descarga usa la ruta en plural que corrige v3 (v4 §1.1/§1.2)', () => {
+    // v3's draft was singular (`/calls/1/recording/file/:file-id`); v4 corrects it to the
+    // plural form Infobip's REST convention actually uses. Pinned here so a future edit
+    // cannot silently regress to the wrong draft.
+    expect(RUTA_GRABACIONES).toBe('/calls/1/recordings/files')
+    expect(RUTA_GRABACIONES).not.toMatch(/recording\/file\b/)
   })
 })
