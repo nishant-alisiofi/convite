@@ -69,6 +69,16 @@ const POLITICA: Record<string, 'publica' | 'autenticada'> = {
   // app holds no cookie) but authenticated by the token in the URL — a stranger with no valid
   // token gets a 404, never a calendar. An authenticated surface, not a public one.
   '/api/agenda/[token]': 'autenticada',
+  // PRD-34 §28.1's subscribe-link screen: shows/copies the signed-in person's own .ics URL(s).
+  // Session-gated like the rest of the panel; the secret itself still lives in the token, not
+  // in a session cookie, so this page merely displays what `/api/agenda/[token]` already
+  // protects.
+  '/agenda': 'autenticada',
+  // PRD-34 item 2 (§28's Informes-exports slice): the CSV download of jornadas + stops, and
+  // the page that offers it. Session-gated — unlike the .ics feed, this is a signed-in browser
+  // download, not something a calendar app polls with no cookie.
+  '/exportes': 'autenticada',
+  '/api/exportes/agenda': 'autenticada',
   '/tablero': 'autenticada',
   // Setting a password. Behind a session on purpose: that is the whole mechanism.
   '/clave': 'autenticada',
