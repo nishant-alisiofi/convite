@@ -29,6 +29,12 @@ const PERMITIDAS_ESTATICAS = new Set([
   '/',
   // robots.txt: generated from a static rule set, no database. Free and correct to prerender.
   '/robots.txt',
+  // The public legal pages (Ley 1581 + Meta app review): privacy policy, terms of service, and
+  // data-deletion instructions. Pure static content with no database read — free and correct to
+  // prerender, and they must stay that way (a DB read here would be a build-time connection).
+  '/privacidad',
+  '/terminos',
+  '/eliminar-datos',
 ])
 
 describe('la construcción sobrevive sin base de datos', () => {
