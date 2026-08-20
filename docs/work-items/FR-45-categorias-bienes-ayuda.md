@@ -27,9 +27,23 @@ first-class** and that inventory, needs, and reports can be filtered/summarised 
 
 ## Acceptance criteria
 
-1. Every catalogue item resolves to one of the three families; existing items are backfilled.
-2. Existencias/Inventario and Informes can filter/summarise by family.
-3. Intake normalisation places a recognised item in the right family.
+1. Every deliverable relief good that **belongs** to one of the three named families
+   (alimentos / medicinas / construcción) carries that `familia_ayuda`; the three families are
+   **complete and correct for their members** (no food/medicine/construction good left blank).
+2. Goods in **other** relief-goods families (albergue/abrigo, agua-saneamiento-higiene, niñez)
+   are tracked by the catalogue's own `familia` / `familia_label` and are **not** force-fit into
+   the three — mislabelling a blanket as "construcción" is the fabrication rule 2.12 / BUG-23
+   forbids. **Damage reports** (`tipo='dano'`, non-deliverable) are not relief goods and correctly
+   carry no `familia_ayuda`.
+3. Existencias/Inventario and Informes/Coordinación can filter/summarise by the three families.
+4. Intake normalisation places a recognised food/medicine/construction item in the right family.
+
+> **Correction (2026-08-19):** the original criterion 1 ("every catalogue item resolves to one
+> of three") was too strict — the catalogue legitimately has more relief-goods families than the
+> three the field named, plus non-goods damage reports. The field ask ("distinct tracking for
+> food, medicine, construction") is met when those three are first-class, complete and filterable;
+> forcing the rest in would violate the anti-fabrication rule. Codex should read a blank
+> `familia_ayuda` on shelter/WASH/niñez/daños items as correct, not a defect.
 
 ## Validation approach (staging)
 

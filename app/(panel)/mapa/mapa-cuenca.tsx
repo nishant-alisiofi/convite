@@ -295,6 +295,28 @@ export default function MapaCuenca({ datos, planificacion, fase = 'emergencia', 
       // Remove once BUG-39/PRD-2 map overlays are confirmed rendering.
       if (typeof window !== 'undefined' && window.location.hostname !== 'convite.ai') {
         ;(window as unknown as { __convMapa?: unknown }).__convMapa = m
+        const nCirc =
+          figuras.circulos.solido.length +
+          figuras.circulos.discontinuo.length +
+          figuras.circulos.punteado.length
+        console.log(
+          '[CONV-MAPA] datos → comunidades:',
+          datos.comunidades.length,
+          '| tramos:',
+          datos.tramos.length,
+          '| nodos:',
+          datos.nodos.length,
+        )
+        console.log(
+          '[CONV-MAPA] figuras → circulos:',
+          nCirc,
+          '| pines:',
+          figuras.pines.length,
+          '| sinUbicar:',
+          figuras.sinUbicar.length,
+          '| limites:',
+          JSON.stringify(limites),
+        )
         m.once('idle', () => {
           const estilo = m.getStyle()
           const cuenta = (id: string) => {
@@ -304,16 +326,34 @@ export default function MapaCuenca({ datos, planificacion, fase = 'emergencia', 
               return 'n/a'
             }
           }
-          const src = m.getSource('tramos') as { _data?: { features?: unknown[] } } | undefined
+          const feats = (id: string) => {
+            const s = m.getSource(id) as { serialize?: () => { data?: { features?: unknown[] } } } | undefined
+            try {
+              return s?.serialize?.()?.data?.features?.length ?? '?'
+            } catch {
+              return '?'
+            }
+          }
           console.log('[CONV-MAPA] capas:', estilo.layers.map((l) => l.id).join(','))
-          console.log('[CONV-MAPA] tramos source features:', src?._data?.features?.length ?? '?')
+          console.log(
+            '[CONV-MAPA] source features → tramos:',
+            feats('tramos'),
+            '| circulos-solido:',
+            feats('circulos-solido'),
+          )
+          console.log(
+            '[CONV-MAPA] center:',
+            JSON.stringify(m.getCenter()),
+            '| zoom:',
+            m.getZoom().toFixed(2),
+            '| bounds:',
+            JSON.stringify(m.getBounds().toArray()),
+          )
           console.log(
             '[CONV-MAPA] rendered — tramos-linea:',
             cuenta('tramos-linea'),
             '| circulos-solido-borde:',
             cuenta('circulos-solido-borde'),
-            '| pines-punto:',
-            cuenta('pines-punto'),
           )
         })
       }
