@@ -65,6 +65,11 @@ export const organizaciones = pgTable(
      * comunidades_alcance, direcciones_hogar, inventario_nodo, despacho, agendamiento,
      * evaluacion, puede_delegar. Default `{}` grants nothing (fail closed, the direction the RLS
      * floor already fails). Enforcement is PRD-16; this column only stores the ceiling.
+     *
+     * PRD-49 (Supplement v4 §3): one more boolean key, `acceso_sensible` — may this org's staff
+     * hold `verificador_vulnerable` at all. Same shape convention (a documented jsonb key, no
+     * new column); enforced by `convite_membresia_cabe_en_techo` (migration 0063) exactly like
+     * `despacho`/`evaluacion`/`puede_delegar` already are.
      */
     techoPermisos: jsonb('techo_permisos').notNull().default(sql`'{}'::jsonb`),
     /**

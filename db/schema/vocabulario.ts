@@ -26,12 +26,24 @@ export const ROLES_CONTACTO = [
   'lanchero',
 ] as const
 
+/**
+ * PRD-49 (Supplement v4 §3) + PRD-16's v4 update: `verificador_vulnerable` is the narrow
+ * role that may see un-redacted content on a report flagged sensitive (GBV/distress
+ * disclosure) — everything a `verificador` sees, minus territory-wide reach, plus the one
+ * thing a `verificador` never gets: un-redacted audio/transcript/address on a flagged report,
+ * and only within their own membership's community scope. No new permission *mechanism* — it
+ * rides the existing membership + `techo_permisos` ceiling (PRD-16, migration 0047):
+ * `convite_membresia_cabe_en_techo` refuses to grant it unless the org's ceiling carries
+ * `acceso_sensible: true`, exactly the same shape as `despachador`/`despacho` or
+ * `verificador`/`evaluacion`.
+ */
 export const ROLES_STAFF = [
   'coordinador',
   'verificador',
   'despachador',
   'admin',
   'lectura',
+  'verificador_vulnerable',
 ] as const
 
 /**
@@ -134,6 +146,22 @@ export const PRECISION_POR_FUENTE: Record<string, number | null> = {
 }
 
 export const ESTADOS_REPORTE = ['RECIBIDO', 'VERIFICADO', 'DUPLICADO', 'CANCELADO'] as const
+
+/**
+ * PRD-49: why a report is flagged `sensible` — a routing decision, never a diagnosis (v3
+ * §27b.3). `termino_detectado` is the automated distress-term match at intake; `manual` is a
+ * verifier flagging it by hand. Both redact the same way; only the audit trail differs.
+ */
+export const MOTIVOS_SENSIBLE = ['termino_detectado', 'manual'] as const
+
+/**
+ * PRD-49 §6.3: delivery state of the urgent protection-lead alert a flagged report fires.
+ * `pendiente` the instant the report is flagged (bypassing the normal dashboard cadence);
+ * `enviado`/`fallido` once the send is attempted. A report can be escalated with zero
+ * `contactos_proteccion` configured — the alert row still exists (the signal fired), it just
+ * has nowhere to send until a partner contact is on file.
+ */
+export const ESTADOS_ALERTA_PROTECCION = ['pendiente', 'enviado', 'fallido'] as const
 
 /**
  * Section 1: this classification is the product. Every open request names the side that is
@@ -321,6 +349,8 @@ export type FamiliaAyuda = (typeof FAMILIAS_AYUDA)[number]
 export type TipoReporteRegistrado = (typeof TIPOS_REPORTE_REGISTRADO)[number]
 export type FuenteUbicacion = (typeof FUENTES_UBICACION)[number]
 export type EstadoReporte = (typeof ESTADOS_REPORTE)[number]
+export type MotivoSensible = (typeof MOTIVOS_SENSIBLE)[number]
+export type EstadoAlertaProteccion = (typeof ESTADOS_ALERTA_PROTECCION)[number]
 export type EstadoPedido = (typeof ESTADOS_PEDIDO)[number]
 export type TipoNodo = (typeof TIPOS_NODO)[number]
 export type Modo = (typeof MODOS)[number]

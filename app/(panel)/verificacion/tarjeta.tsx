@@ -1,4 +1,4 @@
-import { CheckCheck, Copy, Mic, Route, TriangleAlert } from 'lucide-react'
+import { CheckCheck, Copy, Mic, Route, ShieldAlert, TriangleAlert } from 'lucide-react'
 import Link from 'next/link'
 import {
   InsigniaCanal,
@@ -62,6 +62,15 @@ export default function Tarjeta({
           {r.urgencia === 3 && (
             <span className="rounded bg-rose-100 px-1.5 py-0.5 text-xs font-medium text-rose-900">
               urgente
+            </span>
+          )}
+          {/* PRD-49 §6.3: bypasses the ordinary cadence entirely — the badge is a routing
+              signal, never a description of content, which is already withheld from this row
+              by the time it reaches this component (migration 0063). */}
+          {r.sensible && (
+            <span className="flex items-center gap-1 rounded bg-rose-600 px-1.5 py-0.5 text-xs font-medium text-white">
+              <ShieldAlert className="size-3" aria-hidden />
+              sensible — acceso restringido
             </span>
           )}
         </div>
@@ -303,6 +312,23 @@ export default function Tarjeta({
                 <Copy className="size-3.5" aria-hidden />
                 Marcar duplicado
               </Link>
+
+              {/* PRD-49 Scope §1: a verifier can flag by hand, not only the automated term
+                  match at intake. Redaction + escalation both happen atomically server-side
+                  (convite_marcar_reporte_sensible) — nothing here decides what gets hidden. */}
+              {!r.sensible && (
+                <form action={accion}>
+                  <input type="hidden" name="accion" value="marcar_sensible" />
+                  <input type="hidden" name="reporteId" value={r.id} />
+                  <button
+                    type="submit"
+                    className="flex items-center gap-1 px-1 py-1.5 text-sm text-rose-700 underline"
+                  >
+                    <ShieldAlert className="size-3.5" aria-hidden />
+                    Marcar sensible
+                  </button>
+                </form>
+              )}
             </div>
 
             {/* §29b.6: the one disambiguation nothing on this screen explains — when to pick the
