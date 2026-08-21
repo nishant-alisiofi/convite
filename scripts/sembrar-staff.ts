@@ -82,7 +82,11 @@ async function main() {
 
   const puestos: { rol: RolStaff; correo: string; comunidades: number }[] = []
 
-  for (const rol of ROLES_STAFF) {
+  // `verificador_vulnerable` (PRD-49) is deliberately NOT invitable through invitaciones_staff:
+  // the sensitive-access role must pass the `acceso_sensible` ceiling gate, never a plain
+  // invitation (migration 0063 keeps it out of `invitaciones_rol_check` on purpose). The demo
+  // staff seed skips it here — showing it in a demo means setting the org's ceiling first.
+  for (const rol of ROLES_STAFF.filter((r) => r !== 'verificador_vulnerable')) {
     const correo = direccionPara(rol)
 
     // Idempotent on the address, like `pnpm invitar`: running this twice re-points the
