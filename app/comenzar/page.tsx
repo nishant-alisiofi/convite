@@ -71,6 +71,10 @@ const HERRAMIENTAS: Record<HerramientaOrganizacion, string> = {
   excel: 'Excel',
   radio: 'Radio comunitaria',
   papel: 'Papel: cuadernos, actas, planillas',
+  kobotoolbox: 'KoboToolbox',
+  odk: 'ODK Collect',
+  activityinfo: 'ActivityInfo',
+  otra: 'Otra herramienta (cuéntenos cuál)',
   ninguna: 'Nada de esto todavía',
 }
 
@@ -114,15 +118,34 @@ async function declarar(formData: FormData) {
   if (!(FASES_RESPUESTA as readonly string[]).includes(faseCruda)) redirect('/comenzar?error=fase')
   if (rural !== 'si' && rural !== 'no') redirect('/comenzar?error=rural')
 
+  const datosExternos = String(formData.get('datos_externos') ?? '') === 'si'
+  const dominio = String(formData.get('dominio_workspace') ?? '').trim()
+
   await conSesion(
     sesion,
-    (client) =>
-      guardarDeclaracion(client, {
+    async (client) => {
+      await guardarDeclaracion(client, {
         intenciones,
         herramientas,
         fase: faseCruda as FaseRespuesta,
         alcanceRural: rural === 'si',
-      }),
+      })
+      // The consent rides on `permisos_admin`, the layer an org controls, and can only ever
+      // narrow what admission already allowed (0069). Saying yes here does not grant anything the
+      // ceiling withheld; saying no switches it off regardless.
+      await client.query(`select convite_fijar_permisos_admin($1::jsonb)`, [
+        JSON.stringify({ datos_externos: datosExternos }),
+      ])
+      if (dominio) {
+        await client.query(
+          `select convite_fijar_canales_organizacion(
+             (select telefono_whatsapp from organizaciones where id = convite_organizacion()),
+             (select telefono_voz from organizaciones where id = convite_organizacion()),
+             $1)`,
+          [dominio],
+        )
+      }
+    },
     { escribe: true },
   )
 
@@ -285,6 +308,48 @@ export default async function Comenzar({
                 </label>
               ))}
             </div>
+          </fieldset>
+
+          <fieldset className="rounded-xl border border-barro-200 bg-white p-5">
+            <legend className="px-1 text-sm font-semibold text-barro-900">
+              5 · ¿Sus datos pueden salir hacia Google Workspace?
+            </legend>
+            <p className="mt-1 text-sm text-barro-600">
+              Si usan Workspace, Convite puede escribir allá: calendarios de jornadas, enlaces de
+              reunión, hojas de cálculo. Es una decisión suya y no técnica —{' '}
+              <span className="font-medium">
+                incluye fotos de casas dañadas y nombres de familias
+              </span>
+              , y una vez allá se rige por las reglas de Google, no por las nuestras. Se puede
+              cambiar después, y por defecto es «no».
+            </p>
+            <div className="mt-4 grid gap-2 sm:grid-cols-2">
+              {[
+                { valor: 'no', titulo: 'No, por ahora no', ayuda: 'Todo se queda en Convite. Puede exportar a mano cuando quiera.' },
+                { valor: 'si', titulo: 'Sí, usamos Workspace', ayuda: 'Nos autoriza a conectar calendario y archivos cuando esa conexión exista.' },
+              ].map((o) => (
+                <label key={o.valor} className="flex cursor-pointer gap-3 rounded-lg border border-barro-200 p-3 hover:border-selva-200">
+                  <input type="radio" name="datos_externos" value={o.valor}
+                    defaultChecked={o.valor === 'no'} className="mt-1 h-4 w-4 shrink-0" />
+                  <span>
+                    <span className="block text-sm font-medium text-barro-900">{o.titulo}</span>
+                    <span className="mt-0.5 block text-xs text-barro-600">{o.ayuda}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+            <label className="mt-3 block">
+              <span className="text-sm text-barro-700">Su dominio de Workspace, si lo tienen</span>
+              <input name="dominio_workspace" placeholder="suorganizacion.org"
+                className="mt-1 w-full rounded-lg border border-barro-300 px-3 py-2 text-base" />
+            </label>
+            {/* Said plainly: the switch is real, the integration is not. PRD-34 §28.4.4 is
+                unbuilt, and a consent that quietly does nothing is worse than no consent —
+                somebody would assume a calendar invitation had gone out. */}
+            <p className="mt-2 text-xs text-barro-500">
+              La conexión con Google todavía no existe. Esto queda guardado como su permiso para
+              cuando exista; nada sale hoy.
+            </p>
           </fieldset>
 
           <button

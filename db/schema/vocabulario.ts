@@ -360,6 +360,15 @@ export const HERRAMIENTAS_ORGANIZACION = [
   'excel',
   'radio',
   'papel',
+  // Humanitarian data collection (0069). KoboToolbox is the standard — ODK-based, free for
+  // non-profits, UN agencies run their own instances — so a partner arriving with three years of
+  // assessments most likely has them there rather than in a spreadsheet. That is exactly what
+  // PRD-34 §28.3's «import ≥ export» is for: reading what exists beats writing somewhere new.
+  'kobotoolbox',
+  'odk',
+  'activityinfo',
+  /** Something we did not think of. The point of asking is to be told, not to offer guesses. */
+  'otra',
   'ninguna',
 ] as const
 

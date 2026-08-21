@@ -1,8 +1,9 @@
-import { UserPlus, Users } from 'lucide-react'
+import { ShieldCheck, UserPlus, Users } from 'lucide-react'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { ROLES_TRABAJADOR, type RolTrabajador } from '@/db/schema/vocabulario'
 import { aE164 } from '@/lib/canales'
+import { CAPACIDADES, capacidadesDeOrganizacion, fijarCapacidades } from '@/lib/permisos'
 import { conSesion, sesionActual } from '@/lib/sesion'
 
 export const dynamic = 'force-dynamic'
@@ -95,6 +96,8 @@ export default async function Equipo({
   // (0035: no invitation at all, e.g. an uninvited admin who only proved possession of an
   // address). The plain invitaciones_staff join used before this had no way to surface the
   // second kind, so an uninvited account had panel access and no row anywhere to deactivate.
+  const capacidades = await conSesion(sesion, (client) => capacidadesDeOrganizacion(client))
+
   const miembros = await conSesion(sesion, async (client) => {
     const { rows } = await client.query<MiembroFila>('select * from convite_equipo()')
     return rows
@@ -154,6 +157,26 @@ export default async function Equipo({
 
     revalidatePath('/equipo')
     redirect(activo ? '/equipo?ok=reactivado' : '/equipo?ok=desactivado')
+  }
+
+  async function guardarCapacidades(formData: FormData) {
+    'use server'
+    const s = await sesionActual()
+    if (!s) redirect('/entrar')
+
+    // Every switch the form showed, so «absent» never becomes ambiguous between «inherit» and
+    // «this form did not mention it». Only capabilities admission actually granted are sent —
+    // writing false for one the ceiling already refuses would record a denial that means nothing.
+    const encendidas: Record<string, boolean> = {}
+    for (const c of CAPACIDADES) {
+      const permitida = capacidades.find((x) => x.clave === c.clave)?.techo
+      if (permitida) encendidas[c.clave] = formData.get(`cap:${c.clave}`) === 'on'
+    }
+
+    const r = await conSesion(s, (client) => fijarCapacidades(client, encendidas), { escribe: true })
+    if (!r.ok) redirect(`/equipo?error=${encodeURIComponent(r.error)}`)
+    revalidatePath('/equipo')
+    redirect('/equipo?ok=permisos')
   }
 
   return (
@@ -277,6 +300,72 @@ export default async function Equipo({
               )
             })}
           </ul>
+        )}
+      </section>
+
+      <section className="mt-10 rounded-lg border border-barro-200 bg-white px-4 py-4">
+        <h2 className="flex items-center gap-2 font-semibold text-barro-900">
+          <ShieldCheck className="size-4 text-selva-700" aria-hidden />
+          Qué puede hacer esta organización
+        </h2>
+        <p className="mt-1 max-w-2xl text-sm text-barro-600">
+          El rol de cada persona decide qué hace; esto decide qué puede hacer la organización
+          entera. Una capacidad está encendida solo si la admisión la concedió{' '}
+          <em>y</em> ustedes no la apagaron aquí — por eso solo se puede apagar, nunca encender
+          algo que no les dieron.
+        </p>
+
+        {!puedeGestionar ? (
+          <ul className="mt-4 space-y-1 text-sm">
+            {capacidades.map((c) => {
+              const meta = CAPACIDADES.find((x) => x.clave === c.clave)!
+              return (
+                <li key={c.clave} className="text-barro-700">
+                  {c.techo && c.encendida ? '✓' : '—'} {meta.titulo}
+                </li>
+              )
+            })}
+          </ul>
+        ) : (
+          <form action={guardarCapacidades} className="mt-4 space-y-2">
+            {capacidades.map((c) => {
+              const meta = CAPACIDADES.find((x) => x.clave === c.clave)!
+              return (
+                <label
+                  key={c.clave}
+                  className={`flex gap-3 rounded-lg border p-3 ${
+                    c.techo ? 'cursor-pointer border-barro-200 hover:border-selva-200' : 'border-barro-100 bg-barro-50'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    name={`cap:${c.clave}`}
+                    defaultChecked={c.techo && c.encendida}
+                    disabled={!c.techo}
+                    className="mt-1 size-4 shrink-0 accent-selva-600"
+                  />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium text-barro-900">{meta.titulo}</span>
+                    <span className="mt-0.5 block text-xs text-barro-600">{meta.detalle}</span>
+                    {/* Shown rather than hidden. A capability the platform withheld is a fact
+                        about this organisation's admission, and an admin who cannot see it would
+                        keep asking why a screen is empty. */}
+                    {!c.techo && (
+                      <span className="mt-1 block text-xs text-barro-500">
+                        No concedida en la admisión. Para tenerla hay que pedirla a la plataforma.
+                      </span>
+                    )}
+                  </span>
+                </label>
+              )
+            })}
+            <button
+              type="submit"
+              className="mt-2 rounded-lg bg-selva-700 px-4 py-2 text-sm font-medium text-white hover:bg-selva-800"
+            >
+              Guardar permisos
+            </button>
+          </form>
         )}
       </section>
     </main>
