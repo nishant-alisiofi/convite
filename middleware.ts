@@ -252,5 +252,18 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
+  /*
+   * `.pmtiles` joins the static exclusions, and it has to be here rather than in PUBLICAS.
+   *
+   * The offline basemap is fetched by the service worker (public/sw.js), which slices it with
+   * HTTP Range requests. Middleware answered those with a 307 to /entrar — a redirect the worker
+   * cannot follow and would cache as the map — so the download button produced a login page in
+   * 13 MB of pieces. PUBLICAS would not have helped: that list is consulted *by* the middleware,
+   * and the problem is the middleware running on a static file at all.
+   *
+   * Safe to exclude: it is a basemap of public geography, identical for everybody, carrying no
+   * community, household or operational data of any kind. Nothing about who is asking changes
+   * what it should return.
+   */
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|pmtiles)$).*)'],
 }
