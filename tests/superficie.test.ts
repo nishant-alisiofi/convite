@@ -85,6 +85,9 @@ const POLITICA: Record<string, 'publica' | 'autenticada'> = {
   '/comenzar': 'autenticada',
   // PRD-28 AC 2: the unified queue, and the panel's front door.
   '/bandeja': 'autenticada',
+  // The phone surface. Authenticated on purpose: stock is staff-only (principle 6 — inventory
+  // is never a promise), which is what separates it from the open e-Catalog question.
+  '/campo': 'autenticada',
   '/tablero': 'autenticada',
   // Setting a password. Behind a session on purpose: that is the whole mechanism.
   '/clave': 'autenticada',

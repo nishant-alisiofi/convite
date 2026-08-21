@@ -89,6 +89,8 @@ export const SECCIONES: SeccionNav[] = [
     ver: rol(['verificador', 'despachador', 'coordinador', 'admin']),
     items: [
       { href: '/bandeja', etiqueta: 'Todo lo pendiente', listo: true },
+      // The phone surface: existencias + avisar qué falta, for whoever is not at a desk.
+      { href: '/campo', etiqueta: 'Campo (teléfono)', listo: true },
       { href: '/verificacion', etiqueta: 'Verificación', listo: true, ver: VE_VERIFICACION },
     ],
   },
