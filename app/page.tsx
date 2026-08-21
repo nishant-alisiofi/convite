@@ -95,11 +95,14 @@ function Enlaces({ compacto = false }: { compacto?: boolean }) {
         <ArrowRight className="size-4" aria-hidden />
       </a>
       {!compacto && (
+        // «¿Qué quiere hacer?» rather than «Entrar al panel»: the panel is for one of the four
+        // people who arrive here, and sending the other three at a login wall is the mistake
+        // §1 of tipos-de-usuario-y-accesos exists to correct.
         <a
-          href="/entrar"
+          href="/entrada"
           className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-barro-300 bg-white px-5 py-3 font-medium text-barro-800 transition-colors hover:border-barro-400 hover:bg-barro-50 sm:w-auto"
         >
-          Entrar al panel
+          ¿Qué quiere hacer?
         </a>
       )}
     </div>

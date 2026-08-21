@@ -35,11 +35,11 @@ export const dynamic = 'force-dynamic'
 export default async function Campo({
   searchParams,
 }: {
-  searchParams: Promise<{ ok?: string; error?: string }>
+  searchParams: Promise<{ ok?: string; error?: string; pedir?: string; comunidad?: string }>
 }) {
   const sesion = await sesionActual()
   if (!sesion) redirect('/entrar')
-  const { ok, error } = await searchParams
+  const { ok, error, pedir, comunidad } = await searchParams
 
   const verStock = puedeVerExistencias(sesion)
   const reportar = puedeReportar(sesion)
@@ -130,6 +130,18 @@ export default async function Campo({
                             ? 'contado hoy'
                             : `contado hace ${f.diasDesdeConteo} d`}
                       </span>
+                      {/* Ordering restock is not a new kind of object: it is a report, and it
+                          goes through verification and the matcher like every other one. A node
+                          that could conjure its own resupply would be the «38 pending» board
+                          this product exists not to be. */}
+                      {reportar && (
+                        <Link
+                          href={`/campo?pedir=${encodeURIComponent(f.codigoItem)}&comunidad=${f.comunidadId}#pedir`}
+                          className="shrink-0 text-xs font-medium text-selva-700 underline"
+                        >
+                          Pedir más
+                        </Link>
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -140,27 +152,37 @@ export default async function Campo({
       )}
 
       {reportar && (
-        <section className="mt-8">
+        <section className="mt-8" id="pedir">
           <h2 className="flex items-center gap-2 text-sm font-semibold text-barro-900">
             <ClipboardPlus className="h-4 w-4 text-selva-700" aria-hidden />
             Avisar qué falta
           </h2>
+          {pedir && (
+            <p className="mt-2 text-xs text-barro-600">
+              Viene de una existencia baja. Confirme las familias y añada lo que sepa: un pedido
+              sin contexto se atasca igual que cualquier otro.
+            </p>
+          )}
           <form action={registrar} className="mt-3 space-y-3 rounded-xl border border-barro-200 bg-white p-4">
             <label className="block">
               <span className="text-sm text-barro-700">Comunidad</span>
-              <select name="comunidadId" required className="mt-1 w-full rounded-lg border border-barro-300 px-3 py-3 text-base">
+              <select name="comunidadId" required defaultValue={comunidad ?? ''} className="mt-1 w-full rounded-lg border border-barro-300 px-3 py-3 text-base">
                 <option value="">Elija una</option>
                 {comunidades.map((c) => (
-                  <option key={c.id} value={c.id}>{c.nombre} · {c.municipio}</option>
+                  <option key={c.id} value={c.id}>
+                    {c.nombre} · {c.municipio}
+                  </option>
                 ))}
               </select>
             </label>
             <label className="block">
               <span className="text-sm text-barro-700">Qué se necesita</span>
-              <select name="codigoItem" className="mt-1 w-full rounded-lg border border-barro-300 px-3 py-3 text-base">
+              <select name="codigoItem" defaultValue={pedir ?? ''} className="mt-1 w-full rounded-lg border border-barro-300 px-3 py-3 text-base">
                 <option value="">Sin clasificar todavía</option>
                 {catalogo.map((i) => (
-                  <option key={i.codigo} value={i.codigo}>{i.itemLabel}</option>
+                  <option key={i.codigo} value={i.codigo}>
+                    {i.itemLabel}
+                  </option>
                 ))}
               </select>
             </label>

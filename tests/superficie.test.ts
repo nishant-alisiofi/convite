@@ -34,6 +34,8 @@ const POLITICA: Record<string, 'publica' | 'autenticada'> = {
   '/': 'publica',
   '/respuesta': 'publica',
   '/entrar': 'publica',
+  // The intent router (§1). Public, static, and links only to doors that gate themselves.
+  '/entrada': 'publica',
   // §4: the vetted door for running a centre. Public by necessity — somebody who is not yet
   // staff asks here — and safe because it creates only a `pendiente` organisation and a pending
   // invitation, with nothing operable behind either until the platform approves.

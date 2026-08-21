@@ -35,6 +35,11 @@ const PERMITIDAS_ESTATICAS = new Set([
   '/privacidad',
   '/terminos',
   '/eliminar-datos',
+  // The intent router (§1, «¿Qué quiere hacer?»). Four doors and their descriptions, all of it
+  // literal — it reads nothing and must keep reading nothing: this is the screen somebody meets
+  // before they are anybody, so a database call here would be a build-time connection for a page
+  // with no session to scope it anyway.
+  '/entrada',
 ])
 
 describe('la construcción sobrevive sin base de datos', () => {

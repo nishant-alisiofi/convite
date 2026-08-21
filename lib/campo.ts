@@ -37,6 +37,9 @@ export type ExistenciaNodo = {
   nodoId: string
   nodo: string
   comunidad: string
+  /** So a «pedir más» from this row can seed a report against the right community. */
+  comunidadId: string
+  codigoItem: string
   item: string
   cantidad: number
   unidad: string | null
@@ -57,12 +60,15 @@ export async function existenciasVisibles(client: PoolClient): Promise<Existenci
     nodo_id: string
     nodo: string
     comunidad: string
+    comunidad_id: string
+    codigo_item: string
     item: string
     cantidad: string
     unidad: string | null
     dias: number | null
   }>(
-    `select n.id as nodo_id, n.nombre as nodo, c.nombre as comunidad,
+    `select n.id as nodo_id, n.nombre as nodo, c.nombre as comunidad, c.id as comunidad_id,
+            e.codigo_item,
             ci.item_label as item, e.cantidad,
             case when e.cantidad = 1 then ci.unidad_singular else ci.unidad_plural end as unidad,
             extract(day from now() - e.contado_en)::int as dias
@@ -77,6 +83,8 @@ export async function existenciasVisibles(client: PoolClient): Promise<Existenci
     nodoId: r.nodo_id,
     nodo: r.nodo,
     comunidad: r.comunidad,
+    comunidadId: r.comunidad_id,
+    codigoItem: r.codigo_item,
     item: r.item,
     cantidad: Number(r.cantidad),
     unidad: r.unidad,

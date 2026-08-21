@@ -27,6 +27,11 @@ import { NextResponse, type NextRequest } from 'next/server'
  */
 export const PUBLICAS = [
   '/entrar',
+  // §1 of docs/tipos-de-usuario-y-accesos.md: «¿Qué quiere hacer?» — the entry that routes by
+  // intention instead of putting one login wall in front of four different people. Public by
+  // definition: it is the screen somebody meets before they are anybody, and every door behind
+  // it carries its own gate.
+  '/entrada',
   // §4: requesting to run a centre is a low-friction, unauthenticated path — the whole point is
   // that somebody who is not yet staff can ask. It creates a `pendiente` organisation and a
   // pending invitation; nothing operates until the platform approves, so opening the door here
