@@ -3,7 +3,7 @@
 - **Type:** PRD
 - **Tier:** 2 — Roadmap (PRD v3 Part IV)
 - **Priority:** P1
-- **Status:** Backlog
+- **Status:** 🟡 Partially built + deployed — the seven-section shell shipped (AC 1, 6, 7). **AC 2–5 are unmet**: the unified single queue, silence-as-item, tasks-as-items and phase-led ordering were all deferred, and the deferral was recorded only in a code comment (`app/(panel)/secciones.ts:24-27` and `:38-41`, «until the single queue exists» + «TODO (PRD-28 follow-up)»), never in this file. Phase is still not a stored concept anywhere in `db/schema`.
 - **Source:** PRD v3 **§18** (navigation and the two inboxes) + **§19** (silence is not on the Tablero).
   Sequence: §33 step 3.
 

@@ -4,7 +4,7 @@
 - **Tier:** 2 — Roadmap (PRD Supplement v4.0)
 - **Priority:** P1 — safety-critical once any real reporting is live, but new build (not a live-demo
   defect)
-- **Status:** Backlog
+- **Status:** 🟡 Built + deployed — migration 0063: RLS redaction, `verificador_vulnerable` role, escalation path. **Open (partner decisions, not engineering defaults):** the protection-lead contact per partner org, and the distress-term list that triggers the alert — both need Red de Mujeres Chocanas / ASOREDIPARCHOCÓ input.
 - **Source:** PRD Supplement v4.0 **§3** (Privacy, Sensitive Data & RBAC) + **§6.3** (Urgent GBV /
   Distress Escalation Protocol). Genuinely new scope — v3 has no GBV/domestic-violence handling; this
   is not an enrichment of an existing WI.

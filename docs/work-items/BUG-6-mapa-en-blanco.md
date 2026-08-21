@@ -3,7 +3,7 @@
 - **Type:** BUG
 - **Tier:** 1 — Demo (this pass)
 - **Priority:** P0
-- **Status:** Open
+- **Status:** ✅ Fixed — deployed (staging + prod), pending Codex validation
 - **Source:** Jam A.
 - **Fixed by:** PRD-2 (real OpenStreetMap panel map).
 

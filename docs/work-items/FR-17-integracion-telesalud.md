@@ -3,7 +3,7 @@
 - **Type:** FR (open request — needs scoping before it becomes a PRD)
 - **Tier:** 2 — Roadmap (from PRD v1.0)
 - **Priority:** P3
-- **Status:** Backlog
+- **Status:** ⛔ **Not started** — no implementation. Forward-references only: `lib/onboarding.ts:273` tells users providers «llegan con la integración de telesalud», and the telemedicine-order fields in `lib/matching/anticipado.ts` + migration 0046 are wired but never populated.
 - **Source:** PRD v1.0 (telehealth-module integration). Partner context: ASOREDIPARCHOCÓ parteras
   (midwives) — health is core to their work.
 

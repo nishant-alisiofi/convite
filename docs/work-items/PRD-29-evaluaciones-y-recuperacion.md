@@ -3,7 +3,7 @@
 - **Type:** PRD
 - **Tier:** 2 — Roadmap (PRD v3 Part IV)
 - **Priority:** P1 — "the largest functional gap, and the thing Herencia de Timbiquí is asking for"
-- **Status:** Backlog
+- **Status:** ✅ Built + deployed (staging + prod) — pending Codex validation (extended by FR-48)
 - **Source:** PRD v3 **§21**. Partner: Fundación Herencia de Timbiquí (§31, their ask is the
   diagnostic — levels 3 & 4). Sequence: §33 step 4 (unblocks both Apadrinar and Herencia).
 

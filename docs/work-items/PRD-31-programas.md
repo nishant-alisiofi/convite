@@ -3,7 +3,7 @@
 - **Type:** PRD
 - **Tier:** 2 — Roadmap (PRD v3 Part IV)
 - **Priority:** P2
-- **Status:** Backlog
+- **Status:** ✅ Built + deployed (staging + prod) — pending Codex validation
 - **Source:** PRD v3 **§21b**. Vocabulary: §18. Partners: ASOREDIPARCHOCÓ's *plan de respuesta a 12
   meses* and Herencia's *Timbiquí Suena* are programas (§30, §31). Sequence: §33 step 6.
 

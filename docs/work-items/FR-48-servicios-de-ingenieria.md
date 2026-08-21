@@ -3,7 +3,7 @@
 - **Type:** FR
 - **Tier:** 2 — Roadmap
 - **Priority:** P3
-- **Status:** In progress (check overlap with PRD-29 evaluaciones and extend, don't duplicate)
+- **Status:** ✅ Built + deployed (staging + prod) — pending Codex validation (extends PRD-29, does not duplicate it)
 - **Source:** Field feedback from Chocó (Doña Marta), relayed by Nishant 2026-08-17. "Clear
   requirement for technical evaluations, engineering services, and on-ground engineering talent to
   assess infrastructure and oversee distribution."

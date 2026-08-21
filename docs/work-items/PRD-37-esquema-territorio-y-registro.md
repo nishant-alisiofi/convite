@@ -3,7 +3,7 @@
 - **Type:** PRD (schema-enabling)
 - **Tier:** 2 — Roadmap (PRD v3 Part IV) · schema prerequisite for the real territory seed
 - **Priority:** P1 — unblocks PRD-38 (the real registry seed) and several Part IV features
-- **Status:** Backlog
+- **Status:** ✅ Built + deployed (staging + prod) — pending Codex validation
 - **Source:** The schema the real seed `db/seed/territorio.sql` requires that does **not exist yet**,
   plus PRD v3 §14 (verificado_en / silence), §29.3b (shared registry, aval), §29.4 (techo_permisos),
   §21b/§22 (jornadas), §7/§9 (map/routes).

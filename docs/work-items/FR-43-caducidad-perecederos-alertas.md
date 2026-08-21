@@ -3,7 +3,7 @@
 - **Type:** FR
 - **Tier:** 2 — Roadmap
 - **Priority:** P2
-- **Status:** In progress
+- **Status:** ✅ Built + deployed (staging + prod) — pending Codex validation
 - **Source:** Field feedback from Chocó (Doña Marta), relayed by Nishant 2026-08-17. "Need
   automated alerts or sorting for items with upcoming expiration dates to prioritize rapid
   distribution."

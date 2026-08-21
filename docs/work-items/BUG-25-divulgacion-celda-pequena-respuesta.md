@@ -3,7 +3,7 @@
 - **Type:** BUG
 - **Tier:** 1 — Defect on the live demo (PRD v3 Part III)
 - **Priority:** P0 — privacy correctness, and visible on the public page now
-- **Status:** Open
+- **Status:** ✅ Fixed — deployed (staging + prod), pending Codex validation · fixed in the D1–D9 batch
 - **Source:** PRD v3 §Defects **D7**. Principle: PRD v3 §4.8 «Show less in public, on purpose» / §17.
 
 ## What's wrong (PRD v3 · D7)

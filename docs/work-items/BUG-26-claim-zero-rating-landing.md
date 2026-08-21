@@ -3,7 +3,7 @@
 - **Type:** BUG
 - **Tier:** 1 — Defect on the live demo (PRD v3 Part III)
 - **Priority:** P1 — visible public copy; the claim is load-bearing to the product's promise
-- **Status:** Open
+- **Status:** ✅ Fixed — deployed (staging + prod), pending Codex validation · fixed in the D1–D9 batch
 - **Source:** PRD v3 §Defects **D8**. Related: §4.1 (missed-call callback), §4.1.1 copy rule.
 
 ## What's wrong (PRD v3 · D8)

@@ -3,7 +3,7 @@
 - **Type:** PRD (audit / verification)
 - **Tier:** 1 — Demo (this pass)
 - **Priority:** P0
-- **Status:** Planned
+- **Status:** ✅ Built + deployed (staging + prod) — pending Codex validation
 - **Source:** Jam A (Nishant clicked through every panel page and all were empty; asked that
   every page "works exactly as it should" once data is populated).
 - **Depends on:** PRD-1 (seed), PRD-2 (map), PRD-3 (card visualization). This is the roll-up

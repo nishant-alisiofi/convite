@@ -3,8 +3,7 @@
 - **Type:** PRD
 - **Tier:** 2 — Roadmap (from PRD v1.0)
 - **Priority:** P1
-- **Status:** In progress — Infobip adapter build (2026-08-18); live test pending the Infobip
-  account + Colombian voice number (Nishant provisioning)
+- **Status:** 🟡 Core built + deployed — reject→callback, spend caps, signed webhook (`/api/webhooks/voz`), SMS send, plus the v4 corrections (migration 0064: plural `/calls/1/recordings/files` path, 60s IVR cap, adaptive retry + 2h TTL, MNO traffic classifier). **Remaining:** inbound-SMS webhook route (SMS is send-only today), and the live test, blocked on Nishant provisioning the Infobip account + Colombian voice number + account-manager activation of recordings and early media.
 - **Source:** PRD v1.0 (four channels, live); PRD.md D1/D2 + M6/M10 (SMS driver + IVR built
   against simulators; real aggregator pending D2).
 

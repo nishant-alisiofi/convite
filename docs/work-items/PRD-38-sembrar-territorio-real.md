@@ -3,7 +3,7 @@
 - **Type:** PRD
 - **Tier:** 2 — Roadmap (PRD v3 Part IV) · community-registry data
 - **Priority:** P1
-- **Status:** Backlog
+- **Status:** ✅ Built + deployed (staging + prod) — pending Codex validation
 - **Source:** The real territory reference data in `db/seed/territorio.sql` (Chocó / ASOREDIPARCHOCÓ +
   Pacífico caucano / Fundación Herencia de Timbiquí). Partners: §30, §31.
 - **Depends on:** **PRD-37** (territory & registry schema) — hard blocker. See the dependency chain

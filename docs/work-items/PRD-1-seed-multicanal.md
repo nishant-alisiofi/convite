@@ -3,7 +3,7 @@
 - **Type:** PRD (feature / infra)
 - **Tier:** 1 — Demo (this pass)
 - **Priority:** P0
-- **Status:** In progress (engineering, in flight)
+- **Status:** ✅ Built + deployed (staging + prod) — pending Codex validation
 - **Source:** Jam A ("populate staging with data so every page works"), Jam B ("show data
   arriving from all four channels via AI ingestion — that has to come out in our demo"),
   engineering-in-flight item #1.

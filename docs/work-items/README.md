@@ -41,17 +41,50 @@ there. Test accounts and how to fetch magic links: `docs/validacion-codex-0a1.md
 
 ---
 
+## Status snapshot (reconciled 2026-08-20)
+
+Statuses in this file and in the individual WIs had drifted badly — a dozen items still read
+"Backlog" while their feature commits were live on both environments. Every status was
+re-derived from git history plus the code itself (not from what the previous status said) and
+rewritten. **Read the tables below as current; do not trust any status text dated earlier.**
+
+Both environments are deployed and current at **migration 59** (`/api/salud` on
+`convite.ai` and `staging.convite.ai`), which is every migration in `db/migrations/`.
+
+**Of 27 PRDs (1–4, 8–16, 28–39, 47, 49): 23 built, 4 not fully done.**
+
+| | Item | Why it is not done |
+|---|---|---|
+| ⛔ Not started | **PRD-14** — self-hosted Whisper | Blocked on **decision D8**, a protection question: may household audio leave our infrastructure? `lib/canales/transcripcion.ts` is a deliberate no-op port, not an oversight. |
+| 🟡 Partial | **PRD-15** — Infobip voice + SMS | Core shipped incl. the v4 corrections. Missing the inbound-SMS webhook route (SMS is send-only); live test blocked on the Infobip account + Colombian number + recordings/early-media activation. |
+| 🟡 Partial | **PRD-28** — unified Bandeja | The seven-section shell shipped; the single queue behind it (AC 2–5) did not. Deferral was recorded only in `secciones.ts`, so this file read "built". |
+| 🟡 Partial | **PRD-34** — groups & integrations | §28.4 items 1–2 shipped (`.ics`, CSV). Items 3–4 (manual Meet links, «Conectar con Google» OAuth), group bridges and Forms/Sheets import are not built. |
+
+**Also outstanding, outside the PRD count:**
+
+- **FR-17** (telehealth integration) — no implementation; forward-references only.
+- **PRD-13** — code and `scripts/construir-pmtiles.sh` are built, but no tile bundle has been
+  generated or hosted (`NEXT_PUBLIC_PMTILES_URL` unset), so the offline basemap is inert. Ops, not engineering.
+- **`BUG-19..27` are all fixed** despite having read "Open" here since 2026-08-15.
+- **Codex validation is the real backlog.** Nearly everything marked built carries
+  "pending Codex" — built and deployed, not yet verified against the Tier-1 checklists.
+- **Three founder/partner decisions block scope, not code:** the reportante-facing e-Catalog
+  (tension with v3 principles 6 and 8), Meet auto-generation sequencing, and PRD-49's
+  protection-lead contacts + distress-term list.
+
+---
+
 ## Tier 1 — Demo (this pass) — validate now
 
 | ID | Title | Type | Source | Priority | Demo/Roadmap | Status |
 |----|-------|------|--------|----------|--------------|--------|
-| [PRD-1](PRD-1-seed-multicanal.md) | Multi-channel AI-ingestion demo seed (staging) | PRD | Jam A + Jam B | P0 | Demo | ✅ Done — on staging (pending Codex) |
-| [PRD-2](PRD-2-mapa-openstreetmap.md) | Real OpenStreetMap panel map + geolocation + pin-drop + center-location capture | PRD | Jam A + Jam B | P0 | Demo | ✅ Done — on staging (pending Codex) |
-| [PRD-3](PRD-3-visualizacion-canal-transcripcion.md) | Panel UI pass: channel/source + transcription visualization on cards | PRD | Jam B | P0 | Demo | ✅ Done — on staging (pending Codex) |
-| [PRD-4](PRD-4-auditoria-paginas-panel.md) | Panel page audit + build Inventario/Comunidades/Catálogo | PRD | Jam A | P0 | Demo | ✅ Done — on staging (pending Codex) |
-| [BUG-5](BUG-5-paginas-vacias-org.md) | Panel pages empty for the logged-in org despite an approved center + members | BUG | Jam A | P0 | Demo | ✅ Fixed (seed org now `aprobada`) |
-| [BUG-6](BUG-6-mapa-en-blanco.md) | Mapa renders blank / schematic with no basemap | BUG | Jam A | P0 | Demo | ✅ Fixed (real OSM base) |
-| [BUG-7](BUG-7-recogidas-sin-ubicacion.md) | Recogidas: centers have no location ("Ningún centro tiene ubicación") | BUG | Jam A | P1 | Demo | ✅ Fixed (offer + center locations) |
+| [PRD-1](PRD-1-seed-multicanal.md) | Multi-channel AI-ingestion demo seed (staging) | PRD | Jam A + Jam B | P0 | Demo | ✅ Built + deployed — pending Codex |
+| [PRD-2](PRD-2-mapa-openstreetmap.md) | Real OpenStreetMap panel map + geolocation + pin-drop + center-location capture | PRD | Jam A + Jam B | P0 | Demo | ✅ Built + deployed — pending Codex |
+| [PRD-3](PRD-3-visualizacion-canal-transcripcion.md) | Panel UI pass: channel/source + transcription visualization on cards | PRD | Jam B | P0 | Demo | ✅ Built + deployed — pending Codex |
+| [PRD-4](PRD-4-auditoria-paginas-panel.md) | Panel page audit + build Inventario/Comunidades/Catálogo | PRD | Jam A | P0 | Demo | ✅ Built + deployed — pending Codex |
+| [BUG-5](BUG-5-paginas-vacias-org.md) | Panel pages empty for the logged-in org despite an approved center + members | BUG | Jam A | P0 | Demo | ✅ Fixed — deployed, pending Codex |
+| [BUG-6](BUG-6-mapa-en-blanco.md) | Mapa renders blank / schematic with no basemap | BUG | Jam A | P0 | Demo | ✅ Fixed — deployed, pending Codex |
+| [BUG-7](BUG-7-recogidas-sin-ubicacion.md) | Recogidas: centers have no location ("Ningún centro tiene ubicación") | BUG | Jam A | P1 | Demo | ✅ Fixed — deployed, pending Codex |
 
 ## Tier 1 — Defects on the live demo (PRD v3 Part III) — fix now
 
@@ -60,22 +93,22 @@ Validate on `staging.convite.ai` (D7/D8 are on the public surface, no login).
 
 | ID | Title | Type | Source | Priority | Status |
 |----|-------|------|--------|----------|--------|
-| [BUG-19](BUG-19-copia-de-estado-no-se-regenera.md) | State-dependent copy not regenerated on transition (Paimadó) | BUG | v3 §D1 | P0 | Open |
-| [BUG-20](BUG-20-correccion-prellenada-baja-confianza.md) | Correction field pre-filled below the confidence threshold | BUG | v3 §D2 | P1 | Open |
-| [BUG-21](BUG-21-clasificacion-item-no-corregible.md) | Proposed item classification (`codigo_item`) not correctable | BUG | v3 §D3 | P1 | Open |
-| [BUG-22](BUG-22-defectos-de-locale.md) | Locale defects (mm/dd/yyyy date; raw `todo_el_ano` enum) | BUG | v3 §D4 | P2 | Open |
-| [BUG-23](BUG-23-falsa-precision-perecederos.md) | False precision on perishable expiry timestamps | BUG | v3 §D5 | P2 | Open |
-| [BUG-24](BUG-24-silencio-tier1-vs-tier4.md) | Never-seen tier-1 escalated the same as tier-3/4 silence | BUG | v3 §D6 | P1 | Open |
-| [BUG-25](BUG-25-divulgacion-celda-pequena-respuesta.md) | Small-cell disclosure on `/respuesta` (k-anonymity) | BUG | v3 §D7 | P0 | Open |
-| [BUG-26](BUG-26-claim-zero-rating-landing.md) | Overstated zero-rating claim on the landing page | BUG | v3 §D8 | P1 | Open |
-| [BUG-27](BUG-27-codigo-catalogo-como-cantidad.md) | Catalogue code reads as a quantity in Inventario | BUG | v3 §D9 | P1 | Open |
+| [BUG-19](BUG-19-copia-de-estado-no-se-regenera.md) | State-dependent copy not regenerated on transition (Paimadó) | BUG | v3 §D1 | P0 | ✅ Fixed — deployed, pending Codex |
+| [BUG-20](BUG-20-correccion-prellenada-baja-confianza.md) | Correction field pre-filled below the confidence threshold | BUG | v3 §D2 | P1 | ✅ Fixed — deployed, pending Codex |
+| [BUG-21](BUG-21-clasificacion-item-no-corregible.md) | Proposed item classification (`codigo_item`) not correctable | BUG | v3 §D3 | P1 | ✅ Fixed — deployed, pending Codex |
+| [BUG-22](BUG-22-defectos-de-locale.md) | Locale defects (mm/dd/yyyy date; raw `todo_el_ano` enum) | BUG | v3 §D4 | P2 | ✅ Fixed — deployed, pending Codex |
+| [BUG-23](BUG-23-falsa-precision-perecederos.md) | False precision on perishable expiry timestamps | BUG | v3 §D5 | P2 | ✅ Fixed — deployed, pending Codex |
+| [BUG-24](BUG-24-silencio-tier1-vs-tier4.md) | Never-seen tier-1 escalated the same as tier-3/4 silence | BUG | v3 §D6 | P1 | ✅ Fixed — deployed, pending Codex |
+| [BUG-25](BUG-25-divulgacion-celda-pequena-respuesta.md) | Small-cell disclosure on `/respuesta` (k-anonymity) | BUG | v3 §D7 | P0 | ✅ Fixed — deployed, pending Codex |
+| [BUG-26](BUG-26-claim-zero-rating-landing.md) | Overstated zero-rating claim on the landing page | BUG | v3 §D8 | P1 | ✅ Fixed — deployed, pending Codex |
+| [BUG-27](BUG-27-codigo-catalogo-como-cantidad.md) | Catalogue code reads as a quantity in Inventario | BUG | v3 §D9 | P1 | ✅ Fixed — deployed, pending Codex |
 
 ## Tier 1 — Defects found by Codex validation pass 1 (2026-08-16)
 
 | ID | Title | Type | Source | Priority | Status |
 |----|-------|------|--------|----------|--------|
-| [BUG-39](BUG-39-mapa-sin-capas-de-datos.md) | Map data overlays don't render over the OSM basemap | BUG | Codex pass 1 | P1 | ✅ Fixed (white casings) |
-| [BUG-40](BUG-40-emparejador-no-corre-al-promover.md) | Matcher not run when a report is promoted to a pedido | BUG | Codex pass 1 | P1 | ✅ Fixed (emparejarPedido on promotion) |
+| [BUG-39](BUG-39-mapa-sin-capas-de-datos.md) | Map data overlays don't render over the OSM basemap | BUG | Codex pass 1 | P1 | ✅ Fixed — deployed, pending Codex (white casings) |
+| [BUG-40](BUG-40-emparejador-no-corre-al-promover.md) | Matcher not run when a report is promoted to a pedido | BUG | Codex pass 1 | P1 | ✅ Fixed — deployed, pending Codex (`emparejarPedido` on promotion) |
 | [BUG-41](BUG-41-produccion-sin-noindex.md) | Production missing the pre-launch noindex | BUG | Codex pass 1 | P1 | ✅ Fixed (config) |
 | [PRD-39](PRD-39-unificar-comunidades-demo-registro.md) | Unify demo activity onto the real registry (dedup staging communities) | PRD | PRD-38 gap | P1 | ✅ Done (82→68, no dupes) |
 
@@ -83,17 +116,17 @@ Validate on `staging.convite.ai` (D7/D8 are on the public surface, no login).
 
 | ID | Title | Type | Source | Priority | Demo/Roadmap | Status |
 |----|-------|------|--------|----------|--------------|--------|
-| [PRD-8](PRD-8-transporte-de-personas.md) | Transport of people (not just goods) | PRD | PRD v1.0 | P2 | Roadmap | Backlog |
-| [PRD-9](PRD-9-compra-local-financiada.md) | Funded local purchase (third supply mode) | PRD | PRD v1.0 | P2 | Roadmap | Backlog |
-| [PRD-10](PRD-10-puntos-de-conexion.md) | Connection points (puntos de conexión) | PRD | PRD v1.0 | P2 | Built early | ✅ Done — on staging (pending Codex) |
-| [PRD-11](PRD-11-ingesta-de-radio.md) | Real radio ingestion (fourth channel) | PRD | PRD v1.0 + Jam B | P2 | Roadmap | Backlog |
-| [PRD-12](PRD-12-apadrina-una-partera.md) | Sponsorship: "apadrina una partera" | PRD | PRD v1.0 | P2 | Built early | ✅ Done — on staging (pending Codex) |
-| [PRD-13](PRD-13-mapas-offline-pmtiles.md) | Offline PMTiles map bundles | PRD | PRD v1.0 | P2 | Roadmap | Backlog |
-| [PRD-14](PRD-14-whisper-autohospedado.md) | Self-hosted Whisper transcription (D8) | PRD | PRD v1.0 + PRD §D8 | P1 | Roadmap | Backlog |
-| [PRD-15](PRD-15-gateways-sms-voz.md) | Live SMS + voice-callback gateways (D1/D2) | PRD | PRD v1.0 + PRD §D1/D2 | P1 | Roadmap | Backlog |
-| [PRD-16](PRD-16-membresia-multi-org.md) | Multi-org membership (join-table) | PRD | PRD v1.0 | P2 | Roadmap | Backlog |
-| [FR-17](FR-17-integracion-telesalud.md) | Telehealth-module integration | FR | PRD v1.0 | P3 | Roadmap | Backlog |
-| [FR-18](FR-18-autoregistro-transportista.md) | Transporter self-signup flow (decision pending) | FR | Jam B | P3 | Roadmap | Decision pending |
+| [PRD-8](PRD-8-transporte-de-personas.md) | Transport of people (not just goods) | PRD | PRD v1.0 | P2 | Roadmap | ✅ Built + deployed — pending Codex |
+| [PRD-9](PRD-9-compra-local-financiada.md) | Funded local purchase (third supply mode) | PRD | PRD v1.0 | P2 | Roadmap | ✅ Built + deployed — pending Codex |
+| [PRD-10](PRD-10-puntos-de-conexion.md) | Connection points (puntos de conexión) | PRD | PRD v1.0 | P2 | Built early | ✅ Built + deployed — pending Codex |
+| [PRD-11](PRD-11-ingesta-de-radio.md) | Real radio ingestion (fourth channel) | PRD | PRD v1.0 + Jam B | P2 | Roadmap | ✅ Built + deployed — pending Codex |
+| [PRD-12](PRD-12-apadrina-una-partera.md) | Sponsorship: "apadrina una partera" | PRD | PRD v1.0 | P2 | Built early | ✅ Built + deployed — pending Codex |
+| [PRD-13](PRD-13-mapas-offline-pmtiles.md) | Offline PMTiles map bundles | PRD | PRD v1.0 | P2 | Roadmap | 🟡 Code built + deployed — **no tile bundle yet** (`NEXT_PUBLIC_PMTILES_URL` unset); ops step |
+| [PRD-14](PRD-14-whisper-autohospedado.md) | Self-hosted Whisper transcription (D8) | PRD | PRD v1.0 + PRD §D8 | P1 | Roadmap | ⛔ **Not started** — blocked on decision D8 (no-op port by design) |
+| [PRD-15](PRD-15-gateways-sms-voz.md) | Live SMS + voice-callback gateways (D1/D2) | PRD | PRD v1.0 + PRD §D1/D2 | P1 | Roadmap | 🟡 Core built + deployed (+ v4 fixes, migration 0064); **inbound-SMS route** + live test pending the Infobip account |
+| [PRD-16](PRD-16-membresia-multi-org.md) | Multi-org membership (join-table) | PRD | PRD v1.0 | P2 | Roadmap | ✅ Built + deployed — pending Codex |
+| [FR-17](FR-17-integracion-telesalud.md) | Telehealth-module integration | FR | PRD v1.0 | P3 | Roadmap | ⛔ **Not started** — no implementation, forward-references only |
+| [FR-18](FR-18-autoregistro-transportista.md) | Transporter self-signup flow (decision pending) | FR | Jam B | P3 | Roadmap | ✅ Built + deployed — `aportante` tier; v3 §29.2–29.3b resolved the decision |
 
 **Enriched by PRD v3 (not duplicated):** `PRD-8` (§25 transport of people), `PRD-9` (§24 funded
 local purchase), `PRD-12` (§13 Apadrinar built + §21b.4 programa funding + §21 house-pricing),
@@ -109,17 +142,17 @@ Continues the ID sequence after FR-18. Build order follows PRD v3 §33.
 
 | ID | Title | Type | Source | Priority | Status |
 |----|-------|------|--------|----------|--------|
-| [PRD-28](PRD-28-bandeja-unificada-navegacion.md) | Unified Bandeja + 7-section navigation (silence as first-class item) | PRD | v3 §18–19 | P1 | Backlog |
-| [PRD-29](PRD-29-evaluaciones-y-recuperacion.md) | Assessments & recovery (levels 2–4, coverage, bill of materials) | PRD | v3 §21 | P1 | Backlog |
-| [PRD-30](PRD-30-jornadas.md) | Jornadas — the scheduling container over the same matching | PRD | v3 §22 | P2 | Backlog |
-| [PRD-31](PRD-31-programas.md) | Programas — funded layer above jornadas, seasonal feasibility | PRD | v3 §21b | P2 | Backlog |
-| [PRD-32](PRD-32-mapa-como-superficie-de-planificacion.md) | Map as planning surface (draft-over-facts, area selection, assessment-recency) | PRD | v3 §23 | P1 | Backlog |
-| [PRD-33](PRD-33-cadena-de-frio-y-suministro-anticipado.md) | Cold chain constraints + anticipatory supply | PRD | v3 §24 | P2 | Backlog |
-| [PRD-34](PRD-34-grupos-e-integraciones.md) | Groups & integrations (.ics feeds, Meet, Google import/export, group bridges) | PRD | v3 §28 | P2 | Backlog |
-| [PRD-35](PRD-35-admision-de-organizaciones-y-registro-comun.md) | Org admission tiers, vouching, shared community gazetteer, manual-entry channel | PRD | v3 §29.3b | P1 | Backlog |
-| [PRD-36](PRD-36-onboarding-por-fases.md) | Staged onboarding by phase (Configurar / Operar / Revisar) | PRD | v3 §29b | P2 | Backlog |
-| [PRD-37](PRD-37-esquema-territorio-y-registro.md) | Territory & registry schema (regiones, verificado_en, org ceiling/aval, jornadas tables) | PRD | v3 §14/§29/§22 + seed | P1 | Backlog |
-| [PRD-38](PRD-38-sembrar-territorio-real.md) | Wire the real territory seed (`db/seed/territorio.sql`) | PRD | territory seed | P1 | Backlog |
+| [PRD-28](PRD-28-bandeja-unificada-navegacion.md) | Unified Bandeja + 7-section navigation (silence as first-class item) | PRD | v3 §18–19 | P1 | 🟡 Partial — shell shipped, **AC 2–5 (the queue itself) unbuilt** |
+| [PRD-29](PRD-29-evaluaciones-y-recuperacion.md) | Assessments & recovery (levels 2–4, coverage, bill of materials) | PRD | v3 §21 | P1 | ✅ Built + deployed — pending Codex (extended by FR-48) |
+| [PRD-30](PRD-30-jornadas.md) | Jornadas — the scheduling container over the same matching | PRD | v3 §22 | P2 | ✅ Built + deployed — pending Codex |
+| [PRD-31](PRD-31-programas.md) | Programas — funded layer above jornadas, seasonal feasibility | PRD | v3 §21b | P2 | ✅ Built + deployed — pending Codex |
+| [PRD-32](PRD-32-mapa-como-superficie-de-planificacion.md) | Map as planning surface (draft-over-facts, area selection, assessment-recency) | PRD | v3 §23 | P1 | ✅ Built + deployed — pending Codex |
+| [PRD-33](PRD-33-cadena-de-frio-y-suministro-anticipado.md) | Cold chain constraints + anticipatory supply | PRD | v3 §24 | P2 | ✅ Built + deployed — pending Codex |
+| [PRD-34](PRD-34-grupos-e-integraciones.md) | Groups & integrations (.ics feeds, Meet, Google import/export, group bridges) | PRD | v3 §28 | P2 | 🟡 Partially built — `.ics` + CSV shipped; Meet, Google OAuth, group bridges, import **not built** |
+| [PRD-35](PRD-35-admision-de-organizaciones-y-registro-comun.md) | Org admission tiers, vouching, shared community gazetteer, manual-entry channel | PRD | v3 §29.3b | P1 | ✅ Built + deployed — pending Codex |
+| [PRD-36](PRD-36-onboarding-por-fases.md) | Staged onboarding by phase (Configurar / Operar / Revisar) | PRD | v3 §29b | P2 | ✅ Built + deployed — pending Codex |
+| [PRD-37](PRD-37-esquema-territorio-y-registro.md) | Territory & registry schema (regiones, verificado_en, org ceiling/aval, jornadas tables) | PRD | v3 §14/§29/§22 + seed | P1 | ✅ Built + deployed — pending Codex |
+| [PRD-38](PRD-38-sembrar-territorio-real.md) | Wire the real territory seed (`db/seed/territorio.sql`) | PRD | territory seed | P1 | ✅ Built + deployed — pending Codex |
 
 **Dependency chain for the territory seed:** `PRD-37` (schema: regiones + `comunidades.region_id`/
 `verificado_en` + `organizaciones.techo_permisos`/`aval_motivo` + `jornadas`/`jornada_paradas`
@@ -130,7 +163,7 @@ the community registry, not demo test data) — unlike the staging-only demo `db
 
 ---
 
-## Nishant field-feedback wrap-up (Chocó / Doña Marta, Aug 2026) — building now
+## Nishant field-feedback wrap-up (Chocó / Doña Marta, Aug 2026) — shipped
 
 Source: Nishant's relay of Red de Mujeres Chocanas / Doña Marta field feedback (2026-08-17).
 **"Missed call with a recorded call back is the feature they need the most."** Provider path:
@@ -144,14 +177,14 @@ account + Colombian voice number + account-manager activation of recordings/earl
 
 | ID | Title | Type | Priority | Status |
 |----|-------|------|----------|--------|
-| [PRD-15](PRD-15-gateways-sms-voz.md) | Infobip voice missed-call + SMS gateway (build) | PRD | P1 | 🟡 Core built + deployed (reject→callback→spend-caps + SMS send + signed webhook); IVR capture + inbound-SMS route + live test pending Infobip account |
-| [FR-42](FR-42-busqueda-rapida-personas.md) | Fast person/beneficiary search | FR | P2 | ✅ Built + deployed (staging+prod, pending Codex) |
-| [FR-43](FR-43-caducidad-perecederos-alertas.md) | Perishable expiry tracking + alerts | FR | P2 | ✅ Built + deployed (staging+prod, pending Codex) |
-| [FR-44](FR-44-inventario-farmacias-locales.md) | Local pharmacy inventory | FR | P3 | ✅ Built + deployed (staging+prod, pending Codex) |
-| [FR-45](FR-45-categorias-bienes-ayuda.md) | Relief-goods categories (food/medical/construction) | FR | P2 | ✅ Built + deployed (staging+prod, pending Codex) |
-| [FR-46](FR-46-lanchas-costo-y-pago.md) | Paid boat (lancha) logistics: cost + operator pay | FR | P2 | ✅ Built + deployed (staging+prod, pending Codex) |
-| [PRD-47](PRD-47-red-de-lancheros-datos.md) | Lanchero relay network for data collection | PRD | P3 | ✅ Built + deployed (assumptions — partner review; pending Codex) |
-| [FR-48](FR-48-servicios-de-ingenieria.md) | Engineering / technical evaluation services | FR | P3 | ✅ Built + deployed (staging+prod, pending Codex) |
+| [PRD-15](PRD-15-gateways-sms-voz.md) | Infobip voice missed-call + SMS gateway (build) | PRD | P1 | 🟡 Core built + deployed (+ v4 fixes, migration 0064); **inbound-SMS route** + live test pending the Infobip account |
+| [FR-42](FR-42-busqueda-rapida-personas.md) | Fast person/beneficiary search | FR | P2 | ✅ Built + deployed — pending Codex |
+| [FR-43](FR-43-caducidad-perecederos-alertas.md) | Perishable expiry tracking + alerts | FR | P2 | ✅ Built + deployed — pending Codex |
+| [FR-44](FR-44-inventario-farmacias-locales.md) | Local pharmacy inventory | FR | P3 | ✅ Built + deployed — pending Codex |
+| [FR-45](FR-45-categorias-bienes-ayuda.md) | Relief-goods categories (food/medical/construction) | FR | P2 | ✅ Built + deployed — pending Codex |
+| [FR-46](FR-46-lanchas-costo-y-pago.md) | Paid boat (lancha) logistics: cost + operator pay | FR | P2 | ✅ Built + deployed — pending Codex |
+| [PRD-47](PRD-47-red-de-lancheros-datos.md) | Lanchero relay network for data collection | PRD | P3 | ✅ Built + deployed — **pending partner review** + Codex |
+| [FR-48](FR-48-servicios-de-ingenieria.md) | Engineering / technical evaluation services | FR | P3 | ✅ Built + deployed — pending Codex |
 
 **Also in this wrap-up (not a new WI):** WhatsApp live-number verification — number registered
 (+57 300 510 1284), production webhook green, env vars set on app + worker; blocked only on a real
@@ -176,7 +209,7 @@ Two founder-supplied documents were diffed against the tracked spec and work-ite
 
 | ID | Title | Type | Source | Priority | Status |
 |----|-------|------|--------|----------|--------|
-| [PRD-49](PRD-49-reportes-sensibles-y-violencia-de-genero.md) | Sensitive-disclosure handling: redaction, escalation, `verificador_vulnerable` role | PRD | Supplement v4 §3, §6.3 | P1 | Backlog |
+| [PRD-49](PRD-49-reportes-sensibles-y-violencia-de-genero.md) | Sensitive-disclosure handling: redaction, escalation, `verificador_vulnerable` role | PRD | Supplement v4 §3, §6.3 | P1 | 🟡 Built + deployed (migration 0063); **protection-lead contacts + distress terms** need partner input |
 
 **Enriched (dated "PRD v4 update (2026-08-19)" section added, not duplicated):**
 
