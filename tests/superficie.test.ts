@@ -40,6 +40,8 @@ const POLITICA: Record<string, 'publica' | 'autenticada'> = {
   // staff asks here — and safe because it creates only a `pendiente` organisation and a pending
   // invitation, with nothing operable behind either until the platform approves.
   '/solicitar-centro': 'publica',
+  // §2.2 the self-service donor path. Writes one offer, grants nothing.
+  '/donar': 'publica',
   // FR-18: the transporter self-signup (offer capacity) and its possession callback. Public by
   // necessity — a driver who is not yet staff proves possession here — and safe: signed out it
   // shows only the sign-in doors, and the aportante it creates has a `lectura` role + empty ceiling,

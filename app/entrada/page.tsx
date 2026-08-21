@@ -49,8 +49,8 @@ const PUERTAS: Puerta[] = [
     quien: 'Tengo algo para aportar: mercados, materiales, dinero.',
     friccion: 'Un nombre y un número. Nada más.',
     Icono: HeartHandshake,
-    href: null,
-    cta: 'En construcción',
+    href: '/donar',
+    cta: 'Ofrecer algo',
   },
   {
     titulo: 'Puedo transportar',

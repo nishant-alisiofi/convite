@@ -37,6 +37,10 @@ export const PUBLICAS = [
   // pending invitation; nothing operates until the platform approves, so opening the door here
   // opens nothing behind it.
   '/solicitar-centro',
+  // §2.2: the self-service donor. Public by definition — «donar es fácil» is the whole design —
+  // and safe: the one function behind it creates a `donante` contact and a single offer, grants
+  // no session and no read, and 2.10 holds because a number on an offer opens no panel.
+  '/donar',
   // FR-18 (§29.2–29.3b): a transporter self-registers to OFFER capacity — the frictionless supply
   // side. Public by necessity (somebody not yet staff proves possession here) and safe: it lands
   // the person as an aportante with an empty ceiling and a `lectura` role, so RLS gives them no
