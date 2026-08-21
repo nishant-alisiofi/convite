@@ -36,6 +36,7 @@ type SesionMock = {
   estadoOrganizacion: string
   nivelAdmision: string | null
   organizacionDeclarada: boolean
+  faseOrganizacion: string | null
 }
 let sesionActiva: SesionMock
 
@@ -108,6 +109,7 @@ beforeAll(async () => {
     estadoOrganizacion: 'aprobada',
     nivelAdmision: 'ancla',
     organizacionDeclarada: true,
+    faseOrganizacion: 'emergencia',
   }
 
   const com = await conSesion(sesionActiva, (c) =>

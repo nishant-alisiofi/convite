@@ -84,6 +84,15 @@ export type SesionStaff = {
    * lib/declaracion.ts, which owns the whole rule.
    */
   organizacionDeclarada: boolean
+  /**
+   * §18's response phase for this organisation, declared at onboarding (migration 0065).
+   *
+   * Null for organisations that have not declared — the Bandeja falls back to `emergencia`, the
+   * same default the map has always used. This is what makes «phase decides what the Bandeja
+   * leads with» buildable at all: until 0065 the phase was a TypeScript union and a `?fase=`
+   * parameter nothing emitted.
+   */
+  faseOrganizacion: string | null
 }
 
 /**
@@ -116,9 +125,10 @@ export async function sesionActual(): Promise<SesionStaff | null> {
     estado_aprobacion: string
     nivel_admision: string | null
     declarada: boolean
+    fase: string | null
   }>(
     `select u.rol_staff, u.organizacion_id, u.es_plataforma, o.estado_aprobacion,
-            o.nivel_admision,
+            o.nivel_admision, o.fase,
             o.onboarding_completado_en is not null as declarada
        from usuarios u
        join organizaciones o on o.id = u.organizacion_id
@@ -138,6 +148,7 @@ export async function sesionActual(): Promise<SesionStaff | null> {
     estadoOrganizacion: fila.estado_aprobacion,
     nivelAdmision: fila.nivel_admision,
     organizacionDeclarada: fila.declarada,
+    faseOrganizacion: fila.fase,
   }
 }
 

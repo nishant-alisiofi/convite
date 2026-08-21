@@ -172,6 +172,7 @@ conBase('de código a permiso, y hasta las políticas', () => {
       estadoOrganizacion: 'aprobada',
       nivelAdmision: 'ancla',
       organizacionDeclarada: true,
+      faseOrganizacion: 'emergencia',
     }
 
     const visto = await conSesion(sesion, async (client) => {

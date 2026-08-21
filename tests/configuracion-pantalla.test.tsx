@@ -43,6 +43,7 @@ vi.mock('@/lib/sesion', () => ({
     estadoOrganizacion: 'aprobada',
     nivelAdmision: 'ancla',
     organizacionDeclarada: true,
+    faseOrganizacion: 'emergencia',
   }),
   // Runs the page's callback with a throwaway client; the IO it would call is mocked below.
   conSesion: async <T,>(_s: unknown, fn: (c: unknown) => Promise<T>): Promise<T> => fn({}),

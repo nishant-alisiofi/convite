@@ -28,6 +28,7 @@ function sesion(rolStaff: string, extra: Partial<SesionStaff> = {}): SesionStaff
     estadoOrganizacion: 'aprobada',
     nivelAdmision: 'ancla',
     organizacionDeclarada: true,
+    faseOrganizacion: 'emergencia',
     ...extra,
   }
 }

@@ -22,6 +22,7 @@ export default function robots(): MetadataRoute.Robots {
         '/auth',
         '/api',
         '/comenzar',
+        '/bandeja',
         '/tablero',
         '/verificacion',
         '/mapa',

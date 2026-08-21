@@ -188,7 +188,7 @@ export default async function Entrar({
     restablecer?: string
   }>
 }) {
-  if (await sesionActual()) redirect('/tablero')
+  if (await sesionActual()) redirect('/bandeja')
   const { enviado, error, motivo, desde, codigo, tel, clave, restablecer } = await searchParams
   const pidiendoCodigo = codigo === '1' && Boolean(tel)
 

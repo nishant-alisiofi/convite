@@ -83,5 +83,5 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
 
   const desde = rutaInterna(request.nextUrl.searchParams.get('desde') ?? '')
-  return NextResponse.redirect(aRuta(desde ?? '/tablero'))
+  return NextResponse.redirect(aRuta(desde ?? '/bandeja'))
 }

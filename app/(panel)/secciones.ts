@@ -10,12 +10,12 @@ import type { SesionStaff } from '@/lib/sesion'
  * conexión nest under Mapa (you edit them by looking at them); Envíos and Recogidas nest under
  * Agenda (the goods legs of a jornada); Catálogo and Inventario sit under Existencias.
  *
- * **Bandeja** is §18/§19's answer to «two inboxes». A full single-queue merge is a page with
- * its own business logic (PRD-28 scope note), so this shell keeps Tablero and Verificación as
- * the two Bandeja entries and adds **Silencio** as a first-class Bandeja item — the signal that
- * fires when *nobody* reports (§19), which until now lived only in Comunidades where a
- * coordinator working the board never saw it. Silencio points at the existing «Comunidades
- * calladas» list on /estado.
+ * **Bandeja** is §18/§19's answer to «two inboxes», and it is now one real queue: `/bandeja`
+ * merges reports awaiting verification, pedidos the matcher could not move, and silence — which
+ * is a first-class item there rather than a link to an anchor on another page (§19). Verificación
+ * stays as its own entry because verifying is a distinct sitting-down-to-work surface, not
+ * because the queue is still split. Tablero moved to Agenda: §18 files a goods-dispatch board
+ * with the goods legs of a jornada, and it never was the head of the pipeline.
  *
  * **Not-yet-built** sub-items (Citas §27b.2 → FR-17, Cobertura, Entregas y evidencia, Exportes,
  * Centros de acopio, Ofertas, Capacidad ofrecida) are shown greyed as «en construcción» so the
@@ -36,9 +36,10 @@ import type { SesionStaff } from '@/lib/sesion'
  * returns the plain, serialisable shape the client island consumes.
  *
  * **Phase** (§18) changes only what Bandeja leads with and what Mapa opens on — never this
- * structure, which is identical across impacto/emergencia/recuperación/ordinario. Phase-based
- * ordering is deferred to the pages themselves; the seven-section shell is phase-invariant. TODO
- * (PRD-28 follow-up): lead-item reordering by phase once the Bandeja becomes one real queue.
+ * structure, which is identical across impacto/emergencia/recuperación/ordinario. The phase-based
+ * ordering now happens inside the queue (lib/bandeja/rango.ts) rather than in this shell, which
+ * stays phase-invariant by design. It became buildable when migration 0065 gave the phase its
+ * first home in the database.
  */
 export type ItemNav = {
   href: string
@@ -87,9 +88,8 @@ export const SECCIONES: SeccionNav[] = [
     etiqueta: 'Bandeja',
     ver: rol(['verificador', 'despachador', 'coordinador', 'admin']),
     items: [
-      { href: '/tablero', etiqueta: 'Tablero', listo: true },
+      { href: '/bandeja', etiqueta: 'Todo lo pendiente', listo: true },
       { href: '/verificacion', etiqueta: 'Verificación', listo: true, ver: VE_VERIFICACION },
-      { href: '/estado#silencio', etiqueta: 'Silencio', listo: true, ver: VE_SILENCIO },
     ],
   },
   {
@@ -123,6 +123,10 @@ export const SECCIONES: SeccionNav[] = [
     etiqueta: 'Agenda',
     ver: rol(['despachador', 'coordinador', 'admin']),
     items: [
+      // §18 puts a goods-dispatch board here: Tablero is the tail of the pipeline, not its head
+      // (nothing reaches it until a report is verified and the matcher has run), so it sits with
+      // the other goods legs of a jornada rather than acting as the front door. PRD-28 AC 2.
+      { href: '/tablero', etiqueta: 'Tablero de despacho', listo: true },
       { href: '/programas', etiqueta: 'Programas', listo: true }, // PRD-31
       { href: '/jornadas', etiqueta: 'Jornadas', listo: true }, // PRD-30
       { href: '/agenda', etiqueta: 'Mi calendario', listo: true }, // PRD-34 (.ics subscribe link)

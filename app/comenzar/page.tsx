@@ -126,7 +126,7 @@ async function declarar(formData: FormData) {
     { escribe: true },
   )
 
-  redirect('/tablero')
+  redirect('/bandeja')
 }
 
 export default async function Comenzar({
@@ -141,7 +141,7 @@ export default async function Comenzar({
   // typing the URL and would then refuse the submit at the SQL layer — a dead end with no
   // explanation. `debeDeclarar` owns the whole rule; see lib/declaracion.ts for why each
   // exemption exists.
-  if (!debeDeclarar(sesion)) redirect('/tablero')
+  if (!debeDeclarar(sesion)) redirect('/bandeja')
 
   const { error } = await searchParams
   const actual = await conSesion(sesion, (client) => leerDeclaracion(client))

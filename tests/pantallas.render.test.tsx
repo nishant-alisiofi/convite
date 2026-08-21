@@ -55,6 +55,7 @@ type SesionMock = {
   estadoOrganizacion: string
   nivelAdmision: string | null
   organizacionDeclarada: boolean
+  faseOrganizacion: string | null
 }
 const SESION_COORDINADOR: SesionMock = {
   authId: COORDINADOR,
@@ -66,6 +67,7 @@ const SESION_COORDINADOR: SesionMock = {
   estadoOrganizacion: 'aprobada',
   nivelAdmision: 'ancla',
   organizacionDeclarada: true,
+  faseOrganizacion: 'emergencia',
 }
 
 let pool: Pool

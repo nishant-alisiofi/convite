@@ -83,6 +83,8 @@ const POLITICA: Record<string, 'publica' | 'autenticada'> = {
   // reads and writes the signed-in organisation's own row through `convite_organizacion()`, so
   // signed out it has no organisation to declare anything about.
   '/comenzar': 'autenticada',
+  // PRD-28 AC 2: the unified queue, and the panel's front door.
+  '/bandeja': 'autenticada',
   '/tablero': 'autenticada',
   // Setting a password. Behind a session on purpose: that is the whole mechanism.
   '/clave': 'autenticada',

@@ -51,7 +51,7 @@ export default async function PanelLayout({ children }: { children: React.ReactN
           {/* Top row: wordmark and the account-level identity/actions. Nothing about the basin
               lives here — «Su contraseña» and «Salir» are about the person, not the sections. */}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            <Link href="/tablero" className="font-semibold text-barro-900">
+            <Link href="/bandeja" className="font-semibold text-barro-900">
               Convite
             </Link>
             <div className="ml-auto flex min-w-0 items-center gap-3 text-sm">
