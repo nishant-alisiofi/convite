@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { SeccionVisible } from './secciones'
 
 /**
@@ -28,9 +28,17 @@ import type { SeccionVisible } from './secciones'
  * /ajustes) keep it: the `<summary>` is the toggle, and the overview is the first item inside, so
  * the page is one tap away and nothing that used to be reachable stops being reachable.
  *
- * **Here / active.** The section containing the current route is highlighted and opens by
- * default, and the exact item is marked `aria-current`, so a coordinator always knows where they
- * are.
+ * **Here / active.** The section containing the current route is highlighted, and the exact item
+ * is marked `aria-current`, so a coordinator always knows where they are.
+ *
+ * **It does not open that section by itself, and that is the fix for a real complaint.** It used
+ * to: every page load left one dropdown already open, and from `sm` up a dropdown is an absolutely
+ * positioned panel with a shadow sitting over the page — so the first thing a coordinator saw was
+ * their own content behind a menu, with no obvious way to dismiss it. Nothing closed it either: a
+ * native `<details>` ignores clicks elsewhere, ignores Escape, and survives navigation. Menus do
+ * not behave that way anywhere else, and «open» is a thing a person does, not a thing a page
+ * decides for them. Highlighting says where you are; opening says what you are doing, and only
+ * the person knows that.
  */
 export function NavSecciones({ secciones }: { secciones: SeccionVisible[] }) {
   const pathname = usePathname() ?? ''
@@ -45,11 +53,36 @@ export function NavSecciones({ secciones }: { secciones: SeccionVisible[] }) {
   const seccionActiva = (s: SeccionVisible) =>
     (s.href ? rutaActiva(s.href) : false) || s.items.some((it) => it.listo && rutaActiva(it.href))
 
-  // Single-open accordion, opened on the current section. `useState` seeds it once from the path
-  // on first render — the same value on the server and on hydration, so no mismatch.
-  const [abierta, setAbierta] = useState<string | null>(
-    () => secciones.find(seccionActiva)?.clave ?? null,
-  )
+  // Single-open accordion, closed to begin with. Server and first client render agree trivially,
+  // because the answer does not depend on the path.
+  const [abierta, setAbierta] = useState<string | null>(null)
+  const navRef = useRef<HTMLElement>(null)
+
+  // Close when the route changes. Following a link inside a dropdown used to leave it hanging
+  // over the page it had just navigated to.
+  useEffect(() => {
+    setAbierta(null)
+  }, [pathname])
+
+  // Close on a click anywhere else, and on Escape — the two things every other menu does and a
+  // bare `<details>` does not. `pointerdown` rather than `click` so the panel is gone before the
+  // press completes, which is what makes it feel like a menu rather than a stuck panel.
+  useEffect(() => {
+    if (abierta === null) return
+    const alApuntar = (ev: PointerEvent) => {
+      if (navRef.current?.contains(ev.target as Node)) return
+      setAbierta(null)
+    }
+    const alTeclear = (ev: KeyboardEvent) => {
+      if (ev.key === 'Escape') setAbierta(null)
+    }
+    document.addEventListener('pointerdown', alApuntar)
+    document.addEventListener('keydown', alTeclear)
+    return () => {
+      document.removeEventListener('pointerdown', alApuntar)
+      document.removeEventListener('keydown', alTeclear)
+    }
+  }, [abierta])
 
   // Keep React in step with the native toggle. When the browser force-closes a sibling to honour
   // the accordion, `cur` has already moved on, so the guard leaves it be.
@@ -58,6 +91,7 @@ export function NavSecciones({ secciones }: { secciones: SeccionVisible[] }) {
 
   return (
     <nav
+      ref={navRef}
       aria-label="Secciones"
       className="mt-3 flex flex-col gap-x-6 gap-y-1 border-t border-barro-100 pt-3 sm:flex-row sm:flex-wrap sm:items-start"
     >

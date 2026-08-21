@@ -117,11 +117,18 @@ describe('NavSecciones — el shell anidado (PRD-28)', () => {
     expect(marcado).toContain('href="/ajustes"')
   })
 
-  it('la sección de la ruta actual queda abierta y marcada, y solo esa', () => {
-    // Only the section holding /tablero (Bandeja) is expanded; the other six are closed.
-    expect((marcado.match(/aria-expanded="true"/g) ?? []).length).toBe(1)
-    expect((marcado.match(/aria-expanded="false"/g) ?? []).length).toBe(6)
-    // And the exact page is flagged for a screen reader.
+  it('ninguna sección se abre sola: la actual se marca, no se despliega', () => {
+    // Deliberate change of behaviour. Opening the current section on every load meant that from
+    // `sm` up — where the items are an absolutely positioned panel with a shadow — a coordinator
+    // met their own page with a menu sitting over it, and nothing dismissed it: a native
+    // <details> ignores outside clicks, ignores Escape and survives navigation. Highlighting says
+    // where you are; opening is something a person does.
+    expect(marcado).not.toContain('aria-expanded="true"')
+    expect((marcado.match(/aria-expanded="false"/g) ?? []).length).toBe(7)
+    // The current page is still flagged for a screen reader — the items are in the DOM whether
+    // the disclosure is open or not, so this never depended on it being open.
     expect(marcado).toContain('aria-current="page"')
+    // And the section holding it is still visibly the active one.
+    expect(marcado).toContain('text-selva-700')
   })
 })
