@@ -209,3 +209,51 @@ export async function registrarReporteDesdeViaje(
   }
 }
 
+export type CanalesOrganizacion = {
+  whatsapp: string | null
+  voz: string | null
+  workspace: string | null
+}
+
+/**
+ * The organisation's own channel identity (migration 0068).
+ *
+ * Distinct from `waba_phone_number_id`, which is a Meta routing identifier and cannot be dialled
+ * or printed. These are the numbers a partner actually answers on and hands to a community.
+ */
+export async function canalesDeOrganizacion(client: PoolClient): Promise<CanalesOrganizacion> {
+  const { rows } = await client.query<{
+    telefono_whatsapp: string | null
+    telefono_voz: string | null
+    dominio_workspace: string | null
+  }>(
+    `select telefono_whatsapp, telefono_voz, dominio_workspace
+       from organizaciones where id = convite_organizacion()`,
+  )
+  const f = rows[0]
+  return {
+    whatsapp: f?.telefono_whatsapp ?? null,
+    voz: f?.telefono_voz ?? null,
+    workspace: f?.dominio_workspace ?? null,
+  }
+}
+
+export async function fijarCanalesOrganizacion(
+  client: PoolClient,
+  c: CanalesOrganizacion,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    await client.query(`select convite_fijar_canales_organizacion($1, $2, $3)`, [
+      c.whatsapp,
+      c.voz,
+      c.workspace,
+    ])
+    return { ok: true }
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'No se pudieron guardar los canales.',
+    }
+  }
+}
+

@@ -1,9 +1,11 @@
-import { CloudRain, History, Sun, TriangleAlert } from 'lucide-react'
+import { CloudRain, History, PhoneCall, Sun, TriangleAlert } from 'lucide-react'
 import Link from 'next/link'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { TEMPORADAS_OPERATIVAS } from '@/db/schema/vocabulario'
 import { efectoDeLaTemporada } from '@/lib/alcance'
+import { aE164 } from '@/lib/canales'
+import { canalesDeOrganizacion, fijarCanalesOrganizacion } from '@/lib/campo'
 import type { TemporadaActual } from '@/lib/matching/tipos'
 import { conSesion, sesionActual } from '@/lib/sesion'
 import { CLAVE_TEMPORADA, fijarTemporada, temporadaVigente } from '@/lib/temporada'
@@ -48,6 +50,8 @@ export default async function Ajustes({ searchParams }: { searchParams: Params }
   const destino = TEMPORADAS_OPERATIVAS.includes(cambiar as TemporadaActual)
     ? (cambiar as TemporadaActual)
     : null
+
+  const canales = await conSesion(sesion, (client) => canalesDeOrganizacion(client))
 
   const { temporada, historia, efecto } = await conSesion(sesion, async (client) => {
     const temporada = await temporadaVigente(client)
@@ -97,6 +101,41 @@ export default async function Ajustes({ searchParams }: { searchParams: Params }
     )
 
     // The engine reads the setting per run, so the next sweep already uses this.
+    revalidatePath('/ajustes')
+    redirect('/ajustes')
+  }
+
+  async function guardarCanales(formData: FormData) {
+    'use server'
+    const s = await sesionActual()
+    if (!s) redirect('/entrar')
+
+    // Normalised before the database sees them. The column's check is E.164 or nothing, and a
+    // half-formatted number is worse than a missing one: it looks dialable, gets printed on
+    // something, and fails in the field rather than here.
+    const limpiar = (v: FormDataEntryValue | null) => {
+      const crudo = String(v ?? '').trim()
+      if (!crudo) return ''
+      const e164 = aE164(crudo)
+      return /^\+[1-9][0-9]{7,14}$/.test(e164) ? e164 : '__invalido__'
+    }
+    const whatsapp = limpiar(formData.get('telefono_whatsapp'))
+    const voz = limpiar(formData.get('telefono_voz'))
+    if (whatsapp === '__invalido__' || voz === '__invalido__') {
+      redirect('/ajustes?error=Escriba los números con indicativo, así: +57 300 111 2233.')
+    }
+
+    const r = await conSesion(
+      s,
+      (client) =>
+        fijarCanalesOrganizacion(client, {
+          whatsapp: whatsapp || null,
+          voz: voz || null,
+          workspace: String(formData.get('dominio_workspace') ?? '').trim() || null,
+        }),
+      { escribe: true },
+    )
+    if (!r.ok) redirect(`/ajustes?error=${encodeURIComponent(r.error)}`)
     revalidatePath('/ajustes')
     redirect('/ajustes')
   }
@@ -188,6 +227,67 @@ export default async function Ajustes({ searchParams }: { searchParams: Params }
               <Link href="/ajustes" className="px-3 py-1.5 text-sm text-barro-700 underline">
                 Cancelar
               </Link>
+            </div>
+          </form>
+        )}
+      </section>
+
+      <section className="mt-8 rounded-lg border border-barro-200 bg-white px-4 py-4">
+        <h2 className="flex items-center gap-2 font-semibold text-barro-900">
+          <PhoneCall className="h-4 w-4 text-selva-700" aria-hidden />
+          Canales de esta organización
+        </h2>
+        <p className="mt-1 text-sm text-barro-600">
+          Los números en los que ustedes contestan. Van en carteles, en mensajes y en la lista de
+          verificación — por eso se guardan con indicativo o no se guardan.
+        </p>
+        {!esAdmin ? (
+          <dl className="mt-4 grid gap-2 text-sm sm:grid-cols-3">
+            <div>
+              <dt className="text-barro-500">WhatsApp</dt>
+              <dd className="text-barro-900">{canales.whatsapp ?? 'Sin definir'}</dd>
+            </div>
+            <div>
+              <dt className="text-barro-500">Línea de llamadas</dt>
+              <dd className="text-barro-900">{canales.voz ?? 'Sin definir'}</dd>
+            </div>
+            <div>
+              <dt className="text-barro-500">Dominio de Workspace</dt>
+              <dd className="text-barro-900">{canales.workspace ?? 'Sin definir'}</dd>
+            </div>
+          </dl>
+        ) : (
+          <form action={guardarCanales} className="mt-4 grid gap-3 sm:grid-cols-3">
+            <label className="block">
+              <span className="text-sm text-barro-700">WhatsApp Business</span>
+              <input name="telefono_whatsapp" defaultValue={canales.whatsapp ?? ''}
+                inputMode="tel" placeholder="+57 300 111 2233"
+                className="mt-1 w-full rounded-lg border border-barro-300 px-3 py-2 text-base" />
+            </label>
+            <label className="block">
+              <span className="text-sm text-barro-700">Línea de llamadas</span>
+              <input name="telefono_voz" defaultValue={canales.voz ?? ''}
+                inputMode="tel" placeholder="+57 604 111 2233"
+                className="mt-1 w-full rounded-lg border border-barro-300 px-3 py-2 text-base" />
+            </label>
+            <label className="block">
+              <span className="text-sm text-barro-700">Dominio de Workspace</span>
+              <input name="dominio_workspace" defaultValue={canales.workspace ?? ''}
+                placeholder="suorganizacion.org"
+                className="mt-1 w-full rounded-lg border border-barro-300 px-3 py-2 text-base" />
+            </label>
+            <div className="sm:col-span-3">
+              <button type="submit"
+                className="rounded-lg bg-selva-700 px-4 py-2 text-sm font-medium text-white hover:bg-selva-800">
+                Guardar canales
+              </button>
+              {/* Said plainly rather than implied by an empty field: the domain is recorded and
+                  nothing reads it yet. PRD-34 §28.4.4's «Conectar con Google» is unbuilt, and a
+                  field that looks like an integration but is a note would be a small lie. */}
+              <p className="mt-2 text-xs text-barro-500">
+                El dominio se guarda para cuando exista la conexión con Google Calendar; todavía no
+                hace nada por sí solo.
+              </p>
             </div>
           </form>
         )}
