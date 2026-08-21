@@ -85,6 +85,12 @@ type Props = {
 
 const CLAVE_BORRADORES = 'convite:mapa:borradores'
 
+/**
+ * The vendored Copernicus EMS activation — EMSR916, the 7.4 earthquake of 10 August 2026 whose
+ * assessment footprints cover Quibdó, Istmina and Buenaventura. Refresh with `pnpm traer:cems`.
+ */
+const CEMS_RUTA = '/cems/EMSR916.json'
+
 /** Below this the community name chips are hidden — see `ajustarNombres`. */
 const ZOOM_NOMBRES = 8.5
 
@@ -499,6 +505,25 @@ export default function MapaCuenca({
         // byte-for-byte what it was.
         if (planificacion) {
           agregarCapasPlan(m)
+
+          // Copernicus EMS footprints, from our own origin — vendored by `pnpm traer:cems`, not
+          // fetched from Copernicus at render. A layer that calls a European API on load is a
+          // layer that is blank from a lancha with no signal, which is exactly where somebody
+          // needs to know whether an area has been assessed (PRD-13's whole argument).
+          //
+          // Failure is silent by design: no banner, no error state. The layer simply has nothing
+          // in it, which is the honest rendering of «we have no assessment footprints» and is not
+          // the same kind of event as the map itself failing to draw.
+          fetch(CEMS_RUTA)
+            .then((r) => (r.ok ? r.json() : null))
+            .then((paquete: { aois?: unknown } | null) => {
+              if (!paquete?.aois || mapaRef.current !== m) return
+              const fuente = m.getSource('cems-aoi')
+              if (fuente && 'setData' in fuente) {
+                ;(fuente as { setData: (d: unknown) => void }).setData(paquete.aois)
+              }
+            })
+            .catch(() => {})
           // Click to add a polygon vertex, double-click to close (§23.5). Handlers read the
           // mode from a ref so they never capture stale React state.
           m.on('click', (e) => {
@@ -765,6 +790,7 @@ const CAPAS_OVERLAY: Record<string, string[]> = {
   contacto: ['plan-contacto-relleno', 'plan-contacto-borde'],
   silencio: ['plan-silencio-borde'],
   conexion: ['plan-conexion-punto'],
+  cems: ['cems-aoi-relleno', 'cems-aoi-borde'],
 }
 
 const VACIA = { type: 'FeatureCollection' as const, features: [] }
@@ -811,9 +837,18 @@ function agregarCapasPlan(m: MapaGL) {
     'plan-seleccion',
     'plan-borrador-ruta',
     'plan-borrador-paradas',
+    'cems-aoi',
   ]
   for (const id of fuentes) {
-    if (!m.getSource(id)) m.addSource(id, { type: 'geojson', data: VACIA })
+    if (m.getSource(id)) continue
+    // Copernicus requires attribution for reuse. Declared on the source rather than hardcoded
+    // into the control, so the credit appears exactly when the data does — and never claims a
+    // Copernicus source for a layer that failed to load.
+    const atribucion =
+      id === 'cems-aoi'
+        ? { attribution: 'Evaluación: © Copernicus EMS (EMSR916), Unión Europea 2026' }
+        : {}
+    m.addSource(id, { type: 'geojson', data: VACIA, ...atribucion })
   }
 
   const capas: Record<string, unknown>[] = [
@@ -856,6 +891,22 @@ function agregarCapasPlan(m: MapaGL) {
       type: 'line',
       source: 'plan-seleccion',
       paint: { 'line-color': '#4338ca', 'line-width': 2, 'line-dasharray': [2, 1.5] },
+    },
+    // Copernicus EMS assessment footprints (EMSR916). Drawn under everything our own data
+    // draws — it is context for the basin, not a fact about a community, and it must never
+    // sit on top of a pedido or a route. Hatched-looking thin border with a very light fill so
+    // a city-sized polygon does not swamp the 1 km accuracy circles inside it.
+    {
+      id: 'cems-aoi-relleno',
+      type: 'fill',
+      source: 'cems-aoi',
+      paint: { 'fill-color': '#7c3aed', 'fill-opacity': 0.07 },
+    },
+    {
+      id: 'cems-aoi-borde',
+      type: 'line',
+      source: 'cems-aoi',
+      paint: { 'line-color': '#7c3aed', 'line-width': 1.5, 'line-dasharray': [3, 2], 'line-opacity': 0.8 },
     },
     // The vertices themselves. White casing for the same reason the accuracy circles have
     // one — over OSM raster a bare indigo dot disappears into a road junction. Filtered to

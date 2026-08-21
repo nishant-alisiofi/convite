@@ -27,6 +27,14 @@ export const CAPAS: MetaCapa[] = [
   { id: 'conectividad', nombre: 'Tier de conectividad', ayuda: 'De datos confiables (1) a relevo por radio (4).' },
   { id: 'silencio', nombre: 'Comunidades en silencio', ayuda: 'Sin contacto más allá de su intervalo, o nunca.' },
   { id: 'contacto', nombre: 'Último contacto', ayuda: 'Sombra por tiempo desde el último mensaje recibido.' },
+  {
+    id: 'cems',
+    nombre: 'Evaluación satelital (Copernicus)',
+    // Deliberately says «dónde miraron», not «dónde hay daño». The AOI is the footprint of the
+    // assessment, not its findings — claiming otherwise would paint a whole city as damaged
+    // because a satellite looked at it.
+    ayuda: 'Áreas que Copernicus EMS evaluó tras el sismo del 10 de agosto. Marca dónde hay informe, no dónde hay daño.',
+  },
 ]
 
 export type TipoSeleccion = 'municipio' | 'cuenca' | 'agrupador'

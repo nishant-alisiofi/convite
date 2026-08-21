@@ -30,7 +30,8 @@
     "build:limpio": "env -u DATABASE_URL -u BETTER_AUTH_SECRET -u BETTER_AUTH_URL -u RESEND_API_KEY next build",
     "sembrar:staff": "tsx scripts/sembrar-staff.ts",
     "sembrar:plataforma": "tsx scripts/sembrar-plataforma.ts",
-    "sembrar:territorio": "tsx scripts/sembrar-territorio.ts"
+    "sembrar:territorio": "tsx scripts/sembrar-territorio.ts",
+    "traer:cems": "tsx scripts/traer-cems.ts"
   },
   "dependencies": {
     "better-auth": "1.6.29",

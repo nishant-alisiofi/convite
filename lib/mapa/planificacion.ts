@@ -548,6 +548,7 @@ export type CapaId =
   | 'conectividad'
   | 'silencio'
   | 'contacto'
+  | 'cems'
 
 /**
  * The operational phase (§18).
