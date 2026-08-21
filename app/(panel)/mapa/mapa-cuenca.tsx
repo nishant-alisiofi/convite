@@ -433,12 +433,17 @@ export default function MapaCuenca({
       // Fed by the raster source's `attribution`; the OSM tile policy requires this credit.
       m.addControl(new AttributionControl({ compact: true }), 'bottom-right')
 
-      // Only style/runtime errors, never a tile. MapLibre fires `error` for every failed or
-      // aborted raster request, so a single 429 from tile.openstreetmap.org used to leave
-      // «No se pudo dibujar el mapa» sitting under a map that was working perfectly well —
-      // and it never cleared. A tile event carries a sourceId; a real one does not.
+      // Ignore a failed TILE, never a failed SOURCE — and the difference cost a demo.
+      //
+      // MapLibre fires `error` for every aborted or 429'd raster tile, so surfacing all of them
+      // left «No se pudo dibujar el mapa» sitting under a map that was working perfectly well.
+      // The first fix filtered on `sourceId`, which was too blunt: a source that fails to LOAD
+      // also carries a sourceId, so a broken basemap became a silent grey box with every overlay
+      // missing and nothing to say why.
+      //
+      // A tile error carries the tile it was fetching. A source error does not.
       m.on('error', (e) => {
-        if ((e as { sourceId?: string }).sourceId) return
+        if ((e as { tile?: unknown }).tile) return
         setError(e.error?.message ?? 'No se pudo dibujar el mapa.')
       })
 
