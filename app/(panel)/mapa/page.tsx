@@ -65,6 +65,16 @@ export default async function Mapa({ searchParams }: { searchParams: Params }) {
   if (!sesion) redirect('/entrar')
 
   const { ok, error, fase: faseParam, viaje, cupo, fecha } = await searchParams
+  // §18 / PRD-28: the Mapa section is for despachador/coordinador/admin/lectura (and platform),
+  // never a verificador — whose work is the queue, not the territory surface. The nav hides it;
+  // this gate makes the page itself refuse a direct visit (Codex: a verificador could open /mapa
+  // directly) rather than loading the whole basin for a role that should not see it. RLS still
+  // scopes the data behind this — this only aligns the page with the nav's role model.
+  const PUEDEN_VER_MAPA = ['despachador', 'coordinador', 'admin', 'lectura']
+  if (!PUEDEN_VER_MAPA.includes(sesion.rolStaff) && !sesion.esPlataforma) {
+    redirect('/tablero')
+  }
+
   const esAdmin = sesion.rolStaff === 'admin'
   const fase: Fase = FASES.includes(faseParam as Fase) ? (faseParam as Fase) : 'emergencia'
 
