@@ -3,7 +3,7 @@
 - **Type:** PRD
 - **Tier:** 2 — Roadmap (from PRD v1.0)
 - **Priority:** P2
-- **Status:** Backlog
+- **Status:** 🟡 Code built + deployed (MapLibre PMTiles reader, `/mapa-offline`, `scripts/construir-pmtiles.sh`) — **no tile bundle generated or hosted yet**: `NEXT_PUBLIC_PMTILES_URL` is unset, so the offline basemap is inert and the map still falls back to the online OSM raster. Remaining work is an ops step, not engineering.
 - **Source:** PRD v1.0 (offline PMTiles bundles); PRD.md §3 (MapLibre + Protomaps extract "which
   also works offline").
 

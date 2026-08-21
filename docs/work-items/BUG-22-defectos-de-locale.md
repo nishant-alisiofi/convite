@@ -3,7 +3,7 @@
 - **Type:** BUG
 - **Tier:** 1 — Defect on the live demo (PRD v3 Part III)
 - **Priority:** P2
-- **Status:** Open
+- **Status:** ✅ Fixed — deployed (staging + prod), pending Codex validation · fixed in the D1–D9 batch
 - **Source:** PRD v3 §Defects **D4**.
 
 ## What's wrong (PRD v3 · D4)

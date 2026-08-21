@@ -53,6 +53,8 @@ type SesionMock = {
   organizacionId: string
   esPlataforma: boolean
   estadoOrganizacion: string
+  nivelAdmision: string | null
+  organizacionDeclarada: boolean
 }
 const SESION_COORDINADOR: SesionMock = {
   authId: COORDINADOR,
@@ -62,6 +64,8 @@ const SESION_COORDINADOR: SesionMock = {
   organizacionId: '',
   esPlataforma: false,
   estadoOrganizacion: 'aprobada',
+  nivelAdmision: 'ancla',
+  organizacionDeclarada: true,
 }
 
 let pool: Pool

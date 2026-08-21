@@ -3,7 +3,7 @@
 - **Type:** BUG
 - **Tier:** 1 — Demo (this pass)
 - **Priority:** P0
-- **Status:** Open
+- **Status:** ✅ Fixed — deployed (staging + prod), pending Codex validation
 - **Source:** Jam A.
 - **Fixed by:** PRD-1 (multi-channel demo seed scoped to the demo org).
 

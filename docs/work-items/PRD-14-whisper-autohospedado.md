@@ -3,7 +3,7 @@
 - **Type:** PRD
 - **Tier:** 2 — Roadmap (from PRD v1.0)
 - **Priority:** P1
-- **Status:** Backlog
+- **Status:** ⛔ **Not started** — the only PRD with no implementation. `lib/canales/transcripcion.ts` is a deliberate no-op port (`transcripcionPendiente.transcribir()` returns `null`); the call site (`lib/canales/trabajos.ts:93`) and the audio inbox that catches untranscribed notes already exist. Blocked on **decision D8** (may household audio leave our infrastructure?), which is a protection question, not a procurement one. v4 adds a prerequisite: noise suppression ahead of Whisper (§6.2).
 - **Source:** PRD v1.0; PRD.md D8 + `docs/decisiones-pendientes.md` ("Whisper auto-hospedado
   desde el día uno").
 

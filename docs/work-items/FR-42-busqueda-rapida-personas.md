@@ -3,7 +3,7 @@
 - **Type:** FR
 - **Tier:** 2 — Roadmap
 - **Priority:** P2
-- **Status:** In progress
+- **Status:** ✅ Built + deployed (staging + prod) — pending Codex validation
 - **Source:** Field feedback from Chocó (Doña Marta, Red de Mujeres Chocanas), relayed by Nishant
   2026-08-17. "Optimize search functionality to make locating individuals in remote databases
   fast and straightforward."

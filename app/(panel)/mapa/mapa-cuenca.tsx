@@ -72,24 +72,106 @@ type Props = {
   fase?: Fase
   /** A draft handed in by the supply-first entry point (§23.2), if any. */
   borradorInicial?: Borrador
+  /**
+   * Where this organisation itself sits, when it has said.
+   *
+   * The page has always read this and printed it as two decimal numbers under the map, which
+   * is the one place a coordinate is least useful. «A centre with nodes around it» is the
+   * shape of the whole operation, and the centre was the only part of it missing from the
+   * picture.
+   */
+  ubicacionCentro?: { lat: number; lon: number; precisionM: number | null } | null
 }
 
 const CLAVE_BORRADORES = 'convite:mapa:borradores'
-const CENTRO_CUENCA: [number, number] = [-76.72, 5.95]
+
+/** Below this the community name chips are hidden — see `ajustarNombres`. */
+const ZOOM_NOMBRES = 8.5
+
+/** How close two vertices must land, in screen pixels, to be treated as the same click. */
+const TOLERANCIA_VERTICE_PX = 8
+
+/**
+ * Strip vertices stacked on the end of the ring within `TOLERANCIA_VERTICE_PX` of each other.
+ *
+ * Compared in projected pixels rather than degrees on purpose: the same two-click stack is
+ * ~0.00001° apart at zoom 14 and ~0.01° apart at zoom 5, so any fixed degree epsilon is either
+ * useless when zoomed in or eats real corners when zoomed out. Pixels are what the person
+ * actually clicked in.
+ */
+function sinRepetidosAlFinal(
+  m: import('maplibre-gl').Map,
+  vertices: readonly Vertice[],
+): Vertice[] {
+  const salida = [...vertices]
+  while (salida.length >= 2) {
+    const a = m.project(salida[salida.length - 1]!)
+    const b = m.project(salida[salida.length - 2]!)
+    if (Math.hypot(a.x - b.x, a.y - b.y) > TOLERANCIA_VERTICE_PX) break
+    salida.pop()
+  }
+  return salida
+}
+
+/**
+ * The bounding box of the communities with an open request, or null when none have one.
+ *
+ * Deliberately points, not accuracy rings: `fitBounds`' own padding already buys the margin a
+ * ring would, and reaching into `Figuras` here would couple the opening viewport to how a
+ * circle happens to be drawn. Null (rather than an empty box) so the caller can fall back to
+ * the full extent — a basin with nothing open should still show the basin.
+ */
+function limitesDeDemanda(
+  comunidades: readonly { lat: number | null; lon: number | null; abiertos: number }[],
+): [[number, number], [number, number]] | null {
+  let oeste = Infinity
+  let sur = Infinity
+  let este = -Infinity
+  let norte = -Infinity
+  let vistas = 0
+
+  for (const c of comunidades) {
+    if (c.abiertos <= 0 || c.lat === null || c.lon === null) continue
+    vistas += 1
+    oeste = Math.min(oeste, c.lon)
+    este = Math.max(este, c.lon)
+    sur = Math.min(sur, c.lat)
+    norte = Math.max(norte, c.lat)
+  }
+
+  return vistas > 0 ? [[oeste, sur], [este, norte]] : null
+}
 
 /** Overlay layer ids, in one place so the toggles and the setup cannot drift. */
+// `fuentesYCapas` emits THREE layers per stroke — -relleno, -casing, -borde. Listing only
+// the fills here made the toggle look dead: unchecking «Pedidos pendientes» left every white
+// casing and coloured ring exactly where it was, and the fill it did hide is drawn at 0.2
+// opacity, so almost nothing changed on screen. All three have to move together.
 const CAPAS_BASE_PEDIDOS = [
   'circulos-solido-relleno',
+  'circulos-solido-casing',
+  'circulos-solido-borde',
   'circulos-discontinuo-relleno',
+  'circulos-discontinuo-casing',
+  'circulos-discontinuo-borde',
   'circulos-punteado-relleno',
+  'circulos-punteado-casing',
+  'circulos-punteado-borde',
   'pines-punto',
 ] as const
 const CAPAS_BASE_RUTAS = ['tramos-casing', 'tramos-linea'] as const
 
-export default function MapaCuenca({ datos, planificacion, fase = 'emergencia', borradorInicial }: Props) {
+export default function MapaCuenca({
+  datos,
+  planificacion,
+  fase = 'emergencia',
+  borradorInicial,
+  ubicacionCentro,
+}: Props) {
   const contenedor = useRef<HTMLDivElement>(null)
   const mapaRef = useRef<import('maplibre-gl').Map | null>(null)
   const marcadoresStock = useRef<import('maplibre-gl').Marker[]>([])
+  const marcadoresNombre = useRef<import('maplibre-gl').Marker[]>([])
   const [error, setError] = useState<string | null>(null)
   const [listo, setListo] = useState(false)
 
@@ -107,6 +189,27 @@ export default function MapaCuenca({ datos, planificacion, fase = 'emergencia', 
   const modoPoligonoRef = useRef(modoPoligono)
   useEffect(() => {
     modoPoligonoRef.current = modoPoligono
+  }, [modoPoligono])
+
+  // Draw mode changed the sidebar button's label and nothing else — the pointer over the map
+  // stayed a grab hand, which reads as "pan me", the one thing it no longer does.
+  useEffect(() => {
+    const m = mapaRef.current
+    if (!m || !listo) return
+    m.getCanvas().style.cursor = modoPoligono ? 'crosshair' : ''
+  }, [modoPoligono, listo])
+
+  // Escape abandons a half-drawn area. Without it the only way out of draw mode was to draw
+  // three corners you did not want, or reload.
+  useEffect(() => {
+    if (!modoPoligono) return
+    const alTeclear = (ev: KeyboardEvent) => {
+      if (ev.key !== 'Escape') return
+      setPoligono([])
+      setModoPoligono(false)
+    }
+    window.addEventListener('keydown', alTeclear)
+    return () => window.removeEventListener('keydown', alTeclear)
   }, [modoPoligono])
 
   // Drafts are client state: saveable, several at once, committed by a person later (§23.2).
@@ -361,7 +464,22 @@ export default function MapaCuenca({ datos, planificacion, fase = 'emergencia', 
       // Frame the data instead of a fixed viewport: at a hardcoded basin-wide zoom a
       // kilometre-wide accuracy circle is a single pixel, and the map quietly becomes the
       // dot map it exists not to be.
-      if (limites) m.fitBounds(limites, { padding: 48, animate: false })
+      //
+      // Framing *every* row is not enough, though, and for a while it was actively wrong.
+      // `comunidades_lectura` is deliberately role-only and not org-scoped (0017, and 0058
+      // says so in as many words): the community registry is shared territory, so a Chocó
+      // coordinator legitimately reads Herencia's Cauca communities too. Fitting all of them
+      // spans lat 2.48→8.51 — about 670 km — which lands at zoom ~5.6, where 1622 m of ground
+      // is one pixel and a 1000 m accuracy circle is *1.2 px*. Everything was drawn correctly
+      // and nothing was visible, which is exactly how BUG-39 came to be closed on styling.
+      //
+      // So open on the work: the communities that actually have an open request. That is the
+      // half of the registry this coordinator is doing something about, it is geographically
+      // tight, and the rest stays one pan away. `maxZoom` guards the other end — when a single
+      // community carries the only open request the bbox collapses to a point, and without a
+      // clamp fitBounds drops the coordinator onto a rooftop.
+      const limitesFoco = limitesDeDemanda(datos.comunidades) ?? limites
+      if (limitesFoco) m.fitBounds(limitesFoco, { padding: 48, maxZoom: 11, animate: false })
 
       m.addControl(new NavigationControl({ showCompass: false }), 'top-right')
       // "Use my location": centres on the coordinator's device position. The first GPS fix is
@@ -378,7 +496,14 @@ export default function MapaCuenca({ datos, planificacion, fase = 'emergencia', 
       // Fed by the raster source's `attribution`; the OSM tile policy requires this credit.
       m.addControl(new AttributionControl({ compact: true }), 'bottom-right')
 
-      m.on('error', (e) => setError(e.error?.message ?? 'No se pudo dibujar el mapa.'))
+      // Only style/runtime errors, never a tile. MapLibre fires `error` for every failed or
+      // aborted raster request, so a single 429 from tile.openstreetmap.org used to leave
+      // «No se pudo dibujar el mapa» sitting under a map that was working perfectly well —
+      // and it never cleared. A tile event carries a sourceId; a real one does not.
+      m.on('error', (e) => {
+        if ((e as { sourceId?: string }).sourceId) return
+        setError(e.error?.message ?? 'No se pudo dibujar el mapa.')
+      })
 
       m.on('load', () => {
         // Labels are DOM markers, not a symbol layer: a symbol layer needs a glyph server
@@ -394,10 +519,37 @@ export default function MapaCuenca({ datos, planificacion, fase = 'emergencia', 
             'pointer-events-none rounded bg-white/95 px-1 text-[11px] font-medium text-barro-900 shadow-sm ring-1 ring-black/10'
           // Hung below the point: centred, the label box is wider than a 1000 m circle at
           // basin zoom and hides the very thing the circle is there to show.
-          new Marker({ element: el, anchor: 'top', offset: [0, 7] })
+          const mk = new Marker({ element: el, anchor: 'top', offset: [0, 7] })
             .setLngLat([c.lon, c.lat])
             .addTo(m)
+          marcadoresNombre.current.push(mk)
         }
+
+        // This organisation's own point, when it has one. Deliberately a different shape from
+        // everything else on the map — a filled marker with a ring, not an accuracy circle —
+        // because it is the one location here that is not a report about somewhere else.
+        if (ubicacionCentro) {
+          const el = document.createElement('span')
+          el.setAttribute('aria-label', 'Este centro')
+          el.className =
+            'block h-4 w-4 rounded-full border-2 border-white bg-selva-700 shadow ring-2 ring-selva-700/30'
+          marcadoresNombre.current.push(
+            new Marker({ element: el }).setLngLat([ubicacionCentro.lon, ubicacionCentro.lat]).addTo(m),
+          )
+        }
+
+        // Zoom-gate the names. Sixty-eight of these, each a ~70 px white chip, cover the basin
+        // in white at the zoom the whole registry fits into — the labels end up hiding the
+        // circles they annotate. Above the threshold there is room for them and they are the
+        // fastest way to read the map; below it, the shapes carry more than the words do.
+        const ajustarNombres = () => {
+          const visible = m.getZoom() >= ZOOM_NOMBRES
+          for (const mk of marcadoresNombre.current) {
+            mk.getElement().style.display = visible ? '' : 'none'
+          }
+        }
+        ajustarNombres()
+        m.on('zoomend', ajustarNombres)
 
         for (const t of datos.tramos) {
           const el = document.createElement('span')
@@ -424,7 +576,13 @@ export default function MapaCuenca({ datos, planificacion, fase = 'emergencia', 
           })
           m.on('dblclick', (e) => {
             if (!modoPoligonoRef.current) return
+            // preventDefault suppresses the double-click zoom (MapLibre honours it through
+            // HandlerManager), but it cannot un-fire the two `click` events the browser has
+            // already delivered at this same point. Closing a triangle at C therefore arrives
+            // here as [A, B, C, C] — an extra vertex stacked on the corner, which skews any
+            // point-in-polygon test run against it. Drop the trailing stack instead.
             e.preventDefault()
+            setPoligono((prev) => sinRepetidosAlFinal(m, prev))
             setModoPoligono(false)
           })
         }
@@ -442,6 +600,8 @@ export default function MapaCuenca({ datos, planificacion, fase = 'emergencia', 
       setListo(false)
       marcadoresStock.current.forEach((mk) => mk.remove())
       marcadoresStock.current = []
+      marcadoresNombre.current.forEach((mk) => mk.remove())
+      marcadoresNombre.current = []
       mapaRef.current?.remove()
       mapaRef.current = null
     }
@@ -635,7 +795,10 @@ export default function MapaCuenca({ datos, planificacion, fase = 'emergencia', 
           agrupadores={planificacion.agrupadores}
           seleccionActual={seleccionPor}
           onSeleccionarPor={seleccionarPor}
-          haySeleccion={idsSeleccionados.size > 0}
+          // Also while the area is still being drawn: `idsSeleccionados` only fills once the
+          // ring closes at three vertices, so a one- or two-click mistake — or a closed area
+          // that happens to contain no community — offered no way back out.
+          haySeleccion={idsSeleccionados.size > 0 || poligono.length > 0}
           onLimpiar={limpiarSeleccion}
         />
         <PanelPlan
@@ -762,6 +925,21 @@ function agregarCapasPlan(m: MapaGL) {
       type: 'line',
       source: 'plan-seleccion',
       paint: { 'line-color': '#4338ca', 'line-width': 2, 'line-dasharray': [2, 1.5] },
+    },
+    // The vertices themselves. White casing for the same reason the accuracy circles have
+    // one — over OSM raster a bare indigo dot disappears into a road junction. Filtered to
+    // Point so it never tries to draw the ring or the line.
+    {
+      id: 'plan-seleccion-vertices',
+      type: 'circle',
+      source: 'plan-seleccion',
+      filter: ['==', ['geometry-type'], 'Point'],
+      paint: {
+        'circle-radius': 5,
+        'circle-color': '#4338ca',
+        'circle-stroke-width': 2,
+        'circle-stroke-color': '#ffffff',
+      },
     },
     // The draft route: dashed, and drawn by leg state so a closed or missing leg is never
     // drawn as an open plan (§23.1, §23.3). One layer per state with a static dash pattern —

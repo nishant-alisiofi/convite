@@ -2,7 +2,7 @@
 
 - **Type:** BUG · **Priority:** P1 · **Tier:** 1 (live demo)
 - **Source:** Codex validation pass 1 (2026-08-16), `.forge/artifacts/validate/2026-08-15.md`
-- **Status:** Fix in progress (engineering)
+- **Status:** ✅ Fixed — deployed (staging + prod), pending Codex validation (`emparejarPedido` runs on promotion)
 - **Related:** M7 (verification → pedido), the matcher (`lib/matching/*`)
 
 ## Problem

@@ -192,6 +192,15 @@ export default async function Mapa({ searchParams }: { searchParams: Params }) {
           planificacion={planificacion}
           fase={fase}
           borradorInicial={borradorInicial}
+          ubicacionCentro={
+            ubicacionCentro?.lat != null && ubicacionCentro.lon != null
+              ? {
+                  lat: ubicacionCentro.lat,
+                  lon: ubicacionCentro.lon,
+                  precisionM: ubicacionCentro.precisionM ?? null,
+                }
+              : null
+          }
         />
       </div>
 

@@ -3,7 +3,7 @@
 - **Type:** PRD (feature / front-end)
 - **Tier:** 1 — Demo (this pass)
 - **Priority:** P0
-- **Status:** Planned (part of the panel-UI pass)
+- **Status:** ✅ Built + deployed (staging + prod) — pending Codex validation
 - **Source:** Jam B ("each report showing its source and, for voice notes, a 'transcribed'
   indicator"; "raw-messages → triage → categorized Tablero"; recurring theme: "show
   organisations the value that comes in through this AI ingestion"), planned panel-UI pass.

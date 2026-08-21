@@ -1,8 +1,18 @@
 # Despliegue
 
-> **Estado:** el código está listo para desplegar; **no hay nada desplegado todavía** y no se
-> han creado recursos. La decisión de dónde corre el servidor es D5 (PRD §2). Este documento
-> es lo que hay que hacer el día que se cree el proyecto, no un registro de algo ya hecho.
+> **Estado (2026-08-20):** ya está desplegado. **`convite.ai` (producción) y
+> `staging.convite.ai` corren en Railway**, ambos al día en la **migración 59** — todo lo que
+> hay en `db/migrations/`. Un `git push` a `main` dispara el despliegue solo; no hay workflow
+> de GitHub Actions en el repo porque el despliegue lo gobierna la integración de Railway con
+> GitHub, no el CI. D5 quedó resuelta de hecho.
+>
+> El párrafo de abajo se escribió antes de que existiera el proyecto: léalo como la referencia
+> de configuración (variables, migraciones como paso de release, el comando del worker), que
+> sigue siendo exacta, y **no** como que falte crear los recursos.
+>
+> **Nota:** `staging.convite.ai/api/salud` responde **503 con 2 alertas** al 2026-08-20;
+> producción responde 200. Vale revisarlo antes de la próxima validación de Codex, porque
+> staging es la única superficie de validación de Tier 1.
 
 Dos servicios sobre la misma imagen. Una base de datos. Nada más.
 
@@ -234,9 +244,9 @@ Va como **paso de release**, antes de que arranque la versión nueva. `migrate.t
 correr una migración ya aplicada cuyo contenido cambió, así que un despliegue con el historial
 tocado falla ruidosamente en vez de dejar la base a medias.
 
-**Sin aplicar en el proyecto alojado hoy: 0020 a 0024.** Incluyen dos cambios que necesitan el
-visto bueno de Nishant antes de tocar datos reales (`sin_clasificar` en 0021, la columna
-`plantilla` en 0022).
+**Al día (2026-08-20): las 59 migraciones están aplicadas en staging y en producción**, hasta
+`0064_reintento_voz_y_grabacion.sql` inclusive. (Esta línea decía «sin aplicar 0020 a 0024»;
+llevaba meses desactualizada — `/api/salud` reporta `migraciones: 59` en los dos ambientes.)
 
 ---
 

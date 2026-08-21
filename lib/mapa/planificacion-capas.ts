@@ -245,9 +245,22 @@ export function coleccionRutaBorrador(
  * The area being selected (§23.5). While the polygon is still open (fewer than three
  * vertices, or mid-draw) it is returned as a `LineString` so it reads as a work-in-progress;
  * once closed it is a `Polygon`. Empty selection returns an empty collection.
+ *
+ * **Every vertex is also emitted as a Point**, and that is not decoration. Without it the
+ * first click produced a one-coordinate LineString — geometry MapLibre renders as nothing at
+ * all, silently — and the second produced a hairline. Somebody drawing an area clicked, saw
+ * absolutely nothing happen, and reasonably concluded the tool was broken. The shape only
+ * becomes self-evident on the third click, which is two clicks too late to be trusted.
  */
 export function coleccionPoligono(vertices: readonly Posicion[]): Coleccion {
   if (vertices.length === 0) return coleccion([])
+
+  const puntos = vertices.map((v, i) => ({
+    type: 'Feature' as const,
+    properties: { estado: 'vertice', indice: i },
+    geometry: { type: 'Point' as const, coordinates: v },
+  }))
+
   if (vertices.length < 3) {
     return coleccion([
       {
@@ -255,6 +268,7 @@ export function coleccionPoligono(vertices: readonly Posicion[]): Coleccion {
         properties: { estado: 'dibujando' },
         geometry: { type: 'LineString', coordinates: [...vertices] as Posicion[] },
       },
+      ...puntos,
     ])
   }
   const anillo = [...vertices, vertices[0]!] as Posicion[]
@@ -264,6 +278,7 @@ export function coleccionPoligono(vertices: readonly Posicion[]): Coleccion {
       properties: { estado: 'cerrado' },
       geometry: { type: 'Polygon', coordinates: [anillo] },
     },
+    ...puntos,
   ])
 }
 

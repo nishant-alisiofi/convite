@@ -2,7 +2,7 @@
 
 - **Type:** BUG · **Priority:** P1 · **Tier:** 1 (live demo)
 - **Source:** Codex validation pass 1 (2026-08-16), `.forge/artifacts/validate/2026-08-15.md`
-- **Status:** Fix in progress (engineering)
+- **Status:** ✅ Fixed — deployed (staging + prod), pending Codex validation (white casings)
 - **Related:** PRD-2 (real OpenStreetMap map), BUG-6 (blank map)
 
 ## Problem

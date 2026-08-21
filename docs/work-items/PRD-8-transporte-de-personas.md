@@ -3,7 +3,7 @@
 - **Type:** PRD
 - **Tier:** 2 — Roadmap (from PRD v1.0)
 - **Priority:** P2
-- **Status:** Backlog
+- **Status:** ✅ Built + deployed (staging + prod) — pending Codex validation
 - **Source:** PRD v1.0 (three-sided marketplace; transport of PEOPLE, not only supplies).
 
 ## Problem / why

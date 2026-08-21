@@ -2,7 +2,7 @@
 
 - **Type:** PRD · **Priority:** P1 · **Tier:** 1 (finishes PRD-38)
 - **Source:** PRD-38 reconciliation gap + Codex-visible duplication
-- **Status:** Fix in progress (engineering)
+- **Status:** ✅ Done — 82→68 communities, no duplicates; deployed (staging + prod)
 - **Depends on / follows:** PRD-38 (territory registry wired), PRD-37 (schema)
 
 ## Problem

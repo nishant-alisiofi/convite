@@ -3,7 +3,7 @@
 - **Type:** PRD
 - **Tier:** 2 — Roadmap
 - **Priority:** P3
-- **Status:** In progress (built on stated assumptions — flag for partner review)
+- **Status:** ✅ Built + deployed (staging + prod) — built on stated assumptions; **pending partner review** as well as Codex validation
 - **Source:** Field feedback from Chocó (Doña Marta), relayed by Nishant 2026-08-17. "Boat
   operators act as a vital local communication network; they can be leveraged to collect field
   data and sync updates between disconnected river communities."

@@ -3,7 +3,7 @@
 - **Type:** FR
 - **Tier:** 2 — Roadmap
 - **Priority:** P2
-- **Status:** In progress
+- **Status:** ✅ Built + deployed (staging + prod) — pending Codex validation
 - **Source:** Field feedback from Chocó (Doña Marta), relayed by Nishant 2026-08-17. "Ensure
   distinct tracking for: food & essential provisions; medical supplies & medicines; construction
   materials."

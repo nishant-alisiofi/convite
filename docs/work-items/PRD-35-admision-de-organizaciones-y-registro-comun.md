@@ -3,7 +3,7 @@
 - **Type:** PRD
 - **Tier:** 2 — Roadmap (PRD v3 Part IV)
 - **Priority:** P1 — gates onboarding stage 0 and the day-one manual-entry channel
-- **Status:** Backlog
+- **Status:** ✅ Built + deployed (staging + prod) — pending Codex validation
 - **Source:** PRD v3 **§29.3b** (how an organisation gets in; shared gazetteer; manual-entry zeroth
   channel; aggregate read layer). Related: §29.1 (governing principle), §23 Ley 1581.
 
@@ -85,3 +85,27 @@ avalada org and confirm its ceiling ≤ the anchor's, then revoke and confirm su
 `canal = 'manual'` report before any channel; propose a duplicate community and confirm name/proximity
 matching flags it; confirm the aggregate layer is visible to all tiers and bilateral detail is not.
 Never validate on production.
+
+## Onboarding declaration — what it did and did not cover (2026-08-21)
+
+The pre-panel declaration flow (`/comenzar`, migration 0065) was built under **PRD-36**; see that
+WI. Two of its four questions are PRD-35's, and are now captured for the first time:
+
+- **Intent** (`organizaciones.intenciones`) — what the organisation says it is here to do. This is
+  the question that should *choose* the admission tier, and today does not: `/solicitar-centro`
+  still creates an org with `tipo` NULL, `techo_permisos` `{}` and `nivel_admision` NULL, and the
+  `/centros` approval screen is still a bare yes/no. `convite_avalar_organizacion` and
+  `convite_fijar_nivel_admision` (0047) remain **unreachable from any UI**.
+- **Rural reach** (`organizaciones.alcance_rural`) — the scoping question behind
+  `techo_permisos.comunidades_alcance`. Recorded; not yet wired to the ceiling.
+
+**Still open under PRD-35:** approve-with-tier-and-ceiling, the vouching UI, and populating
+`tipo`/`nivel_admision` at signup rather than leaving them null.
+
+**Hazard this flow runs straight into — not fixed here.** `db/migrations/0035_ingreso_abierto.sql`
+makes an uninvited person signing in at `/entrar` an **`admin` of the earliest-created active
+organisation** — someone else's. `vincularAportante` (`lib/aportante.ts:26`) intercepts before
+`vincular_usuario_staff()` for the transporter door precisely because of this; the org-signup path
+has no equivalent. A real organisation that signs in instead of using `/solicitar-centro` silently
+joins another org as admin, and would then be shown *that* organisation's declaration flow. Worth
+its own BUG.

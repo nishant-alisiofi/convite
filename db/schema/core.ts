@@ -103,6 +103,23 @@ export const organizaciones = pgTable(
     ubicacion: punto('ubicacion'),
     ubicacionFuente: text('ubicacion_fuente'),
     ubicacionPrecisionM: integer('ubicacion_precision_m'),
+    /**
+     * The onboarding declaration (migration 0065): what this organisation says it is here to
+     * do, what it already works in, which phase it is in, and whether it needs to reach
+     * communities off the road network.
+     *
+     * Declarations, not grants — the opposite end of `techoPermisos`, which stays the only
+     * ceiling. Saying «transporte» acquires nothing; it routes the product. `fase` is §18's
+     * phase, stored per organisation for the first time because two organisations on the same
+     * river are routinely in different phases. `alcanceRural` is nullable because «not asked»
+     * and «no» are different facts. Check constraints live in SQL, as the vocabulary columns
+     * next to them do.
+     */
+    intenciones: text('intenciones').array().notNull().default(sql`'{}'::text[]`),
+    herramientas: text('herramientas').array().notNull().default(sql`'{}'::text[]`),
+    fase: text('fase'),
+    alcanceRural: boolean('alcance_rural'),
+    onboardingCompletadoEn: timestamp('onboarding_completado_en', { withTimezone: true, mode: 'date' }),
     activo: boolean('activo').notNull().default(true),
     creadoEn: creadoEn(),
     actualizadoEn: actualizadoEn(),

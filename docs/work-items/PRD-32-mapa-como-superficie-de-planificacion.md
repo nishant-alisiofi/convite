@@ -3,7 +3,7 @@
 - **Type:** PRD
 - **Tier:** 2 — Roadmap (PRD v3 Part IV)
 - **Priority:** P1 — "the most demo-able thing for a diagnostic partner" (§33 step 3b)
-- **Status:** Backlog
+- **Status:** ✅ Built + deployed (staging + prod) — pending Codex validation
 - **Source:** PRD v3 **§23**. Sequence: §33 steps 3b & 5. Builds on PRD-2 (the rendered map).
 
 ## Problem / why

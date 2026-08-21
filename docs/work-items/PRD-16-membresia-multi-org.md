@@ -3,7 +3,7 @@
 - **Type:** PRD
 - **Tier:** 2 — Roadmap (from PRD v1.0)
 - **Priority:** P2
-- **Status:** Backlog
+- **Status:** ✅ Built + deployed (staging + prod) — pending Codex validation
 - **Source:** PRD v1.0 (multi-org membership via a join table — a user can belong to more than one
   organisation).
 

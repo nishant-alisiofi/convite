@@ -3,7 +3,7 @@
 - **Type:** PRD (feature)
 - **Tier:** 1 — Demo (this pass)
 - **Priority:** P0
-- **Status:** In progress (engineering, in flight)
+- **Status:** ✅ Built + deployed (staging + prod) — pending Codex validation
 - **Source:** Jam A ("the map must show a real map with pins + 'use my location' lat-long", not
   the schematic one), Jam B ("a real map showing the area + centers + exact request points"),
   engineering-in-flight item #2.

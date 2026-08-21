@@ -1,4 +1,4 @@
-import type { Modo, Temporada } from '@/db/schema/vocabulario'
+import type { FaseRespuesta, Modo, Temporada } from '@/db/schema/vocabulario'
 import type { TemporadaActual } from '@/lib/matching/tipos'
 
 /**
@@ -550,10 +550,14 @@ export type CapaId =
   | 'contacto'
 
 /**
- * The operational phase (§18). Not yet a stored value — the phase machine is future work —
- * so the surface defaults to one; the mapping itself is what §18 pins down and is tested.
+ * The operational phase (§18).
+ *
+ * It *is* a stored value now — `organizaciones.fase`, declared at onboarding (migration 0065)
+ * — so this is no longer «future work» and the surface no longer has to default blindly.
+ * Derived from `FASES_RESPUESTA` rather than restating the four strings, so the column's check
+ * constraint and this union cannot drift apart.
  */
-export type Fase = 'impacto' | 'emergencia' | 'recuperacion' | 'ordinario'
+export type Fase = FaseRespuesta
 
 /**
  * What the map opens on for each phase (§18). Phase changes what opens first, never the

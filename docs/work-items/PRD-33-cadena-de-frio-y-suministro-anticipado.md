@@ -3,7 +3,7 @@
 - **Type:** PRD
 - **Tier:** 2 — Roadmap (PRD v3 Part IV)
 - **Priority:** P2
-- **Status:** Backlog
+- **Status:** ✅ Built + deployed (staging + prod) — pending Codex validation
 - **Source:** PRD v3 **§24** (the two supply capabilities other than funded local purchase, which is
   PRD-9). Also §27b.2b (anticipation), §30 (diabetes reordering, "anticiparnos al parto"). Sequence:
   §33 step 7. Open question: §34 (cold chain — what storage exists, which routes carry insulin).

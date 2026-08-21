@@ -3,7 +3,7 @@
 - **Type:** BUG
 - **Tier:** 1 — Demo (this pass)
 - **Priority:** P1
-- **Status:** Open
+- **Status:** ✅ Fixed — deployed (staging + prod), pending Codex validation
 - **Source:** Jam A.
 - **Fixed by:** PRD-1 (seed gives centers coordinates) + PRD-2 (center-location capture from the
   panel).

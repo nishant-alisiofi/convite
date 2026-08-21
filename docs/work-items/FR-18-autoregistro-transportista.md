@@ -3,7 +3,7 @@
 - **Type:** FR (open request — decision pending)
 - **Tier:** 2 — Roadmap
 - **Priority:** P3
-- **Status:** Decision pending
+- **Status:** ✅ Built + deployed (staging + prod) — transporter self-signup as `aportante` tier; the v3 §29.2–29.3b tier model resolved the pending decision
 - **Source:** Jam B — Nishant raised "a transporter self-signup question" and **explicitly flagged
   it as undecided**.
 

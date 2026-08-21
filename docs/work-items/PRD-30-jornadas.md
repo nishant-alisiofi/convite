@@ -3,7 +3,7 @@
 - **Type:** PRD
 - **Tier:** 2 — Roadmap (PRD v3 Part IV)
 - **Priority:** P2
-- **Status:** Backlog
+- **Status:** ✅ Built + deployed (staging + prod) — pending Codex validation
 - **Source:** PRD v3 **§22**. Vocabulary: §18 (jornada = one occurrence, at a place, on a date).
   Sequence: §33 step 6 (jornadas, then programas §21b).
 
