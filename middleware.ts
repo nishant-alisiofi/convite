@@ -261,9 +261,15 @@ export const config = {
    * 13 MB of pieces. PUBLICAS would not have helped: that list is consulted *by* the middleware,
    * and the problem is the middleware running on a static file at all.
    *
-   * Safe to exclude: it is a basemap of public geography, identical for everybody, carrying no
-   * community, household or operational data of any kind. Nothing about who is asking changes
-   * what it should return.
+   * `cems/` is excluded for the same reason and one more. The Copernicus EMSR916 footprints are
+   * published by the European Union and identical for everybody, so nothing about who is asking
+   * changes the answer. But it also removes a fragile dependency: the map island fetches them
+   * with the browser's cookies, so today it happens to work only because the person looking at
+   * the map is signed in. That is an accident, and it fails silently — the fetch would receive
+   * the login page as HTML, `r.json()` would throw, and the catch would leave the layer quietly
+   * empty with no way to tell that from «no footprints published».
    */
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|pmtiles)$).*)'],
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|cems/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|pmtiles)$).*)',
+  ],
 }
