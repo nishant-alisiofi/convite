@@ -40,3 +40,14 @@ supabase/.temp/
 # Offline basemap archives (PRD-13): operational data, built by scripts/construir-pmtiles.sh
 # and copied here for local serving. Never versioned — can be tens of MB. See docs/mapas-offline.md
 /public/mapa/*.pmtiles
+# …except Chocó, committed deliberately and against the rule above (2026-08-21).
+#
+# The rule assumed ~50 MB per territory and a persistent volume to serve it from. Neither held:
+# the real extract is 13 MB, and `DATA_DIR` on Railway is `/tmp/convite-data` — the container
+# filesystem, with no volume mounted — so there is nowhere on the host for operational data to
+# survive a deploy. Without this the offline map is inert in every environment, which makes
+# PRD-13 a feature that exists only on the machine that built it.
+#
+# Revisit when a volume exists or a second territory lands: two or three of these in git history
+# is a different conversation from one.
+!/public/mapa/choco.pmtiles
