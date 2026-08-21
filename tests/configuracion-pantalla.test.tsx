@@ -41,6 +41,8 @@ vi.mock('@/lib/sesion', () => ({
     organizacionId: '00000000-0000-4000-8000-0000000000aa',
     esPlataforma: false,
     estadoOrganizacion: 'aprobada',
+    nivelAdmision: 'ancla',
+    organizacionDeclarada: true,
   }),
   // Runs the page's callback with a throwaway client; the IO it would call is mocked below.
   conSesion: async <T,>(_s: unknown, fn: (c: unknown) => Promise<T>): Promise<T> => fn({}),

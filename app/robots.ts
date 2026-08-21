@@ -21,6 +21,7 @@ export default function robots(): MetadataRoute.Robots {
         '/entrar',
         '/auth',
         '/api',
+        '/comenzar',
         '/tablero',
         '/verificacion',
         '/mapa',

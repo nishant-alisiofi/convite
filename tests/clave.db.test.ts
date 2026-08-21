@@ -252,6 +252,8 @@ conBase('el recorrido real: poner, salir, volver a entrar', () => {
       organizacionId: '',
       esPlataforma: false,
       estadoOrganizacion: 'aprobada',
+      nivelAdmision: 'ancla',
+      organizacionDeclarada: true,
     }
 
     const visto = await conSesion(sesion, async (client) => {

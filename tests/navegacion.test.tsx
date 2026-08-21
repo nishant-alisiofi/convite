@@ -26,6 +26,8 @@ function sesion(rolStaff: string, extra: Partial<SesionStaff> = {}): SesionStaff
     organizacionId: 'org',
     esPlataforma: false,
     estadoOrganizacion: 'aprobada',
+    nivelAdmision: 'ancla',
+    organizacionDeclarada: true,
     ...extra,
   }
 }

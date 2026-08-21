@@ -306,6 +306,63 @@ export const TIPOS_ORGANIZACION = [
   'otro',
 ] as const
 
+/**
+ * The four phases of a response (§18), as a stored value at last.
+ *
+ * §18 has always named these and the map has always branched on them, but until now the phase
+ * lived only as a TypeScript union and a `?fase=` query parameter nobody emitted — which is
+ * precisely why §18's «phase changes what the Bandeja leads with» was never buildable. It is
+ * declared per organisation rather than globally on purpose: two organisations working the same
+ * basin are routinely in different phases, because a river community reached last week is in
+ * recuperación while its neighbour up the same river is still in emergencia. A single global
+ * phase would force one of them to lie.
+ *
+ * `lib/mapa/planificacion.ts`'s `Fase` derives from this array, so the column's check
+ * constraint and the type can no longer drift apart.
+ */
+export const FASES_RESPUESTA = ['impacto', 'emergencia', 'recuperacion', 'ordinario'] as const
+
+/**
+ * What an organisation says it is here to do, asked once at onboarding.
+ *
+ * This is a *declaration*, not a grant — the opposite end of `techo_permisos`, which is the
+ * ceiling an approver imposes. Saying «transporte» does not give an organisation despatch; it
+ * tells us which questions to ask next and which parts of the panel are noise for them. Kept
+ * deliberately coarse: six answers a coordinator can pick in one screen on a phone, not a
+ * taxonomy. An organisation may pick several, because most real ones do several.
+ */
+export const INTENCIONES_ORGANIZACION = [
+  'donaciones',
+  'materiales',
+  'servicios',
+  'transporte',
+  'reportes',
+  'coordinacion',
+] as const
+
+/**
+ * The tools an organisation already works in.
+ *
+ * PRD-34 §28.3 says it in as many words — «Ask what exists before designing anything» — and
+ * then nothing ever asked. Convite plugs in beside what a partner already uses (§2, «not a
+ * group chat»); knowing that Herencia lives in Google Sheets and ASOREDIPARCHOCÓ lives in a
+ * WhatsApp group changes which integration is worth building, and for whom.
+ *
+ * `ninguna` is a real answer and has to stay available: a council working on paper is the case
+ * the product exists for, and an onboarding form that cannot express it teaches them to lie on
+ * the first screen.
+ */
+export const HERRAMIENTAS_ORGANIZACION = [
+  'whatsapp',
+  'google_drive',
+  'google_sheets',
+  'google_calendar',
+  'excel',
+  'radio',
+  'papel',
+  'ninguna',
+] as const
+
 /** §5.7: a region groups communities for the map and jornada planning. `mixta` = urban + rural. */
 export const TIPOS_REGION = ['rural', 'urbana', 'mixta'] as const
 
@@ -341,6 +398,9 @@ export type EstadoAprobacion = (typeof ESTADOS_APROBACION)[number]
 export type TipoOrganizacion = (typeof TIPOS_ORGANIZACION)[number]
 export type TipoComunidad = (typeof TIPOS_COMUNIDAD)[number]
 export type TipoRegion = (typeof TIPOS_REGION)[number]
+export type FaseRespuesta = (typeof FASES_RESPUESTA)[number]
+export type IntencionOrganizacion = (typeof INTENCIONES_ORGANIZACION)[number]
+export type HerramientaOrganizacion = (typeof HERRAMIENTAS_ORGANIZACION)[number]
 export type TipoJornada = (typeof TIPOS_JORNADA)[number]
 export type EstadoJornada = (typeof ESTADOS_JORNADA)[number]
 export type Canal = (typeof CANALES)[number]

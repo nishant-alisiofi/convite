@@ -3,7 +3,7 @@
 - **Type:** PRD
 - **Tier:** 2 — Roadmap (PRD v3 Part IV)
 - **Priority:** P2
-- **Status:** Backlog
+- **Status:** ✅ Built + deployed — **two distinct pieces**: the derived setup checklist at `/configuracion-inicial` (original scope), and the pre-panel **declaration flow** at `/comenzar` (migration 0065, built 2026-08-21 — intent, tools, phase, rural reach; see the section at the end of this file). Phase is stored for the first time, which unblocks PRD-28's phase-led ordering. Nothing yet *routes* on the declaration.
 - **Source:** PRD v3 **§29b** (onboarding, staged by phase, not one long form).
 
 ## Problem / why
@@ -77,3 +77,47 @@ Walk a fresh org through Configurar; confirm it can reach useful operation at st
 communities + a number; leave a step incomplete and confirm the checklist states the consequence;
 confirm role confirmation is sentence-based; confirm empty screens teach and that no numbered tour
 exists. Never validate on production.
+
+## Onboarding declaration — built 2026-08-21 (migration 0065)
+
+Founder feedback (Nishant, 2026-08-21): *"We need to make an onboarding flow before we reach our
+home screen so that an organization can sign up and explain what they would like to do… We should
+ask them what tools they use… This should match up with the phases that are important for a
+disaster and also we should allow them to decide if they need to connect to rural areas or not."*
+
+**What PRD-36 shipped was not this.** The built `/configuracion-inicial` is a *derived progress
+checklist* — thirteen counts read from existing tables, two acknowledgement rows in
+`configuracion`, reachable only as the fourth sub-item under Ajustes, blocking nothing, asking
+nothing. Post-login has always landed on `/tablero` (`app/auth/callback/route.ts:86`). So the
+declarative pre-panel flow is new *behaviour*, filed here rather than under a new ID because
+PRD-36 already owns §29b onboarding and its five setup stages already mirror the four phases.
+
+**Built:**
+- `app/comenzar/page.tsx` — four questions, one screen, one submit. Outside `app/(panel)/` on
+  purpose: the panel layout is what redirects here, so living inside it would loop, and the
+  seven-section shell is precisely what this screen postpones. Server-rendered, zero client JS,
+  matching `/entrar` and `/solicitar-centro`.
+- `db/migrations/0065_declaracion_de_onboarding.sql` — `intenciones`, `herramientas`, `fase`,
+  `alcance_rural`, `onboarding_completado_en` on `organizaciones`, with vocabulary check
+  constraints and `convite_declarar_organizacion()` (admin-only, own org, audited).
+- `lib/declaracion.ts` — `debeDeclarar` / `faltaDeclaracionAjena`, pure and tested
+  (`tests/declaracion.test.ts`) because getting the rule wrong strands somebody outside the panel.
+- Gate in `app/(panel)/layout.tsx`, ordered **after** `panelBloqueado`.
+
+**Four exemptions, each of which would otherwise strand somebody:** platform admins (they
+approve organisations; gating them locks the approval queue behind the thing it approves);
+unapproved organisations (already sent to the awaiting-approval screen — and two gates racing
+for one redirect is how loops start); `aportante` organisations (a self-registered transporter
+has a one-person org and is in no "phase of the response"); and non-admins (the SQL function
+refuses them, so gating them traps them in a form that rejects them — they get a note instead).
+
+**Phase is now stored.** `organizaciones.fase` is §18's phase's first home in the database. It
+existed only as a TypeScript union and a `?fase=` parameter nothing emitted — which is exactly
+why PRD-28's phase-led Bandeja ordering was never buildable. `lib/mapa/planificacion.ts`'s `Fase`
+now derives from `FASES_RESPUESTA` so the column and the type cannot drift. **Per organisation,
+not global:** two organisations on the same river are routinely in different phases, and one
+global value would force one of them to lie.
+
+**Not built, deliberately:** nothing yet *reads* `intenciones` or `herramientas` to change the
+panel. The declaration is recorded and audited; routing on it is the follow-up, and it belongs
+with PRD-28's queue work (what the Bandeja leads with) and PRD-34's integration discovery.

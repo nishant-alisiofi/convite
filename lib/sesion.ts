@@ -69,6 +69,21 @@ export type SesionStaff = {
    * See `panelBloqueado` in lib/organizacion.ts.
    */
   estadoOrganizacion: string
+  /**
+   * §29.3b admission tier of the caller's own organisation — `ancla`, `avalada`, `aportante`,
+   * `observadora`, or null for organisations admitted before tiers existed.
+   *
+   * Read here so the onboarding gate can tell an organisation running a response from a
+   * self-registered transporter, who has their own one-person `aportante` org and must never be
+   * asked which disaster phase they are in.
+   */
+  nivelAdmision: string | null
+  /**
+   * Whether this organisation has finished the onboarding declaration (migration 0065). False
+   * means an admin is sent to `/comenzar` before the panel; see `debeDeclarar` in
+   * lib/declaracion.ts, which owns the whole rule.
+   */
+  organizacionDeclarada: boolean
 }
 
 /**
@@ -99,8 +114,12 @@ export async function sesionActual(): Promise<SesionStaff | null> {
     organizacion_id: string
     es_plataforma: boolean
     estado_aprobacion: string
+    nivel_admision: string | null
+    declarada: boolean
   }>(
-    `select u.rol_staff, u.organizacion_id, u.es_plataforma, o.estado_aprobacion
+    `select u.rol_staff, u.organizacion_id, u.es_plataforma, o.estado_aprobacion,
+            o.nivel_admision,
+            o.onboarding_completado_en is not null as declarada
        from usuarios u
        join organizaciones o on o.id = u.organizacion_id
       where u.id = $1 and u.activo`,
@@ -117,6 +136,8 @@ export async function sesionActual(): Promise<SesionStaff | null> {
     organizacionId: fila.organizacion_id,
     esPlataforma: fila.es_plataforma,
     estadoOrganizacion: fila.estado_aprobacion,
+    nivelAdmision: fila.nivel_admision,
+    organizacionDeclarada: fila.declarada,
   }
 }
 

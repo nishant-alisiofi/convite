@@ -3,7 +3,7 @@
 - **Type:** PRD
 - **Tier:** 2 — Roadmap (PRD v3 Part IV)
 - **Priority:** P2
-- **Status:** Backlog
+- **Status:** 🟡 Partially built + deployed — §28.4 build-order items **1–2 shipped**: per-person scoped `.ics` subscribe link (`/agenda`) and CSV export (`/exportes`). **Not built:** XLSX + scheduled spreadsheet email (CSV only — see the note in `lib/exportes.ts`), manual Meet links on citas (§28.2), «Conectar con Google» OAuth for Sheets/Calendar/Drive (§28.4.4), `wa.me` group bridges + paste-ready summaries, and Forms/Sheets import (§28.3). Drive-for-evidence stays deferred behind its sharing-config gate.
 - **Source:** PRD v3 **§28** (incl. §28.1 calendar, §28.2 Meet, §28.3 import, §28.4 build order).
 
 ## Problem / why
@@ -99,3 +99,18 @@ Forms/Sheets import — **it does not mention Gmail anywhere**, and Drive-for-ev
 EXIF-stripping/sharing-gate item) also doesn't appear in v4. Nothing added to this WI's Drive-gate scope
 (still deferred behind the explicit sharing-config gate, acceptance criterion 7) or to Gmail (never
 scoped in v3 either — not added here).
+
+## «Ask what exists before designing anything» — now asked (2026-08-21)
+
+§28.3's instruction has stood since August and nothing ever asked. As of migration 0065 it does:
+`organizaciones.herramientas` records what a partner already works in — WhatsApp, Drive, Sheets,
+Calendar, Excel, radio, paper, or `ninguna` — captured in the pre-panel flow built under PRD-36
+(`app/comenzar/page.tsx`).
+
+`ninguna` is a first-class answer on purpose: a community council working on paper is the case the
+product exists for, and a form that cannot express it teaches people to lie on the first screen.
+
+This does not build any integration. It makes §28.4.4's build order **evidence-led** rather than
+guessed — «Conectar con Google» is worth building when the organisations that need it have said
+so, and the `wa.me` group bridge is worth more than either if the answer is overwhelmingly
+WhatsApp. Nothing reads the column yet.

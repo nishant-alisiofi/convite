@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { getAuth } from '@/lib/auth'
+import { debeDeclarar, faltaDeclaracionAjena } from '@/lib/declaracion'
 import { panelBloqueado } from '@/lib/organizacion'
 import { identidadVisible, sesionActual, type SesionStaff } from '@/lib/sesion'
 import { NavSecciones } from './nav-secciones'
@@ -31,6 +32,13 @@ export default async function PanelLayout({ children }: { children: React.ReactN
   // the panel is not theirs to use — so they meet a calm «awaiting approval» screen with a way
   // out, not a broken shell. A platform admin is never gated (they do the approving).
   if (panelBloqueado(sesion)) return <CentroPendiente sesion={sesion} />
+
+  // Before the panel, once: what is this organisation here to do? Ordered after the approval
+  // gate on purpose — an organisation nobody has agreed to yet should not be asked to invest
+  // in an answer, and two gates racing for the same redirect is how loops start. Only the
+  // people who can actually answer are sent; everyone else gets a note further down, because
+  // `debeDeclarar` refuses non-admins and the SQL function would refuse them too.
+  if (debeDeclarar(sesion)) redirect('/comenzar')
 
   // The sections this role may see, already filtered to plain data (see secciones.ts). The role
   // gate stays on the server; the client island receives the answer, never the predicates.
@@ -73,7 +81,19 @@ export default async function PanelLayout({ children }: { children: React.ReactN
           <NavSecciones secciones={secciones} />
         </div>
       </header>
-      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">{children}</div>
+      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
+        {/* The other side of the onboarding gate. An admin is redirected to /comenzar; everybody
+            else works on, because only an admin can answer and trapping a verificador behind a
+            form that rejects them helps nobody. But silence would be worse than a note — without
+            it the panel just behaves generically and nobody knows why, or who to ask. */}
+        {faltaDeclaracionAjena(sesion) && (
+          <p className="mb-6 rounded-lg border border-atrato-100 bg-atrato-50 px-4 py-3 text-sm text-barro-800">
+            Su organización todavía no ha dicho a qué vino ni en qué momento de la respuesta
+            está, así que el panel abre igual para todos. Lo responde un admin, una sola vez.
+          </p>
+        )}
+        {children}
+      </div>
     </div>
   )
 }
