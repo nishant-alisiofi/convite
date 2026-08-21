@@ -5,6 +5,7 @@ import { figurasDe } from '@/lib/mapa/capas'
 import { cargarMapa } from '@/lib/mapa/datos'
 import { representacionDe } from '@/lib/mapa/precision'
 import { IntroColapsable } from '@/components/intro-colapsable'
+import { esTransportista } from '@/lib/campo'
 import { conSesion, sesionActual } from '@/lib/sesion'
 import { temporadaVigente } from '@/lib/temporada'
 import MapaOffline from './mapa-offline'
@@ -33,6 +34,23 @@ export default async function MapaOfflinePagina() {
   const sesion = await sesionActual()
   if (!sesion) redirect('/entrar')
 
+  // PRD-13, corroborated by v4: the transporter's offline map is the basemap, their own
+  // position, and the stop they are driving to. Nothing else — a delivery driver's screen, not a
+  // reduced copy of the coordinator's.
+  //
+  // The dataset is produced by RLS rather than by branching here, and that is the whole point.
+  // `comunidades_transportista` (0025) admits exactly the communities this person is currently
+  // carrying something to: `convite_conduce_hacia` requires that the envío is theirs AND that it
+  // is out and not yet back. Somebody who ran a trip in March cannot pull those coordinates in
+  // August. Meanwhile `nodos_lectura` and `rutas_lectura` stay role-gated, so warehouse contents
+  // and the route graph simply do not come back for them.
+  //
+  // So the same `cargarMapa` call yields the coordinator's basin and the driver's single pin,
+  // and the difference is enforced by policy rather than by a branch somebody can forget. What
+  // this fixes is only the copy: a driver used to meet «0 tramos dibujados», which reads as a
+  // broken map rather than a correct one.
+  const transportista = esTransportista(sesion)
+
   const { datos } = await conSesion(sesion, async (client) => {
     const datos = await cargarMapa(client, await temporadaVigente(client))
     return { datos }
@@ -45,13 +63,21 @@ export default async function MapaOfflinePagina() {
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <h1 className="text-xl font-semibold text-barro-900">Mapa sin conexión</h1>
         <p className="text-sm text-barro-600">
-          Temporada {datos.temporada} · {datos.tramos.length} tramos dibujados
+          {transportista
+            ? datos.comunidades.length === 0
+              ? 'Sin viaje activo. Cuando le asignen uno, aquí aparece a dónde va.'
+              : `Su viaje: ${datos.comunidades.length === 1 ? '1 parada' : `${datos.comunidades.length} paradas`}.`
+            : `Temporada ${datos.temporada} · ${datos.tramos.length} tramos dibujados`}
         </p>
       </div>
 
       <IntroColapsable
         id="mapa-offline"
-        unaLinea="El mapa base se descarga con señal; el GPS funciona sin ella."
+        unaLinea={
+          transportista
+            ? 'Descargue el mapa con señal. Después el GPS y su parada siguen funcionando sin ella.'
+            : 'El mapa base se descarga con señal; el GPS funciona sin ella.'
+        }
       >
         Descarga el mapa del territorio mientras haya señal y quedará disponible sin conexión en
         campo. El punto de GPS del teléfono no necesita conexión —solo el mapa la necesitaba—, así

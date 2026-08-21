@@ -81,6 +81,16 @@ const VE_REGISTRO = rol(['verificador', 'despachador', 'coordinador', 'admin']) 
 const VE_RECOGIDAS = rol(['coordinador', 'admin']) // recogidas PUEDEN_PLANEAR
 const VE_APADRINAR = rol(['coordinador', 'admin']) // apadrinar PUEDEN_APADRINAR
 
+/**
+ * Not a self-registered transporter (FR-18).
+ *
+ * Their org is minted `aprobada`, so `panelBloqueado` lets them into the shell, and their role is
+ * `lectura` — which the Mapa section admits. RLS then gives them nothing on the coordinator-facing
+ * pages, so they met empty screens with no explanation. The tier is what separates them from a
+ * centre-invited `lectura`, who is real staff of a real organisation and may legitimately read.
+ */
+const NO_ES_APORTANTE = (s: SesionStaff) => s.nivelAdmision !== 'aportante'
+
 export const SECCIONES: SeccionNav[] = [
   {
     // §19: everything awaiting a person. Two entries + silence until the single queue exists.
@@ -97,12 +107,15 @@ export const SECCIONES: SeccionNav[] = [
   {
     clave: 'mapa',
     etiqueta: 'Mapa',
+    // No section link for an aportante: /mapa is the coordinator's planning surface and now has
+    // a server-side role gate of its own, so offering it here would land them on a refusal.
     href: '/mapa',
     ver: rol(['despachador', 'coordinador', 'admin', 'lectura']),
     items: [
-      { href: '/evaluaciones', etiqueta: 'Evaluaciones', listo: true }, // PRD-29
-      { href: '/rutas', etiqueta: 'Rutas', listo: true },
-      { href: '/conexion', etiqueta: 'Puntos de conexión', listo: true },
+      { href: '/evaluaciones', etiqueta: 'Evaluaciones', listo: true, ver: NO_ES_APORTANTE }, // PRD-29
+      { href: '/rutas', etiqueta: 'Rutas', listo: true, ver: NO_ES_APORTANTE },
+      { href: '/conexion', etiqueta: 'Puntos de conexión', listo: true, ver: NO_ES_APORTANTE },
+      // The one Mapa item a transporter should see: their basemap, their position, their stop.
       { href: '/mapa-offline', etiqueta: 'Mapa sin conexión', listo: true }, // PRD-13
     ],
   },

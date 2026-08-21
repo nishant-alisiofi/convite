@@ -1,7 +1,14 @@
 import { Boxes, ClipboardPlus, Map as MapaIcono } from 'lucide-react'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { existenciasVisibles, puedeReportar, puedeVerExistencias } from '@/lib/campo'
+import {
+  esTransportista,
+  existenciasVisibles,
+  puedeReportar,
+  puedeVerExistencias,
+  registrarReporteDesdeViaje,
+  viajeActivo,
+} from '@/lib/campo'
 import { catalogoActivo, comunidadesDeOrganizacion, registrarReporteManual } from '@/lib/manual'
 import { conSesion, sesionActual } from '@/lib/sesion'
 
@@ -43,11 +50,15 @@ export default async function Campo({
 
   const verStock = puedeVerExistencias(sesion)
   const reportar = puedeReportar(sesion)
+  const conduce = esTransportista(sesion)
 
-  const { existencias, comunidades, catalogo } = await conSesion(sesion, async (client) => ({
+  const { existencias, comunidades, catalogo, viaje } = await conSesion(sesion, async (client) => ({
     existencias: verStock ? await existenciasVisibles(client) : [],
     comunidades: reportar ? await comunidadesDeOrganizacion(client, sesion.organizacionId) : [],
-    catalogo: reportar ? await catalogoActivo(client) : [],
+    // A transporter needs the catalogue too — they are the caller least likely to know it by
+    // code, and «sin clasificar» stays the honest default when they do not.
+    catalogo: reportar || conduce ? await catalogoActivo(client) : [],
+    viaje: conduce ? await viajeActivo(client) : null,
   }))
 
   async function registrar(formData: FormData) {
@@ -61,6 +72,25 @@ export default async function Campo({
       s,
       (client) =>
         registrarReporteManual(client, {
+          comunidadId: String(formData.get('comunidadId') ?? ''),
+          codigoItem: String(formData.get('codigoItem') ?? '') || null,
+          familias: Number.isFinite(familias) ? familias : null,
+          detalle: String(formData.get('detalle') ?? ''),
+        }),
+      { escribe: true },
+    )
+    redirect(r.ok ? `/campo?ok=${r.folio}` : `/campo?error=${encodeURIComponent(r.error)}`)
+  }
+
+  async function reportarDesdeViaje(formData: FormData) {
+    'use server'
+    const s = await sesionActual()
+    if (!s) redirect('/entrar')
+    const familias = Number(String(formData.get('familias') ?? '').trim())
+    const r = await conSesion(
+      s,
+      (client) =>
+        registrarReporteDesdeViaje(client, {
           comunidadId: String(formData.get('comunidadId') ?? ''),
           codigoItem: String(formData.get('codigoItem') ?? '') || null,
           familias: Number.isFinite(familias) ? familias : null,
@@ -96,6 +126,76 @@ export default async function Campo({
         <p className="mt-4 rounded-lg border border-atrato-100 bg-atrato-50 px-4 py-3 text-sm text-barro-800">
           {error === 'permiso' ? 'Su rol no registra reportes.' : error}
         </p>
+      )}
+
+      {conduce && (
+        <section className="mt-6">
+          <h2 className="text-sm font-semibold text-barro-900">Su viaje</h2>
+          {!viaje ? (
+            <p className="mt-2 rounded-lg border border-barro-200 bg-white px-4 py-4 text-sm text-barro-600">
+              No tiene un viaje en curso. Cuando le despachen uno, aquí aparece a dónde va y qué le
+              piden hacer allá.
+            </p>
+          ) : (
+            <div className="mt-2 rounded-xl border border-barro-200 bg-white p-4">
+              <p className="text-sm font-medium text-barro-900">
+                {viaje.codigo} · {viaje.estado.toLowerCase()}
+              </p>
+              <ul className="mt-2 space-y-1 text-sm text-barro-800">
+                {viaje.paradas.map((p) => (
+                  <li key={p.comunidadId}>
+                    {p.comunidad}
+                    {p.municipio && <span className="text-barro-500"> · {p.municipio}</span>}
+                  </li>
+                ))}
+              </ul>
+              {/* The dispatch instruction, read where it is acted on. `envios.notas` already
+                  existed; nothing needed inventing for a coordinator to write «pregunte en
+                  Tagachí si llegó el agua» and have the driver see it standing there. */}
+              {viaje.notas && (
+                <p className="mt-3 rounded-lg bg-atrato-50 px-3 py-2 text-sm text-barro-800">
+                  <span className="font-medium">Le piden: </span>
+                  {viaje.notas}
+                </p>
+              )}
+              <Link
+                href="/mapa-offline"
+                className="mt-3 inline-flex items-center gap-2 text-sm text-selva-700 underline"
+              >
+                <MapaIcono className="h-4 w-4" aria-hidden />
+                Ver en el mapa
+              </Link>
+
+              <form action={reportarDesdeViaje} className="mt-4 space-y-3 border-t border-barro-100 pt-4">
+                <p className="text-sm font-medium text-barro-900">Levantar un reporte aquí</p>
+                <p className="text-xs text-barro-600">
+                  Lo que le cuenten en la comunidad. Entra como relevo y lo verifica el centro —
+                  usted reporta, no verifica.
+                </p>
+                <select name="comunidadId" required defaultValue={viaje.paradas[0]?.comunidadId ?? ''}
+                  className="w-full rounded-lg border border-barro-300 px-3 py-3 text-base">
+                  {viaje.paradas.map((p) => (
+                    <option key={p.comunidadId} value={p.comunidadId}>{p.comunidad}</option>
+                  ))}
+                </select>
+                <select name="codigoItem" className="w-full rounded-lg border border-barro-300 px-3 py-3 text-base">
+                  <option value="">Sin clasificar</option>
+                  {catalogo.map((i) => (
+                    <option key={i.codigo} value={i.codigo}>{i.itemLabel}</option>
+                  ))}
+                </select>
+                <input name="familias" type="number" min="1" inputMode="numeric" placeholder="Cuántas familias"
+                  className="w-full rounded-lg border border-barro-300 px-3 py-3 text-base" />
+                <textarea name="detalle" rows={3} placeholder="Tal como se lo dijeron."
+                  className="w-full rounded-lg border border-barro-300 px-3 py-3 text-base" />
+                <button type="submit"
+                  className="w-full rounded-lg bg-selva-700 px-4 py-3 font-medium text-white hover:bg-selva-800">
+                  Enviar reporte
+                </button>
+              </form>
+            </div>
+          )}
+        </section>
       )}
 
       {verStock && (
@@ -204,7 +304,7 @@ export default async function Campo({
         </section>
       )}
 
-      {!verStock && !reportar && (
+      {!verStock && !reportar && !conduce && (
         <p className="mt-6 rounded-lg border border-barro-200 bg-white px-4 py-4 text-sm text-barro-600">
           Su rol no ve existencias ni registra reportes. Hable con el admin de su organización.
         </p>

@@ -91,3 +91,121 @@ export async function existenciasVisibles(client: PoolClient): Promise<Existenci
     diasDesdeConteo: r.dias,
   }))
 }
+
+/**
+ * Whether this session is a transporter rather than centre staff.
+ *
+ * A self-registered transporter (FR-18) gets their own one-person organisation, `aprobada` on
+ * creation, with `nivel_admision = 'aportante'` and a `lectura` role. `aprobada` means
+ * `panelBloqueado` lets them into the panel shell — so they can already reach pages built for
+ * coordinators, where RLS correctly gives them nothing and they see an empty screen with no
+ * explanation. That is a UX leak, not a data leak, and it is worth closing separately.
+ *
+ * The tier is what distinguishes them, not the role: a centre may also invite somebody as
+ * `lectura`, and that person IS staff of a real organisation.
+ */
+export function esTransportista(
+  sesion: Pick<SesionStaff, 'nivelAdmision' | 'rolStaff' | 'esPlataforma'>,
+): boolean {
+  if (sesion.esPlataforma) return false
+  return sesion.nivelAdmision === 'aportante' && sesion.rolStaff === 'lectura'
+}
+
+export type ParadaViaje = { comunidadId: string; comunidad: string; municipio: string | null }
+export type ViajeActivo = {
+  envioId: string
+  codigo: string
+  estado: string
+  /** What dispatch wrote on the order — including «while you are there, ask about…». */
+  notas: string | null
+  paradas: ParadaViaje[]
+}
+
+/**
+ * The transporter's live run, or null.
+ *
+ * Every row here is already reachable to them by policy — `envio_items_transportista`,
+ * `pedidos_transportista` and `comunidades_transportista` (0025) all key off
+ * `convite_conduce_hacia`, which holds only while the envío is theirs AND out and not yet back.
+ * So this query states no rule of its own; it reads what the window already permits, and stops
+ * returning rows the moment the trip closes.
+ *
+ * `notas` is the dispatch instruction. It is the cheapest possible task channel — a coordinator
+ * writes «pregunte en Tagachí si llegó el agua» on the order, and the driver reads it standing
+ * there — and it needed no new column, because despatch has always had somewhere to write.
+ */
+export async function viajeActivo(client: PoolClient): Promise<ViajeActivo | null> {
+  const { rows } = await client.query<{
+    envio_id: string
+    codigo: string
+    estado: string
+    notas: string | null
+    comunidad_id: string
+    comunidad: string
+    municipio: string | null
+  }>(
+    `select e.id as envio_id, e.codigo, e.estado, e.notas,
+            c.id as comunidad_id, c.nombre as comunidad, c.municipio
+       from envios e
+       join envio_items ei on ei.envio_id = e.id
+       join pedidos p on p.id = ei.pedido_id
+       join comunidades c on c.id = p.comunidad_id
+      where e.estado in ('DESPACHADO', 'EN_RUTA')
+      order by c.nombre`,
+  )
+  const primera = rows[0]
+  if (!primera) return null
+
+  const vistas = new Set<string>()
+  const paradas: ParadaViaje[] = []
+  for (const r of rows) {
+    if (vistas.has(r.comunidad_id)) continue
+    vistas.add(r.comunidad_id)
+    paradas.push({ comunidadId: r.comunidad_id, comunidad: r.comunidad, municipio: r.municipio })
+  }
+
+  return {
+    envioId: primera.envio_id,
+    codigo: primera.codigo,
+    estado: primera.estado,
+    notas: primera.notas,
+    paradas,
+  }
+}
+
+/**
+ * File a report from the community the caller is currently delivering to (migration 0067).
+ *
+ * Deliberately a different function from `registrarReporteManual`: that one is verification-desk
+ * work and demands the community belong to the caller's own organisation, which is never true for
+ * a transporter. This one is gated by the live trip instead, and writes into the *community's*
+ * organisation — a report filed into a one-person aportante org would sit where no coordinator
+ * looks.
+ */
+export async function registrarReporteDesdeViaje(
+  client: PoolClient,
+  args: {
+    comunidadId: string
+    codigoItem?: string | null
+    familias?: number | null
+    detalle?: string | null
+  },
+): Promise<{ ok: true; folio: number } | { ok: false; error: string }> {
+  const detalle = (args.detalle ?? '').trim() || null
+  const codigoItem = (args.codigoItem ?? '').trim() || null
+  if (!args.comunidadId) return { ok: false, error: 'Falta la comunidad.' }
+  if (!codigoItem && !detalle) {
+    return { ok: false, error: 'Diga qué le contaron: elija un ítem o escríbalo.' }
+  }
+  try {
+    const { rows } = await client.query<{ folio: number }>(
+      `select folio from registrar_reporte_transportista($1, $2, $3, null, $4, null)`,
+      [args.comunidadId, codigoItem, args.familias ?? null, detalle],
+    )
+    const fila = rows[0]
+    return fila ? { ok: true, folio: fila.folio } : { ok: false, error: 'No se pudo registrar.' }
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : 'No se pudo registrar.' }
+  }
+}
+
